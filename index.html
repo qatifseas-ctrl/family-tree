@@ -13,6 +13,9 @@
 <!-- ═══ PWA: Proper manifest (replaces broken blob-based version) ═══ -->
 <link rel="manifest" href="manifest.json">
 
+<!-- JSZip — لتصدير نسخة العائلة كـ PWA ZIP كامل -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
 <!-- Apple Touch Icons -->
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152x152.png">
@@ -6247,6 +6250,7 @@ async function openFamilyUpdatesModal(){
   let gistId=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
   let pat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
   let keyHex=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_cloud_key')||'';
+  // المالك يقرأ فقط — يستخدم توكن رفع العائلة أو التوكن الرئيسي كـ fallback
   let readPat=pat||CLOUD_CONFIG.GITHUB_PAT||'';
 
   if(!gistId&&readPat){
@@ -6254,7 +6258,8 @@ async function openFamilyUpdatesModal(){
   }
 
   if(!gistId||!readPat){
-    document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:400px"><h3>📡 تحديثات العائلة</h3><div style="padding:14px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;font-size:13px;color:var(--text2);text-align:center">لم يتم إعداد رفع نسخة العائلة بعد.<br>اضغط <strong>إعداد</strong> لتهيئته.</div><div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn primary" onclick="closeModal();openFamilyUploadSetup()">⚙️ إعداد</button></div></div></div>`;
+    // عرض نموذج الإعداد الأولي مباشرةً
+    _showFamilyUpdates401Modal('not_configured', '', readPat);
     return;
   }
 
@@ -6262,7 +6267,13 @@ async function openFamilyUpdatesModal(){
   try{
     let headers={'Authorization':'token '+readPat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     let res=await fetch('https://api.github.com/gists/'+gistId,{headers});
-    if(!res.ok)throw new Error('GitHub API: '+res.status);
+
+    // ── معالجة 401 / 403 بذكاء ──
+    if(res.status===401||res.status===403){
+      _showFamilyUpdates401Modal(res.status===403?'forbidden':'unauthorized', gistId, readPat);
+      return;
+    }
+    if(!res.ok) throw new Error('GitHub API: '+res.status);
     let j=await res.json();
 
     let familyFiles=Object.values(j.files||{}).filter(f=>f.filename&&/^ft_family_.*\.dat$/i.test(f.filename));
@@ -6284,9 +6295,7 @@ async function openFamilyUpdatesModal(){
           let summary=_familySummarizeUpdate(data);
           let devId=ff.filename.replace(/^ft_family_/i,'').replace(/\.dat$/i,'');
           updates.push({
-            devId,
-            data,
-            summary,
+            devId,data,summary,
             pCount:(data.people||[]).length,
             ts:data.uploadedAt||'',
             filename:ff.filename,
@@ -6314,13 +6323,8 @@ async function openFamilyUpdatesModal(){
       let ts=u.ts?new Date(u.ts).toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
       let stats=u.summary.stats;
       let chips=[
-        `👨 ${stats.males}`,
-        `👩 ${stats.females}`,
-        `⚰️ ${stats.deceased}`,
-        `🖼 ${stats.photos}`,
-        `➕ ${u.newCnt}`,
-        `🔄 ${u.updatedCnt}`,
-        `⏭ ${u.unchangedCnt}`
+        `👨 ${stats.males}`,`👩 ${stats.females}`,`⚰️ ${stats.deceased}`,
+        `🖼 ${stats.photos}`,`➕ ${u.newCnt}`,`🔄 ${u.updatedCnt}`,`⏭ ${u.unchangedCnt}`
       ].map(t=>`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px">${t}</span>`).join('');
       return `<div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:10px">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -6354,6 +6358,99 @@ async function openFamilyUpdatesModal(){
   }catch(e){
     document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:520px"><h3>📡 تحديثات العائلة</h3><div style="padding:14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;line-height:1.8">❌ ${String(e.message||e)}</div><div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn primary" onclick="closeModal();openFamilyUploadSetup()">⚙️ إعداد</button></div></div></div>`;
   }
+}
+
+// ── مودال تشخيص 401 / 403 / not_configured ──
+function _showFamilyUpdates401Modal(reason, gistId, usedPat){
+  let maskedPat = usedPat ? usedPat.slice(0,8)+'••••••••'+usedPat.slice(-4) : '(فارغ)';
+  let title='', body='', hint='';
+
+  if(reason==='not_configured'){
+    title='⚙️ لم يتم الإعداد بعد';
+    body=`لم يتم إعداد رفع نسخة العائلة على هذا الجهاز.`;
+    hint=`يجب ضبط <strong>GitHub PAT</strong> و <strong>Gist ID</strong> لاستقبال تحديثات أفراد العائلة.`;
+  } else if(reason==='unauthorized'){
+    title='🔑 خطأ في المصادقة (401)';
+    body=`التوكن المستخدم: <code style="font-size:11px;background:var(--bg-secondary);padding:2px 6px;border-radius:4px">${maskedPat}</code>`;
+    hint=`<strong>الأسباب المحتملة:</strong><br>
+    • التوكن منتهي الصلاحية — يجب إنشاء توكن جديد<br>
+    • التوكن لا يملك صلاحية <code>gist</code> — يجب التأكد من تفعيلها<br>
+    • التوكن تم حذفه من GitHub`;
+  } else {
+    title='🚫 رفض الوصول (403)';
+    body=`التوكن المستخدم: <code style="font-size:11px;background:var(--bg-secondary);padding:2px 6px;border-radius:4px">${maskedPat}</code>`;
+    hint=`التوكن لا يملك صلاحية القراءة على هذا الـ Gist.<br>تأكد أن التوكن هو <strong>نفس التوكن</strong> الذي أنشأ الـ Gist.`;
+  }
+
+  let savedGistId = gistId||FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||'';
+
+  document.getElementById('modalContainer').innerHTML=`
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:500px">
+    <h3>📡 تحديثات العائلة</h3>
+
+    <div style="padding:12px 14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:600;color:#991b1b;margin-bottom:6px">${title}</div>
+      <div style="font-size:13px;color:#7f1d1d;line-height:1.8">${body}</div>
+      <div style="font-size:12px;color:#991b1b;margin-top:8px;line-height:1.8">${hint}</div>
+    </div>
+
+    <div style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">🔧 تصحيح سريع — أدخل التوكن الصحيح</div>
+
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">🐱 GitHub Personal Access Token (gist scope مطلوب)</label>
+        <div style="display:flex;gap:6px">
+          <input id="fu401_pat" type="password" placeholder="github_pat_xxxxxxxx..."
+            style="flex:1;font-family:monospace;font-size:11px;padding:7px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text)">
+          <button class="btn" onclick="var i=document.getElementById('fu401_pat');i.type=i.type==='password'?'text':'password'" style="font-size:11px">👁</button>
+        </div>
+        <a href="https://github.com/settings/tokens/new?scopes=gist&description=FamilyTree-Read" target="_blank"
+          style="font-size:11px;color:#3b82f6;display:inline-block;margin-top:4px">← إنشاء توكن جديد في GitHub (gist scope فقط)</a>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">🔗 Gist ID</label>
+        <input id="fu401_gid" type="text" value="${savedGistId}" placeholder="معرّف الـ Gist"
+          style="width:100%;font-family:monospace;font-size:11px;padding:7px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);box-sizing:border-box">
+      </div>
+
+      <button class="btn primary" style="width:100%" onclick="_applyFamilyPATFix()">✓ حفظ وإعادة المحاولة</button>
+    </div>
+
+    <div style="font-size:11px;color:var(--text2);line-height:1.8;padding:8px 12px;background:var(--bg-secondary);border-radius:8px">
+      💡 <strong>نصيحة:</strong> استخدم نفس التوكن الذي أنشأت به الـ Gist — أو أنشئ توكناً جديداً مع تفعيل <code>gist</code> فقط.
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">إغلاق</button>
+      <button class="btn" onclick="closeModal();openFamilyUploadSetup()">⚙️ إعداد كامل</button>
+    </div>
+  </div></div>`;
+}
+
+// يحفظ التوكن الجديد ويعيد المحاولة مباشرةً
+async function _applyFamilyPATFix(){
+  let newPat=(document.getElementById('fu401_pat').value||'').trim();
+  let newGid=(document.getElementById('fu401_gid').value||'').trim();
+  if(!newPat){alert('الرجاء إدخال GitHub PAT');return;}
+
+  // تحقق سريع من التوكن قبل الحفظ
+  let btn=event.target;
+  btn.disabled=true;btn.textContent='⏳ جارٍ التحقق...';
+  try{
+    let testRes=await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+newPat,'Accept':'application/vnd.github+json'}});
+    if(testRes.status===401){btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';alert('❌ التوكن غير صالح أو منتهي الصلاحية.\nالرجاء إنشاء توكن جديد من GitHub.');return;}
+    if(testRes.status===403){btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';alert('❌ التوكن محظور.\nالرجاء إنشاء توكن جديد من GitHub.');return;}
+  }catch(e){/* تجاهل أخطاء الشبكة */}
+
+  // حفظ في الذاكرة وlocalStorage
+  FAMILY_UPLOAD_CONFIG.GITHUB_PAT=newPat;
+  if(newGid){FAMILY_UPLOAD_CONFIG.GIST_ID=newGid;localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,newGid);localStorage.setItem('ft_fupload_gid',newGid);}
+  try{localStorage.setItem('ft_fupload_pat',newPat);}catch(e){}
+
+  btn.textContent='✅ تم الحفظ — جارٍ إعادة المحاولة...';
+  setTimeout(()=>openFamilyUpdatesModal(),600);
 }
 
 function openFamilyUpdateDetails(idx){
@@ -7261,92 +7358,230 @@ function _showCloudButtons(show){
 }
 
 // ── حفظ نسخة للعائلة (بلا إعدادات سحابية) ──
-function exportFamilyCopy(){
+// ══════════════════════════════════════════════════════════════
+//  exportFamilyCopy — يُصدِّر ZIP كامل يعمل كـ PWA مباشرةً
+// ══════════════════════════════════════════════════════════════
+async function exportFamilyCopy(){
   closeModal();
-  setTimeout(function(){
+
+  // ── تحقق من وجود JSZip ──
+  if(typeof JSZip==='undefined'){
+    alert('⚠️ مكتبة JSZip غير محملة بعد.\nتأكد من اتصالك بالإنترنت وأعد المحاولة.');
+    return;
+  }
+
+  // ── تحقق من إعداد FAMILY_UPLOAD_CONFIG ──
+  if(!FAMILY_UPLOAD_CONFIG.GITHUB_PAT){
+    if(!confirm('⚠️ لم يتم إعداد رفع العائلة بعد.\nالنسخة المصدَّرة لن ترسل تحديثات للمالك.\n\nهل تريد المتابعة؟')) return;
+  }
+
+  // ── مؤشر تحميل ──
+  var _toast=document.createElement('div');
+  _toast.id='export-progress-toast';
+  _toast.innerHTML='⏳ جارٍ تجهيز حزمة الـ PWA...';
+  Object.assign(_toast.style,{
+    position:'fixed',bottom:'80px',right:'50%',transform:'translateX(50%)',
+    background:'var(--card-bg,#fff)',border:'1px solid var(--card-border,#e5e7eb)',
+    borderRadius:'12px',padding:'12px 20px',fontSize:'14px',fontWeight:'600',
+    color:'var(--text,#111)',boxShadow:'0 4px 20px rgba(0,0,0,.15)',
+    zIndex:'99999',whiteSpace:'nowrap'
+  });
+  document.body.appendChild(_toast);
+  var _removeToast=function(){var t=document.getElementById('export-progress-toast');if(t)t.remove();};
+
+  try{
+    // ════ 1. بناء الكود الرئيسي لنسخة العائلة ════
+    var htmlAttrs='';
+    Array.from(document.documentElement.attributes).forEach(function(a){
+      htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
+    });
+
+    var cleanAppHTML='';
     try{
-      var payload=JSON.stringify({people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null});
-      var bytes=new TextEncoder().encode(payload);
-      var bin='';bytes.forEach(function(b){bin+=String.fromCharCode(b);});
-      var b64=btoa(bin);
-      var dataTag='<scr'+'ipt id="__family_tree_data__" type="application/json">'+b64+'<\/sc'+'ript>';
-      var htmlAttrs='';
-      Array.from(document.documentElement.attributes).forEach(function(a){
-        htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
-      });
-      var cleanAppHTML='';
-      try{
-        var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-        var tApp=tDoc.getElementById('app');
-        if(tApp)cleanAppHTML=tApp.outerHTML;
-      }catch(ex){}
-      if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
-      // الكود بدون إعدادات سحابية — استبدال الكتلة كاملةً لضمان عدم تسريب أي بيانات
-      var mainSrc=document.scripts[document.scripts.length-1].textContent;
+      var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
+      var tApp=tDoc.getElementById('app');
+      if(tApp)cleanAppHTML=tApp.outerHTML;
+    }catch(ex){}
+    if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
 
-      // حذف CLOUD_CONFIG بالكامل من النسخة المشتركة
-      mainSrc=mainSrc.replace(
-        /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
-        "const CLOUD_CONFIG = {\n" +
-        "  KEY_HEX: '',\n" +
-        "  GITHUB_PAT: '',\n" +
-        "  GIST_ID: '',  // ← يُملأ تلقائياً\n" +
-        "  GIST_FILE: 'ft_encrypted.dat',\n" +
-        "}"
-      );
+    // الكود المصدري — تعديل الثوابت
+    var mainSrc=document.scripts[document.scripts.length-1].textContent;
 
-      // إعادة تعيين FAMILY_UPLOAD_CONFIG فارغة أولاً ثم نملؤها أدناه
-      mainSrc=mainSrc.replace(
-        /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
-        "const FAMILY_UPLOAD_CONFIG = {\n" +
-        "  GITHUB_PAT: '',\n" +
-        "  GIST_ID: '',\n" +
-        "  KEY_HEX: '',\n" +
-        "}"
+    // 1a. حذف CLOUD_CONFIG كاملاً — لا مفاتيح المالك السحابية في نسخة العائلة
+    mainSrc=mainSrc.replace(
+      /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
+      "const CLOUD_CONFIG = {\n  KEY_HEX: '',\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  GIST_FILE: 'ft_encrypted.dat',\n}"
+    );
+
+    // 1b. تضمين FAMILY_UPLOAD_CONFIG الحقيقي — مصادقة الرفع الصامت للمالك
+    var familyEncKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||localStorage.getItem('ft_cloud_key')||'';
+    var fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
+    var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
+    mainSrc=mainSrc.replace(
+      /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
+      "const FAMILY_UPLOAD_CONFIG = {\n  GITHUB_PAT: '"+fuPat+"',\n  GIST_ID: '"+fuGid+"',\n  KEY_HEX: '"+familyEncKey+"',\n}"
+    );
+
+    // 1c. تمييز النسخة كـ "نسخة عائلة"
+    mainSrc=mainSrc.replace(/const IS_FAMILY_COPY\s*=\s*false/,'const IS_FAMILY_COPY = true');
+
+    // 1d. Device ID فريد لكل نسخة مصدَّرة
+    var _newDid=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    mainSrc=mainSrc.replace(/const FAMILY_DEVICE_ID\s*=\s*'[^']*'/,"const FAMILY_DEVICE_ID = '"+_newDid+"'");
+
+    // ── بناء head نظيف (بدون JSZip) ──
+    var headClone=document.head.cloneNode(true);
+    headClone.querySelectorAll('script').forEach(function(s){
+      if(s.src&&s.src.includes('jszip'))s.remove();
+    });
+
+    // ✅ لا dataTag — الشجرة فارغة، المستخدم يستورد JSON بنفسه
+    var familyHTML=
+      '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+
+      headClone.outerHTML+'\n'+
+      '<body>\n'+
+      cleanAppHTML+'\n'+
+      '<div id="modalContainer"></div>\n'+
+      '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+      '</body>\n</html>';
+
+    // ════ 2. manifest.json ════
+    var manifestContent=JSON.stringify({
+      name:'شجرة العائلة',short_name:'العائلة',
+      description:'شجرة عائلية تفاعلية',
+      start_url:'./index.html',scope:'./',display:'standalone',orientation:'any',
+      background_color:'#f3f4f6',theme_color:'#3b82f6',lang:'ar',dir:'rtl',
+      icons:[
+        {src:'icons/icon-72x72.png',sizes:'72x72',type:'image/png',purpose:'any'},
+        {src:'icons/icon-96x96.png',sizes:'96x96',type:'image/png',purpose:'any'},
+        {src:'icons/icon-128x128.png',sizes:'128x128',type:'image/png',purpose:'any'},
+        {src:'icons/icon-144x144.png',sizes:'144x144',type:'image/png',purpose:'any'},
+        {src:'icons/icon-152x152.png',sizes:'152x152',type:'image/png',purpose:'any'},
+        {src:'icons/icon-192x192.png',sizes:'192x192',type:'image/png',purpose:'any'},
+        {src:'icons/icon-384x384.png',sizes:'384x384',type:'image/png',purpose:'any'},
+        {src:'icons/icon-512x512.png',sizes:'512x512',type:'image/png',purpose:'any'},
+        {src:'icons/icon-maskable-192x192.png',sizes:'192x192',type:'image/png',purpose:'maskable'},
+        {src:'icons/icon-maskable-512x512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}
+      ]
+    },null,2);
+
+    // ════ 3. sw.js — Network-First لـ index.html (يمنع تحميل HTML قديم من الكاش) ════
+    var swContent=`/* شجرة العائلة — Service Worker */
+const CACHE_NAME='family-tree-v1';
+const SHELL_CACHE='family-tree-shell-v1';
+const STATIC_ASSETS=['./manifest.json','./icons/icon-192x192.png','./icons/icon-512x512.png','./icons/apple-touch-icon.png'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL_CACHE).then(c=>c.addAll(STATIC_ASSETS)).then(()=>self.skipWaiting()).catch(()=>self.skipWaiting()));});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME&&k!==SHELL_CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET'||!e.request.url.startsWith('http'))return;
+  var u=new URL(e.request.url);
+  if(u.origin!==self.location.origin){e.respondWith(fetch(e.request).catch(()=>new Response('',{status:503})));return;}
+  var isPage=e.request.mode==='navigate'||e.request.url.endsWith('index.html')||e.request.url.endsWith('/');
+  e.respondWith(isPage?networkFirst(e.request):cacheFirst(e.request));
+});
+async function networkFirst(req){
+  var cache=await caches.open(SHELL_CACHE);
+  try{var r=await fetch(req);if(r&&r.status===200)cache.put(req,r.clone());return r;}
+  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p></body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
+}
+async function cacheFirst(req){
+  var c=await caches.match(req);if(c)return c;
+  try{var r=await fetch(req);if(r&&r.status===200){var cache=await caches.open(SHELL_CACHE);cache.put(req,r.clone());}return r;}
+  catch{return new Response('',{status:503});}
+}
+self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting();});`;
+
+    // ════ 4. جلب الأيقونات ════
+    _toast.innerHTML='⏳ جارٍ تحميل الأيقونات...';
+    var iconFiles=[
+      'icons/apple-touch-icon.png','icons/icon-72x72.png','icons/icon-96x96.png',
+      'icons/icon-128x128.png','icons/icon-144x144.png','icons/icon-152x152.png',
+      'icons/icon-192x192.png','icons/icon-384x384.png','icons/icon-512x512.png',
+      'icons/icon-maskable-192x192.png','icons/icon-maskable-512x512.png'
+    ];
+    var iconData={};
+    await Promise.all(iconFiles.map(async function(path){
+      try{var resp=await fetch('./'+path);if(resp.ok)iconData[path]=await resp.arrayBuffer();}
+      catch(e){console.warn('Could not fetch icon:',path);}
+    }));
+
+    // ════ 5. دليل الاستضافة ════
+    var guide=`# 🌳 شجرة العائلة — دليل رفع نسخة العائلة
+
+## هيكل الملفات
+\`\`\`
+family-tree-pwa/
+├── index.html       ← التطبيق (بدون بيانات — يطلب استيراد JSON)
+├── manifest.json
+├── sw.js
+└── icons/  (11 أيقونة PNG)
+\`\`\`
+
+## رفع على GitHub Pages (مجاني — مُوصى به)
+1. github.com/new ← اسم المستودع: family-tree ← Public ← Create
+2. ارفع جميع الملفات (بما فيها مجلد icons/)
+3. Settings → Pages → Source: main / (root) → Save
+4. انتظر دقيقتين ← رابطك: https://USERNAME.github.io/family-tree/
+
+## رفع على Netlify (أسرع — سحب وإفلات)
+1. netlify.com ← سجّل دخول
+2. اسحب مجلد family-tree-pwa وأفلته في لوحة التحكم
+3. رابطك جاهز فوراً: https://xxxx.netlify.app
+
+## التثبيت كـ PWA
+- Android/Chrome: بانر التثبيت يظهر تلقائياً
+- iPhone/Safari: زر المشاركة ⬆️ ← "إضافة إلى الشاشة الرئيسية"
+- كمبيوتر: أيقونة ➕ في شريط العنوان
+
+## تدفق الاستخدام
+1. المالك يرسل الرابط + ملف JSON للبيانات
+2. فرد العائلة يفتح الرابط → يضغط "استيراد ملف JSON"
+3. البيانات تُحفظ محلياً — يعمل التطبيق بدون إنترنت
+4. أي تعديل يُرفع تلقائياً للمالك عبر الـ Gist
+`;
+
+    // ════ 6. تجميع ZIP ════
+    _toast.innerHTML='⏳ جارٍ ضغط الملفات...';
+    var zip=new JSZip();
+    var folder=zip.folder('family-tree-pwa');
+    folder.file('index.html',familyHTML);
+    folder.file('manifest.json',manifestContent);
+    folder.file('sw.js',swContent);
+    folder.file('INSTALL.md',guide);
+    var iconsFolder=folder.folder('icons');
+    Object.entries(iconData).forEach(function(entry){
+      iconsFolder.file(entry[0].replace('icons/',''),entry[1]);
+    });
+    var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+
+    // ════ 7. تنزيل ZIP ════
+    _removeToast();
+    var d=new Date();
+    var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var url=URL.createObjectURL(zipBlob);
+    var lnk=document.createElement('a');
+    lnk.href=url;lnk.download='family-tree-pwa-'+stamp+'.zip';
+    document.body.appendChild(lnk);lnk.click();
+    setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},2000);
+
+    showSaveToast();
+    setTimeout(function(){
+      alert(
+        '✅ تم تصدير حزمة الـ PWA\n\n'+
+        '📦 الملف: family-tree-pwa-'+stamp+'.zip\n\n'+
+        'خطوات التوزيع:\n'+
+        '1. ارفع المجلد على GitHub Pages أو Netlify\n'+
+        '2. أرسل الرابط + ملف JSON للبيانات لأفراد العائلة\n'+
+        '3. كل فرد يستورد الـ JSON من داخل التطبيق\n\n'+
+        '📄 راجع INSTALL.md داخل الحزمة للتفاصيل'
       );
-      // ── تضمين إعدادات رفع العائلة + علامة نسخة العائلة ──
-      mainSrc=mainSrc.replace(/const IS_FAMILY_COPY\s*=\s*false/,'const IS_FAMILY_COPY = true');
-      // كل نسخة مصدَّرة تحصل على Device ID فريد → ملف خاص في Gist لا يُكتب عليه
-      var _newDid=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
-      mainSrc=mainSrc.replace(/const FAMILY_DEVICE_ID\s*=\s*'[^']*'/,"const FAMILY_DEVICE_ID = '"+_newDid+"'");
-      if(FAMILY_UPLOAD_CONFIG.GITHUB_PAT){
-        // مفتاح التشفير: استخدم مفتاح المالك تلقائياً إذا كان FAMILY_UPLOAD_CONFIG.KEY_HEX فارغاً
-        var familyEncKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||CLOUD_CONFIG.KEY_HEX||'';
-        if(!familyEncKey){
-          alert('⚠️ لا يوجد مفتاح تشفير!\nيجب تفعيل الحفظ السحابي (مفتاح AES-256) قبل تصدير نسخة العائلة\nحتى تكون البيانات المرفوعة مشفرة وآمنة.');
-          return;
-        }
-        var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||'';
-        mainSrc=mainSrc.replace(
-          /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
-          "const FAMILY_UPLOAD_CONFIG = {\n" +
-          "  GITHUB_PAT: '"+FAMILY_UPLOAD_CONFIG.GITHUB_PAT+"',\n" +
-          "  GIST_ID: '"+fuGid+"',\n" +
-          "  KEY_HEX: '"+familyEncKey+"',\n" +
-          "}"
-        );
-      }
-      var src='<!DOCTYPE html>\n'+
-        '<html'+htmlAttrs+'>\n'+
-        document.head.outerHTML+'\n'+
-        '<body>\n'+
-        cleanAppHTML+'\n'+
-        '<div id="modalContainer"></div>\n'+
-        dataTag+'\n'+
-        '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-        '</body>\n</html>';
-      var d=new Date();
-      var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      var blob=new Blob([src],{type:'text/html;charset=utf-8'});
-      var url=URL.createObjectURL(blob);
-      var lnk=document.createElement('a');
-      lnk.href=url;lnk.download='family_tree_share_'+stamp+'.html';
-      document.body.appendChild(lnk);lnk.click();
-      setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},1500);
-      showSaveToast();
-      setTimeout(()=>alert('✅ تم حفظ نسخة للعائلة\n\nهذه النسخة:\n• تحتوي جميع بيانات الشجرة الحالية\n• لا تحتوي إعدادات السحابة (آمنة للمشاركة)\n• من يحصل عليها يمكنه إضافة أفراد وإرسالها إليك للدمج'),300);
-    }catch(err){alert('خطأ: '+err.message);}
-  },100);
+    },300);
+
+  }catch(err){
+    _removeToast();
+    alert('خطأ في التصدير: '+err.message);
+    console.error('[exportFamilyCopy]',err);
+  }
 }
 
 // ── تهيئة السحابة عند بدء التطبيق ──
@@ -7503,6 +7738,25 @@ function saveData(){
   // ← الحفظ السحابي يدوي فقط (زر ☁️ مزامنة) — لا تشغيل تلقائي
   triggerFamilyUpload(); // ← الرفع الصامت (نسخة العائلة — لا إشعار)
   _fsaTriggerSave();     // ← كتابة مباشرة في الملف (File System Access API)
+  // ← إزالة index.html من كاش الـ SW حتى لا يُعيد تحميل البيانات المضمّنة القديمة
+  _swInvalidateHtmlCache();
+}
+// يُزيل index.html من كاش الـ SW — يُشغَّل عند كل حفظ
+// الـ SW سيعيد جلبه من الشبكة في المرة القادمة ويُخزّن النسخة الجديدة
+function _swInvalidateHtmlCache(){
+  try{
+    if(!('caches' in window))return;
+    caches.keys().then(function(names){
+      names.forEach(function(name){
+        caches.open(name).then(function(cache){
+          // احذف index.html فقط — الأيقونات والـ manifest تبقى
+          cache.delete(location.href).catch(function(){});
+          cache.delete('./index.html').catch(function(){});
+          cache.delete('index.html').catch(function(){});
+        });
+      });
+    });
+  }catch(e){}
 }
 function showSaveToast(){
   var t=document.getElementById('saveToast');
@@ -7720,56 +7974,82 @@ deletePerson=function(id){
   rem(id);_invalidateAll();saveData();renderAll();
 };
 
-// ── Async init (IndexedDB → embedded tag → localStorage → default) ──
+// ── Async init (IDB → localStorage → embedded tag → default) ──
+// ⚠️ الترتيب الصحيح: IDB أولاً (بيانات المستخدم المحفوظة)
+//    ثم localStorage، ثم الـ tag المضمّن كبيانات أولية فقط
 (async function(){
   await _idbOpen();
   loadMyPerson();
 
-  // 1. محاولة تحميل البيانات المضمّنة (أعلى أولوية — مرفق في الملف)
-  var embeddedLoaded=false;
-  try{
-    var tag=document.getElementById('__family_tree_data__');
-    if(tag&&tag.textContent){
-      var raw=tag.textContent.replace(/\s/g,'');
-      if(raw){
-        var bin=atob(raw);
-        var bytes=new Uint8Array(bin.length);
-        for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-        var d=JSON.parse(new TextDecoder().decode(bytes));
-        if(d.people&&d.people.length){
-          people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
-          if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
-          people.forEach(function(p){expanded[p.id]=false;});
-          migrateExternalSpouses();
-          saveData(); // يحفظ في IDB وlocalStorage معاً
-          embeddedLoaded=true;
-        }
-      }
-    }
-  }catch(e){console.warn('Embedded load failed',e);}
+  var dataLoaded=false;
 
-  if(!embeddedLoaded){
-    // 2. محاولة IDB
+  // 1. محاولة IDB — أعلى أولوية (آخر تغيير حفظه المستخدم)
+  try{
     var idbData=await _idbLoad();
     if(idbData&&idbData.people&&idbData.people.length){
       people=idbData.people;nextId=idbData.nextId||1;relPairs=idbData.relPairs||[];
       people.forEach(function(p){expanded[p.id]=false;});
       migrateExternalSpouses();
       _markDeviceInit();
-    } else {
-      // 3. محاولة localStorage (كـ fallback)
+      dataLoaded=true;
+      console.log('[Init] Loaded from IDB:',people.length,'persons');
+    }
+  }catch(e){console.warn('[Init] IDB load failed',e);}
+
+  // 2. محاولة localStorage — إذا فشل IDB
+  if(!dataLoaded){
+    try{
       var lsData=_lsLoad();
-      if(lsData){
+      if(lsData&&lsData.people&&lsData.people.length){
         people=lsData.people;nextId=lsData.nextId||1;relPairs=lsData.relPairs||[];
         people.forEach(function(p){expanded[p.id]=false;});
         migrateExternalSpouses();
         _markDeviceInit();
         // ترحيل البيانات من localStorage إلى IDB
         _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
-      } else {
-        // 4. لا يوجد بيانات — ابدأ من الصفر
-        initData();
+        dataLoaded=true;
+        console.log('[Init] Loaded from localStorage:',people.length,'persons');
       }
+    }catch(e){console.warn('[Init] localStorage load failed',e);}
+  }
+
+  // 3. البيانات المضمّنة في الـ HTML — فقط إذا لا يوجد شيء محفوظ
+  //    (البذرة الأولى — لا تُستخدم إذا المستخدم سبق وحفظ تغييرات)
+  if(!dataLoaded){
+    try{
+      var tag=document.getElementById('__family_tree_data__');
+      if(tag&&tag.textContent){
+        var raw=tag.textContent.replace(/\s/g,'');
+        if(raw){
+          var bin=atob(raw);
+          var bytes=new Uint8Array(bin.length);
+          for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+          var d=JSON.parse(new TextDecoder().decode(bytes));
+          if(d.people&&d.people.length){
+            people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+            if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
+            people.forEach(function(p){expanded[p.id]=false;});
+            migrateExternalSpouses();
+            // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
+            _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
+            _lsSave({people:people,relPairs:relPairs,nextId:nextId});
+            dataLoaded=true;
+            console.log('[Init] Loaded from embedded tag:',people.length,'persons');
+          }
+        }
+      }
+    }catch(e){console.warn('[Init] Embedded tag load failed',e);}
+  }
+
+  // 4. لا يوجد بيانات — نسخة العائلة: شاشة ترحيب / نسخة المالك: بيانات نموذجية
+  if(!dataLoaded){
+    if(IS_FAMILY_COPY){
+      people=[];relPairs=[];nextId=1;
+      console.log('[Init] Family copy — no data, showing welcome screen');
+      setTimeout(_showFamilyWelcome, 700);
+    } else {
+      initData();
+      console.log('[Init] Starting fresh — no data found');
     }
   }
 
@@ -7797,6 +8077,48 @@ deletePerson=function(id){
     if(b2)b2.style.display='';
   }
 })();
+
+// ══════════════════════════════════════════════════════════
+//  شاشة ترحيب نسخة العائلة — تظهر عند أول تشغيل بلا بيانات
+// ══════════════════════════════════════════════════════════
+function _showFamilyWelcome(){
+  var mc=document.getElementById('modalContainer');
+  if(!mc)return;
+  mc.innerHTML=`
+  <div class="modal-overlay">
+  <div class="modal" style="max-width:440px;text-align:center">
+    <div style="font-size:52px;margin-bottom:8px">🌳</div>
+    <h3 style="margin-bottom:6px">مرحباً بك في شجرة العائلة</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.8">
+      أرسل لك المالك ملف <strong>JSON</strong> يحتوي بيانات الشجرة.<br>
+      استورده لعرض الشجرة كاملةً.
+    </p>
+    <label style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:#3b82f6;color:#fff;border-radius:12px;cursor:pointer;font-size:15px;font-weight:600;margin-bottom:12px">
+      📥 استيراد ملف JSON
+      <input type="file" accept=".json" onchange="_familyWelcomeImport(event)" style="display:none">
+    </label>
+    <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-top:8px;padding:10px 14px;background:var(--bg-secondary);border-radius:8px;text-align:right">
+      💡 بعد الاستيراد يُحفظ التطبيق تلقائياً — لن تحتاج الاستيراد مجدداً<br>
+      💡 أي تعديلات تُضيفها تُرسَل للمالك تلقائياً في الخلفية
+    </div>
+  </div>
+  </div>`;
+}
+function _familyWelcomeImport(e){
+  var file=e.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var d=JSON.parse(ev.target.result);
+      if(!d.people||!Array.isArray(d.people))throw new Error('صيغة الملف غير صالحة');
+      _pendingImportData=d;
+      closeModal();
+      showImportModeModal(d,file.name);
+    }catch(ex){alert('خطأ في الملف: '+ex.message);}
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
 
 // ══════════════════════════════════════════════════════════
 //  PWA Install prompt
