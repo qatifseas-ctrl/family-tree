@@ -3069,13 +3069,16 @@ function exportData(){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// تصدير JSON — مع خيار الصور أو بدونها
+// ═══════════════════════════════════════════════════════════════
+// تصدير JSON — بدون صور / مع صور / للعائلة (مع Gist + Device ID)
 // ═══════════════════════════════════════════════════════════════
 function showExportJSONModal(){
   let photoCount=people.filter(p=>p.photo).length;
   let sizeEst=photoCount>0?`~${Math.round(photoCount*40)} KB إضافية للصور`:'لا توجد صور';
+  // خيار "للعائلة" يظهر فقط لنسخة المالك
+  let familyOption=IS_FAMILY_COPY?'':_buildFamilyExportOption();
   let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:400px;">
+  <div class="modal" style="max-width:420px;">
     <h3>📤 تصدير JSON</h3>
     <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">اختر نوع التصدير:</p>
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
@@ -3087,11 +3090,43 @@ function showExportJSONModal(){
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;">🖼️ مع الصور</div>
         <div style="font-size:12px;color:var(--text2);">يتضمن جميع الصور — الحجم أكبر<br>${photoCount>0?`${photoCount} صورة، ${sizeEst}`:'لا توجد صور'}</div>
       </div>
+      ${familyOption}
     </div>
     <div class="modal-footer"><button class="btn" onclick="closeModal()">إلغاء</button></div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=html;
 }
+
+// بناء خيار "للعائلة" ديناميكياً
+function _buildFamilyExportOption(){
+  let fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
+  let fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
+  let photoCount=people.filter(p=>p.photo).length;
+  let configured=!!(fuPat&&fuGid);
+  let badge=configured
+    ?`<span style="font-size:11px;font-weight:400;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;padding:2px 6px;border-radius:6px;margin-right:6px;">\u0645\u064f\u0639\u062f\u064e\u0651\u062f Gist \u2713</span>`
+    :`<span style="font-size:11px;font-weight:400;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;padding:2px 6px;border-radius:6px;margin-right:6px;">\u0628\u062f\u0648\u0646 Gist</span>`;
+  let gidHint=configured
+    ?`Gist: <code style="font-size:10px">${fuGid.slice(0,8)}\u2026</code>`
+    :`<a href="#" onclick="closeModal();openFamilyUploadSetup();return false;" style="color:#3b82f6">\u2699\ufe0f \u0625\u0639\u062f\u0627\u062f Gist \u0623\u0648\u0644\u0627\u064b \u0644\u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0627\u0645\u062a</a>`;
+  return `<div style="border:2px solid #3b82f6;border-radius:10px;overflow:hidden">
+    <div style="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe">
+      <div style="font-size:13px;font-weight:600;color:#1d4ed8;">\ud83d\udce8 \u0644\u0644\u0639\u0627\u0626\u0644\u0629 ${badge}</div>
+      <div style="font-size:11px;color:#3b82f6;margin-top:2px">${gidHint} \u00b7 Device ID \u0641\u0631\u064a\u062f \u0644\u0643\u0644 \u0641\u0631\u062f</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      <div onclick="doExportJSONFamily(false)" style="cursor:pointer;padding:12px 14px;background:var(--card-bg);border-left:1px solid #bfdbfe" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='var(--card-bg)'">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">\ud83d\udcc4 \u0628\u062f\u0648\u0646 \u0635\u0648\u0631</div>
+        <div style="font-size:11px;color:var(--text2);">\u062d\u062c\u0645 \u0623\u0635\u063a\u0631 \u2014 \u0645\u0648\u0635\u0649 \u0628\u0647</div>
+      </div>
+      <div onclick="doExportJSONFamily(true)" style="cursor:pointer;padding:12px 14px;background:var(--card-bg)" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='var(--card-bg)'">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">\ud83d\uddbc\ufe0f \u0645\u0639 \u0627\u0644\u0635\u0648\u0631</div>
+        <div style="font-size:11px;color:var(--text2);">${photoCount} \u0635\u0648\u0631\u0629 \u2014 \u062d\u062c\u0645 \u0623\u0643\u0628\u0631</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function doExportJSON(withPhotos){
   closeModal();
   let data=JSON.parse(JSON.stringify({people,relPairs,nextId}));
@@ -3107,10 +3142,59 @@ function doExportJSON(withPhotos){
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
   showSaveToast();
-  if(!withPhotos&&photoCount>0) setTimeout(()=>alert(`✔ تم التصدير (${data.people.length} شخص) بدون صور.\nللاحتفاظ بالصور استخدم زر "💾 حفظ نسخة" HTML.`),300);
+  if(!withPhotos&&photoCount>0) setTimeout(()=>alert(`\u2714 \u062a\u0645 \u0627\u0644\u062a\u0635\u062f\u064a\u0631 (${data.people.length} \u0634\u062e\u0635) \u0628\u062f\u0648\u0646 \u0635\u0648\u0631.\n\u0644\u0644\u0627\u062d\u062a\u0641\u0627\u0638 \u0628\u0627\u0644\u0635\u0648\u0631 \u0627\u0633\u062a\u062e\u062f\u0645 \u0632\u0631 "\ud83d\udcbe \u062d\u0641\u0638 \u0646\u0633\u062e\u0629" HTML.`),300);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// \u062a\u0635\u062f\u064a\u0631 JSON \u062e\u0627\u0635 \u0628\u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u2014 \u0645\u0639 Gist ID + Device ID \u0641\u0631\u064a\u062f
+function doExportJSONFamily(withPhotos){
+  closeModal();
+  var devId=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
+  var fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
+  var fuKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_cloud_key')||'';
+
+  var data=JSON.parse(JSON.stringify({people,relPairs,nextId}));
+  var photoCount=data.people.filter(p=>p.photo).length;
+  if(!withPhotos) data.people.forEach(function(p){if(p.photo)delete p.photo;});
+
+  var payload={
+    people:data.people,
+    relPairs:data.relPairs,
+    nextId:data.nextId,
+    _familyMeta:{
+      deviceId:devId,
+      gistId:fuGid,
+      pat:fuPat,
+      keyHex:fuKey,
+      exportedAt:new Date().toISOString(),
+      exportedBy:'owner'
+    }
+  };
+
+  var d=new Date();
+  var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var suffix=withPhotos?'full_share_':'share_';
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='family_tree_'+suffix+devId+'_'+stamp+'.json';
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  showSaveToast();
+
+  var gistNote=fuGid?'\u063a\u064a\u0633\u062a \u0645\u064f\u0641\u0639\u064e\u0651\u0644 \u2014 \u0645\u0644\u0641 \u0627\u0644\u0641\u0631\u062f: ft_family_'+devId+'.dat':'\u26a0\ufe0f Gist \u063a\u064a\u0631 \u0645\u064f\u0639\u062f\u064e\u0651\u062f \u2014 \u0627\u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0627\u0645\u062a \u0644\u0646 \u064a\u0639\u0645\u0644';
+  var photosNote=withPhotos&&photoCount>0?'\n\ud83d\uddbc\ufe0f \u064a\u062a\u0636\u0645\u0646 '+photoCount+' \u0635\u0648\u0631\u0629':'';
+  setTimeout(function(){
+    alert(
+      '\u2705 \u062a\u0645 \u062a\u0635\u062f\u064a\u0631 JSON \u0644\u0644\u0639\u0627\u0626\u0644\u0629\n\n'+
+      '\ud83d\udcf1 Device ID: '+devId+'\n'+
+      '\ud83d\udcc1 '+gistNote+photosNote+'\n\n'+
+      '\u0623\u0631\u0633\u0644 \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0644\u0641\u0631\u062f \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u0645\u0639 \u0631\u0627\u0628\u0637 \u0627\u0644\u062a\u0637\u0628\u064a\u0642.\n'+
+      '\u0639\u0646\u062f \u0627\u0633\u062a\u064a\u0631\u0627\u062f\u0647 \u0633\u064a\u062d\u0645\u0651\u0644 \u0627\u0644\u0634\u062c\u0631\u0629 \u0648\u064a\u064f\u0639\u062f\u0651 \u0627\u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0627\u0645\u062a \u062a\u0644\u0642\u0627\u0626\u064a\u0627\u064b.'
+    );
+  },300);
+}
 // استيراد — مع خيار استبدال أو دمج
 // ═══════════════════════════════════════════════════════════════
 let _pendingImportData=null;
@@ -3183,8 +3267,12 @@ function doImport(mode){
       migrateExternalSpouses();
       _invalidateAll();
       if(people.length)expanded[people[0].id]=true;
+      _applyFamilyMetaIfNeeded(d);
       saveData();renderAll();updateMyPersonBtn();
-      setTimeout(()=>alert(`✔ تم الاستيراد بنجاح! (${people.length} فرد)`),200);
+      setTimeout(()=>{
+        let metaNote=IS_FAMILY_COPY&&d._familyMeta&&d._familyMeta.gistId?'\n📡 الرفع الصامت للمالك: مُفعَّل ✓':'';
+        alert(`✔ تم الاستيراد بنجاح! (${people.length} فرد)${metaNote}`);
+      },200);
     } else {
       // وضع الدمج: إعادة ترقيم IDs وتجاهل الأشخاص المكررين
       let incoming=JSON.parse(JSON.stringify(d.people));
@@ -3249,14 +3337,42 @@ function doImport(mode){
       people=people.concat(trulyNew);
       trulyNew.forEach(p=>{expanded[p.id]=false;});
       _invalidateAll();
+      _applyFamilyMetaIfNeeded(d);
       saveData();renderAll();updateMyPersonBtn();
       let msg=`✔ تم الدمج بنجاح!\n➕ أضيف ${trulyNew.length} فرد جديد`;
       if(skipped>0)msg+=`\n⏭️ تجاهل ${skipped} فرد مكرر موجود مسبقاً`;
       msg+=`\n👥 إجمالي الشجرة: ${people.length} فرد`;
+      if(IS_FAMILY_COPY&&d._familyMeta&&d._familyMeta.gistId)msg+=`\n📡 الرفع الصامت للمالك: مُفعَّل ✓`;
       setTimeout(()=>alert(msg),200);
     }
   }catch(ex){alert('خطأ أثناء الاستيراد: '+ex.message);}
 }
+// ── تطبيق _familyMeta تلقائياً عند الاستيراد في نسخة العائلة ──
+function _applyFamilyMetaIfNeeded(data){
+  if(!IS_FAMILY_COPY) return; // المالك لا يحتاج هذا
+  var meta=data._familyMeta;
+  if(!meta) return;
+  // Device ID
+  if(meta.deviceId){
+    try{localStorage.setItem('ft_family_device_id', meta.deviceId);}catch(e){}
+  }
+  // FAMILY_UPLOAD_CONFIG
+  if(meta.pat){
+    FAMILY_UPLOAD_CONFIG.GITHUB_PAT = meta.pat;
+    try{localStorage.setItem('ft_fupload_pat', meta.pat);}catch(e){}
+  }
+  if(meta.gistId){
+    FAMILY_UPLOAD_CONFIG.GIST_ID = meta.gistId;
+    try{localStorage.setItem(FAMILY_UPLOAD_GIST_KEY, meta.gistId);}catch(e){}
+    try{localStorage.setItem('ft_fupload_gid', meta.gistId);}catch(e){}
+  }
+  if(meta.keyHex){
+    FAMILY_UPLOAD_CONFIG.KEY_HEX = meta.keyHex;
+    try{localStorage.setItem('ft_fupload_key', meta.keyHex);}catch(e){}
+  }
+  console.log('[Import] Family meta applied — deviceId:', meta.deviceId||'—', 'gistId:', meta.gistId||'—');
+}
+
 let _renderTreeRAF=null;
 function renderTree(){
   if(_renderTreeRAF)return; // منع الاستدعاءات المتكررة في نفس الإطار
@@ -5563,7 +5679,6 @@ function renderGuide(){
 
     {id:'s10',icon:'📸',title:'الصور',html:`
 <p>في نموذج التعديل: 📷 لرفع صورة، اضغط عليها لعرضها كاملة، 🗑 لحذفها. الصور تُضغط تلقائياً إلى 400px.</p>
-<p><strong>مزامنة الصور سحابياً:</strong> عند الضغط على ☁️ مزامنة تُرفع الصور الجديدة فقط (delta). عند الاستعادة تُضاف الصور غير الموجودة محلياً.</p>
 <p>عند الضغط على اسم متوفى تظهر بطاقة الفاتحة 3 ثوانٍ.</p>`},
   ];
 
@@ -8098,8 +8213,7 @@ function _showFamilyWelcome(){
       <input type="file" accept=".json" onchange="_familyWelcomeImport(event)" style="display:none">
     </label>
     <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-top:8px;padding:10px 14px;background:var(--bg-secondary);border-radius:8px;text-align:right">
-      💡 بعد الاستيراد يُحفظ التطبيق تلقائياً — لن تحتاج الاستيراد مجدداً<br>
-      💡 أي تعديلات تُضيفها تُرسَل للمالك تلقائياً في الخلفية
+      💡 بعد الاستيراد يُحفظ التطبيق تلقائياً — لن تحتاج الاستيراد مجدداً
     </div>
   </div>
   </div>`;
