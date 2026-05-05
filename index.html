@@ -3272,10 +3272,7 @@ function doImport(mode){
       if(people.length)expanded[people[0].id]=true;
       _applyFamilyMetaIfNeeded(d);
       saveData();renderAll();updateMyPersonBtn();
-      setTimeout(()=>{
-        let metaNote=IS_FAMILY_COPY&&d._familyMeta&&d._familyMeta.gistId?'\n📡 الرفع الصامت للمالك: مُفعَّل ✓':'';
-        alert(`✔ تم الاستيراد بنجاح! (${people.length} فرد)${metaNote}`);
-      },200);
+      setTimeout(()=>alert(`✔ تم الاستيراد بنجاح! (${people.length} فرد)`),200);
     } else {
       // وضع الدمج: إعادة ترقيم IDs وتجاهل الأشخاص المكررين
       let incoming=JSON.parse(JSON.stringify(d.people));
@@ -3345,7 +3342,6 @@ function doImport(mode){
       let msg=`✔ تم الدمج بنجاح!\n➕ أضيف ${trulyNew.length} فرد جديد`;
       if(skipped>0)msg+=`\n⏭️ تجاهل ${skipped} فرد مكرر موجود مسبقاً`;
       msg+=`\n👥 إجمالي الشجرة: ${people.length} فرد`;
-      if(IS_FAMILY_COPY&&d._familyMeta&&d._familyMeta.gistId)msg+=`\n📡 الرفع الصامت للمالك: مُفعَّل ✓`;
       setTimeout(()=>alert(msg),200);
     }
   }catch(ex){alert('خطأ أثناء الاستيراد: '+ex.message);}
@@ -7648,7 +7644,6 @@ family-tree-pwa/
 1. المالك يرسل الرابط + ملف JSON للبيانات
 2. فرد العائلة يفتح الرابط → يضغط "استيراد ملف JSON"
 3. البيانات تُحفظ محلياً — يعمل التطبيق بدون إنترنت
-4. أي تعديل يُرفع تلقائياً للمالك عبر الـ Gist
 `;
 
     // ════ 6. تجميع ZIP ════
