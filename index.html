@@ -5945,10 +5945,17 @@ async function createFamilyGistNow(){
 function _loadFamilyUploadSettings(){
   try{
     let pat=localStorage.getItem('ft_fupload_pat')||'';
-    let gid=localStorage.getItem('ft_fupload_gid')||'';
+    // قراءة Gist ID من مفتاحَين مختلفَين (ft_fupload_gid و FAMILY_UPLOAD_GIST_KEY)
+    let gid=localStorage.getItem('ft_fupload_gid')
+          ||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)
+          ||'';
     let key=localStorage.getItem('ft_fupload_key')||'';
     if(pat&&!FAMILY_UPLOAD_CONFIG.GITHUB_PAT)FAMILY_UPLOAD_CONFIG.GITHUB_PAT=pat;
-    if(gid&&!FAMILY_UPLOAD_CONFIG.GIST_ID)FAMILY_UPLOAD_CONFIG.GIST_ID=gid;
+    if(gid&&!FAMILY_UPLOAD_CONFIG.GIST_ID){
+      FAMILY_UPLOAD_CONFIG.GIST_ID=gid;
+      // توحيد المفتاحَين حتى لا يختلفا لاحقاً
+      try{localStorage.setItem('ft_fupload_gid',gid);localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,gid);}catch(e){}
+    }
     if(key&&key.length===64&&!FAMILY_UPLOAD_CONFIG.KEY_HEX)FAMILY_UPLOAD_CONFIG.KEY_HEX=key;
     if(!FAMILY_UPLOAD_CONFIG.KEY_HEX && CLOUD_CONFIG.KEY_HEX && CLOUD_CONFIG.KEY_HEX.length===64){
       FAMILY_UPLOAD_CONFIG.KEY_HEX = CLOUD_CONFIG.KEY_HEX;
@@ -6362,10 +6369,13 @@ async function _familyParseUpdateRaw(raw,keyHex){
 
 async function openFamilyUpdatesModal(){
   let gistId=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
-  let pat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
+  // ⚠️ لا نستخدم CLOUD_CONFIG.GITHUB_PAT كـ fallback — له صلاحية repo وليس gist → 401
+  // المصدر الوحيد المسموح به: FAMILY_UPLOAD_CONFIG أو localStorage ft_fupload_pat
+  let pat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT
+    ||localStorage.getItem('ft_fupload_pat')
+    ||'';
   let keyHex=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_cloud_key')||'';
-  // المالك يقرأ فقط — يستخدم توكن رفع العائلة أو التوكن الرئيسي كـ fallback
-  let readPat=pat||CLOUD_CONFIG.GITHUB_PAT||'';
+  let readPat=pat; // بدون fallback للـ CLOUD PAT
 
   if(!gistId&&readPat){
     gistId=await _findFamilyUploadsGist()||'';
@@ -6549,18 +6559,37 @@ async function _applyFamilyPATFix(){
   let newGid=(document.getElementById('fu401_gid').value||'').trim();
   if(!newPat){alert('الرجاء إدخال GitHub PAT');return;}
 
-  // تحقق سريع من التوكن قبل الحفظ
+  // تحقق من التوكن: نختبر /gists مباشرةً لأن /user يمر حتى بتوكن بلا صلاحية gist
   let btn=event.target;
-  btn.disabled=true;btn.textContent='⏳ جارٍ التحقق...';
+  btn.disabled=true;btn.textContent='⏳ جارٍ التحقق من صلاحية gist...';
   try{
-    let testRes=await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+newPat,'Accept':'application/vnd.github+json'}});
-    if(testRes.status===401){btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';alert('❌ التوكن غير صالح أو منتهي الصلاحية.\nالرجاء إنشاء توكن جديد من GitHub.');return;}
-    if(testRes.status===403){btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';alert('❌ التوكن محظور.\nالرجاء إنشاء توكن جديد من GitHub.');return;}
-  }catch(e){/* تجاهل أخطاء الشبكة */}
+    let testHeaders={'Authorization':'token '+newPat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+    // /gists يفشل بـ 401 إذا لم تكن صلاحية gist مُفعَّلة
+    let testRes=await fetch('https://api.github.com/gists?per_page=1',{headers:testHeaders});
+    if(testRes.status===401){
+      btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';
+      alert('❌ التوكن لا يملك صلاحية gist\n\nالحل:\n1. اذهب إلى github.com/settings/tokens\n2. أنشئ توكناً جديداً\n3. فعّل ✅ gist فقط\n4. انسخه والصقه هنا');
+      return;
+    }
+    if(testRes.status===403){
+      btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';
+      alert('❌ التوكن صالح لكن محظور من الوصول للـ Gists\nتأكد أن التوكن ليس من نوع Fine-grained مقيّد.');
+      return;
+    }
+    if(!testRes.ok){
+      btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';
+      alert('❌ خطأ في التحقق: '+testRes.status+'\nتحقق من اتصالك بالإنترنت وأعد المحاولة.');
+      return;
+    }
+  }catch(e){/* تجاهل أخطاء الشبكة — نكمل الحفظ */}
 
   // حفظ في الذاكرة وlocalStorage
   FAMILY_UPLOAD_CONFIG.GITHUB_PAT=newPat;
-  if(newGid){FAMILY_UPLOAD_CONFIG.GIST_ID=newGid;localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,newGid);localStorage.setItem('ft_fupload_gid',newGid);}
+  if(newGid){
+    FAMILY_UPLOAD_CONFIG.GIST_ID=newGid;
+    // حفظ في كلا المفتاحَين دائماً لتجنب عدم التطابق
+    try{localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,newGid);localStorage.setItem('ft_fupload_gid',newGid);}catch(e){}
+  }
   try{localStorage.setItem('ft_fupload_pat',newPat);}catch(e){}
 
   btn.textContent='✅ تم الحفظ — جارٍ إعادة المحاولة...';
