@@ -3190,8 +3190,11 @@ function doExportJSONFamily(withPhotos){
       '\u2705 \u062a\u0645 \u062a\u0635\u062f\u064a\u0631 JSON \u0644\u0644\u0639\u0627\u0626\u0644\u0629\n\n'+
       '\ud83d\udcf1 Device ID: '+devId+'\n'+
       '\ud83d\udcc1 '+gistNote+photosNote+'\n\n'+
-      '\u0623\u0631\u0633\u0644 \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0644\u0641\u0631\u062f \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u0645\u0639 \u0631\u0627\u0628\u0637 \u0627\u0644\u062a\u0637\u0628\u064a\u0642.\n'+
-      '\u0639\u0646\u062f \u0627\u0633\u062a\u064a\u0631\u0627\u062f\u0647 \u0633\u064a\u062d\u0645\u0651\u0644 \u0627\u0644\u0634\u062c\u0631\u0629 \u0648\u064a\u064f\u0639\u062f\u0651 \u0627\u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0627\u0645\u062a \u062a\u0644\u0642\u0627\u0626\u064a\u0627\u064b.'
+      '\u062e\u0637\u0648\u0627\u062a \u0627\u0644\u062a\u0648\u0632\u064a\u0639:\n'+
+      '1. \u0623\u0631\u0633\u0644 \u0631\u0627\u0628\u0637 \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0644\u0641\u0631\u062f \u0627\u0644\u0639\u0627\u0626\u0644\u0629\n'+
+      '2. \u0623\u0631\u0633\u0644 \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0645\u0646\u0641\u0635\u0644\u0627\u064b (\u0644\u0627 \u062a\u0646\u0634\u0631\u0647 \u0639\u0644\u0646\u0627\u064b)\n'+
+      '3. \u064a\u0641\u062a\u062d \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u2192 \u064a\u0636\u063a\u0637 \u0627\u0633\u062a\u064a\u0631\u0627\u062f JSON \u2192 \u062a\u064f\u0641\u0639\u064e\u0651\u0644 \u0627\u0644\u0645\u0641\u0627\u062a\u064a\u062d \u062a\u0644\u0642\u0627\u0626\u064a\u0627\u064b\n'+
+      '\u26a0\ufe0f \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0646\u0641\u0633\u0647 \u0644\u0627 \u064a\u062d\u0645\u0644 \u0623\u064a \u0645\u0641\u0627\u062a\u064a\u062d'
     );
   },300);
 }
@@ -7485,11 +7488,6 @@ async function exportFamilyCopy(){
     return;
   }
 
-  // ── تحقق من إعداد FAMILY_UPLOAD_CONFIG ──
-  if(!FAMILY_UPLOAD_CONFIG.GITHUB_PAT){
-    if(!confirm('⚠️ لم يتم إعداد رفع العائلة بعد.\nالنسخة المصدَّرة لن ترسل تحديثات للمالك.\n\nهل تريد المتابعة؟')) return;
-  }
-
   // ── مؤشر تحميل ──
   var _toast=document.createElement('div');
   _toast.id='export-progress-toast';
@@ -7528,13 +7526,11 @@ async function exportFamilyCopy(){
       "const CLOUD_CONFIG = {\n  KEY_HEX: '',\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  GIST_FILE: 'ft_encrypted.dat',\n}"
     );
 
-    // 1b. تضمين FAMILY_UPLOAD_CONFIG الحقيقي — مصادقة الرفع الصامت للمالك
-    var familyEncKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||localStorage.getItem('ft_cloud_key')||'';
-    var fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
-    var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
+    // 1b. FAMILY_UPLOAD_CONFIG فارغ في الـ HTML — المفاتيح تأتي فقط من ملف JSON عند الاستيراد
+    // (أكثر أماناً: الـ PWA لا يحمل أي مفاتيح — تُفعَّل فقط بعد استيراد JSON يحتوي _familyMeta)
     mainSrc=mainSrc.replace(
       /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
-      "const FAMILY_UPLOAD_CONFIG = {\n  GITHUB_PAT: '"+fuPat+"',\n  GIST_ID: '"+fuGid+"',\n  KEY_HEX: '"+familyEncKey+"',\n}"
+      "const FAMILY_UPLOAD_CONFIG = {\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  KEY_HEX: '',\n}"
     );
 
     // 1c. تمييز النسخة كـ "نسخة عائلة"
@@ -8213,7 +8209,8 @@ function _showFamilyWelcome(){
       <input type="file" accept=".json" onchange="_familyWelcomeImport(event)" style="display:none">
     </label>
     <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-top:8px;padding:10px 14px;background:var(--bg-secondary);border-radius:8px;text-align:right">
-      💡 بعد الاستيراد يُحفظ التطبيق تلقائياً — لن تحتاج الاستيراد مجدداً
+      💡 بعد الاستيراد تُحفظ الشجرة محلياً — لن تحتاج الاستيراد مجدداً<br>
+      💡 إذا كان الملف يحتوي إعدادات الرفع، فستُفعَّل تلقائياً عند الاستيراد
     </div>
   </div>
   </div>`;
