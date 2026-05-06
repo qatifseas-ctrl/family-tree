@@ -1774,24 +1774,8 @@ function _updateSearchNavBar(){
 function _jumpToResult(idx){
   if(!_searchResultIds.length)return;
   idx=Math.max(0,Math.min(idx,_searchResultIds.length-1));
-  _searchNavIdx=idx;
-  let id=_searchResultIds[idx];
-  _searchActiveId=id;
-  // إغلاق القائمة إذا كانت مفتوحة
-  document.getElementById('searchResultsPanel').style.display='none';
-  _hideSrpOverlay();
-  // ✅ ضبط الشجرة الصحيحة عند الانتقال بالأسهم — يحل مشكلة الشجرة الخارجية
-  _syncFamilyFilterForPerson(id);
-  // فتح مسار الأجداد فقط
-  people.forEach(p=>expanded[p.id]=false);
-  _searchResultIds.forEach(rid=>{
-    function eu(pid){let p=getPerson(pid);if(!p)return;if(p.parentId){expanded[p.parentId]=true;eu(p.parentId);}}
-    eu(rid);expanded[rid]=false;
-  });
-  renderTree();
-  _updateSearchNavBar();
-  // ✅ تمركز واحد فقط — بعد انتهاء الرسم
-  _scrollAndHighlight(id);
+  // استخدم searchNavigateTo مباشرةً: تحتوي على منطق الشجرة الخارجية والانهيار الصحيح
+  searchNavigateTo(_searchResultIds[idx]);
 }
 
 function searchNavNext(){
@@ -1961,8 +1945,6 @@ function closeMobSearchSheet(){
   // إزالة التركيز من حقل البحث حتى لا يعترض ESC بعد إغلاق اللوحة
   let inp=document.getElementById('mss-input');
   if(inp)inp.blur();
-  // إغلاق أي chain مفتوحة (توسّع ذرية) لمنع التداخل مع التنقل
-  document.querySelectorAll('.chain-expanded').forEach(el=>el.classList.remove('chain-expanded'));
 }
 
 function switchTab(tab,el){
@@ -2672,6 +2654,7 @@ function highlightQueryHTML(text,q){
 }
 
 function focusPersonCard(id){
+  // تأخير 360ms لضمان انتهاء أنيميشن إغلاق لوحة البحث (280ms) وإكمال رسم الشجرة
   setTimeout(()=>{
     let el=document.querySelector(`[data-person-id="${id}"]`);
     if(el){
@@ -2680,15 +2663,15 @@ function focusPersonCard(id){
       if(hdr){
         hdr.style.transition='background .12s ease, box-shadow .12s ease';
         hdr.style.background='#fef9c3';
-        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.18)';
+        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';
         setTimeout(()=>{
-          hdr.style.transition='';
+          hdr.style.transition='background .5s, box-shadow .5s';
           hdr.style.background='';
           hdr.style.boxShadow='';
         },900);
       }
     }
-  },120);
+  },360);
 }
 
 function _doSearch(){
@@ -2870,58 +2853,6 @@ function _srpHighlight(items){
     if(i===_srpFocusIdx)el.scrollIntoView({block:'nearest'});
   });
 }
-// ── دالة مشتركة: تضبط currentFamilyFilter حسب شجرة الشخص المستهدف ──
-// تُستخدم من searchNavigateTo و _jumpToResult لضمان الاتساق
-function _syncFamilyFilterForPerson(id){
-  let _targetP=getPerson(id);
-  if(!_targetP)return;
-  let _tRoot=_targetP;
-  while(_tRoot.parentId&&getPerson(_tRoot.parentId))_tRoot=getPerson(_tRoot.parentId);
-  let _mainIds=new Set(getRoots(false).map(r=>r.id));
-  let _isMainTree=_mainIds.has(_tRoot.id);
-  let _alreadyCorrect=currentFamilyFilter&&currentFamilyFilter.rootId===_tRoot.id;
-  if(_alreadyCorrect)return; // لا تغيير مطلوب
-  if(_isMainTree){
-    navStack=[];
-    currentFamilyFilter=null;
-  } else {
-    let _fromLabel=currentFamilyFilter?currentFamilyFilter.label:
-      (getRoots(false).length>0?'عائلة '+getRoots(false)[0].name:'الشجرة الرئيسية');
-    navStack.push({label:_fromLabel,filter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,scrollY:window.scrollY});
-    currentFamilyFilter={
-      rootId:_tRoot.id,
-      label:'عائلة '+(_tRoot.name)+(_tRoot.familyName?' '+_tRoot.familyName:''),
-      viaPersonId:id,fromLabel:_fromLabel
-    };
-  }
-}
-
-// ── تمركز وتمييز بطاقة الشخص بعد انتهاء الرسم ──
-function _scrollAndHighlight(id){
-  // rAF مزدوج: الأول ينتظر بدء الرسم، الثاني ينتظر انتهاء تحديث الـ layout
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    // نعطي الـ DOM 200ms إضافية لأن renderTree قد يُولّد عناصر كثيرة
-    setTimeout(()=>{
-      let el=document.querySelector('[data-person-id="'+id+'"]');
-      if(!el)return;
-      // تمركز في منتصف الشاشة
-      el.scrollIntoView({behavior:'smooth',block:'center'});
-      // تمييز بصري
-      let hdr=el.querySelector('.node-header');
-      if(hdr){
-        hdr.style.transition='background .1s,box-shadow .1s';
-        hdr.style.background='#fef9c3';
-        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';
-        setTimeout(()=>{
-          hdr.style.transition='background .5s,box-shadow .5s';
-          hdr.style.background='';
-          hdr.style.boxShadow='';
-        },800);
-      }
-    },200);
-  }));
-}
-
 function searchNavigateTo(id){
   // أغلق القائمة والخلفية
   document.getElementById('searchResultsPanel').style.display='none';
@@ -2938,18 +2869,40 @@ function searchNavigateTo(id){
   else{_searchResultIds=[id];_searchNavIdx=0;}
   _searchActiveId=id;
 
-  // ضبط الشجرة الصحيحة (رئيسية / خارجية)
-  _syncFamilyFilterForPerson(id);
+  // ── ضبط currentFamilyFilter حسب شجرة الشخص المستهدف ──
+  let _targetP=getPerson(id);
+  if(_targetP){
+    // جد الجذر الأعلى للشخص
+    let _tRoot=_targetP;
+    while(_tRoot.parentId&&getPerson(_tRoot.parentId))_tRoot=getPerson(_tRoot.parentId);
+    let _mainIds=new Set(getRoots(false).map(r=>r.id));
+    let _isMainTree=_mainIds.has(_tRoot.id);
+    let _alreadyCorrect=currentFamilyFilter&&currentFamilyFilter.rootId===_tRoot.id;
+    if(!_alreadyCorrect){
+      if(_isMainTree){
+        // الشخص في الشجرة الرئيسية — ألغِ الفلتر الخارجي
+        navStack=[];
+        currentFamilyFilter=null;
+      } else {
+        // الشخص في شجرة خارجية مختلفة — انتقل إليها
+        let _fromLabel=currentFamilyFilter?currentFamilyFilter.label:
+          (getRoots(false).length>0?'عائلة '+getRoots(false)[0].name:'الشجرة الرئيسية');
+        navStack.push({label:_fromLabel,filter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,scrollY:window.scrollY});
+        currentFamilyFilter={
+          rootId:_tRoot.id,
+          label:'عائلة '+(_tRoot.name)+(_tRoot.familyName?' '+_tRoot.familyName:''),
+          viaPersonId:id,fromLabel:_fromLabel
+        };
+      }
+    }
+  }
 
-  // انهيار الشجرة + فتح مسار الشخص فقط
+  // انهيار الشجرة + فتح مسار الشخص المحدد فقط (لا كل نتائج البحث)
   people.forEach(p=>expanded[p.id]=false);
-  _searchResultIds.forEach(rid=>{
-    function eu(pid){let p=getPerson(pid);if(!p)return;if(p.parentId){expanded[p.parentId]=true;eu(p.parentId);}}
-    eu(rid);
-    expanded[rid]=false;
-  });
+  (function eu(pid){let p=getPerson(pid);if(!p)return;if(p.parentId){expanded[p.parentId]=true;eu(p.parentId);}})(id);
+  expanded[id]=false;
 
-  // فتح تبويب الشجرة
+  // التأكد من فتح تبويب الشجرة
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab')[0].classList.add('active');
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -2957,8 +2910,21 @@ function searchNavigateTo(id){
 
   renderTree();
   _updateSearchNavBar();
-  // تمركز واحد فقط — بعد انتهاء الرسم
-  _scrollAndHighlight(id);
+
+  // تأخير 360ms لضمان انتهاء أنيميشن إغلاق لوحة البحث (280ms) قبل التمرير
+  setTimeout(()=>{
+    let el=document.querySelector(`[data-person-id="${id}"]`);
+    if(el){
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      let hdr=el.querySelector('.node-header');
+      if(hdr){
+        hdr.style.transition='background .12s ease';
+        hdr.style.background='#fef9c3';
+        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';
+        setTimeout(()=>{hdr.style.transition='background .5s,box-shadow .5s';hdr.style.background='';hdr.style.boxShadow='';},800);
+      }
+    }
+  },360);
 }
 function renderStats(){
   let total=people.length;
@@ -3576,21 +3542,19 @@ function navigateToPerson(id){
   document.getElementById('listPanel').classList.remove('active');
   document.getElementById('kinPanel').classList.remove('active');
   renderAll();
-  // تمييز سريع بدون وميض مطوّل
-  requestAnimationFrame(()=>{
-    setTimeout(()=>{
-      let el=document.querySelector(`[data-person-id="${id}"]`);
-      if(el){
-        el.scrollIntoView({behavior:'smooth',block:'center'});
-        let hdr=el.querySelector('.node-header');
-        if(hdr){
-          hdr.style.transition='background .1s';
-          hdr.style.background='#fef9c3';
-          setTimeout(()=>{hdr.style.transition='background .4s';hdr.style.background='';},600);
-        }
+  setTimeout(()=>{
+    let el=document.querySelector(`[data-person-id="${id}"]`);
+    if(el){
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      let hdr=el.querySelector('.node-header');
+      if(hdr){
+        hdr.style.transition='background .12s ease';
+        hdr.style.background='#fef9c3';
+        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';
+        setTimeout(()=>{hdr.style.transition='background .5s,box-shadow .5s';hdr.style.background='';hdr.style.boxShadow='';},800);
       }
-    },80);
-  });
+    }
+  },360);
 }
 // Navigate back to main tree and highlight a specific person (used by external tree wife-links)
 function navigateToMainForPerson(personId){
