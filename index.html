@@ -6798,7 +6798,10 @@ async function _autoRestoreFromCloud(){
   var res=_cloudSmartMerge(d);
   migrateExternalSpouses();_invalidateAll();
   _markDeviceInit();
-  saveData();renderAll();updateMyPersonBtn();
+  saveData();
+  // ── تأكيد حفظ الصور في IDB منفصلاً بعد الاستعادة التلقائية ──
+  await _persistPhotosToIDB();
+  renderAll();updateMyPersonBtn();
   _showCloudToast('✅ تم التحميل: +'+res.added+' شخص، تحديث '+res.updated,'success',4000);
 }
 
@@ -7377,11 +7380,18 @@ async function doCloudRestore(mode){
       // إعادة ضبط hashes الصور بعد الاستبدال الكامل
       let newH={};people.forEach(p=>{if(p.photo)newH[p.id]=p.photo.length;});_saveSyncedHashes(newH);
       _markDeviceInit();
-      saveData();renderAll();updateMyPersonBtn();
+      saveData();
+      // ── تأكيد حفظ الصور في IDB منفصلاً بعد الاستعادة السحابية ──
+      await _persistPhotosToIDB();
+      renderAll();updateMyPersonBtn();
       _showCloudToast('✅ تم الاستبدال الكامل ('+people.length+' فرد)','success',3000);
     } else {
       let{added,updated}=_cloudSmartMerge(d,{mode:'cloud'});
-      migrateExternalSpouses();_invalidateAll();_markDeviceInit();saveData();renderAll();updateMyPersonBtn();
+      migrateExternalSpouses();_invalidateAll();_markDeviceInit();
+      saveData();
+      // ── تأكيد حفظ الصور في IDB منفصلاً بعد الدمج السحابي ──
+      await _persistPhotosToIDB();
+      renderAll();updateMyPersonBtn();
       _showCloudToast('✅ دُمج: +'+added+' جديد، تحديث '+updated+' موجود','success',3500);
     }
   }catch(e){_showCloudToast('❌ خطأ: '+e.message,'error',4000);}
@@ -7815,20 +7825,80 @@ function triggerCloudSync(){
 const STORAGE_KEY='family_tree_data_v3';
 const IDB_NAME='FamilyTreeDB';
 const IDB_STORE='data';
+const IDB_PHOTOS_STORE='photos';   // مخزن منفصل للصور — بدون حد الحجم
 const IDB_KEY='main';
 let _idb=null;
 
 function _idbOpen(){
   return new Promise(function(resolve){
     try{
-      var req=indexedDB.open(IDB_NAME,1);
+      // version=2 لإضافة مخزن الصور — onupgradeneeded يُنفَّذ مرة واحدة فقط
+      var req=indexedDB.open(IDB_NAME,2);
       req.onupgradeneeded=function(e){
-        e.target.result.createObjectStore(IDB_STORE);
+        var db=e.target.result;
+        if(!db.objectStoreNames.contains(IDB_STORE))
+          db.createObjectStore(IDB_STORE);
+        if(!db.objectStoreNames.contains(IDB_PHOTOS_STORE))
+          db.createObjectStore(IDB_PHOTOS_STORE);
       };
       req.onsuccess=function(e){_idb=e.target.result;resolve(true);};
       req.onerror=function(){resolve(false);};
     }catch(e){resolve(false);}
   });
+}
+
+// حفظ قاموس الصور {id: base64} في مخزن منفصل
+function _idbSavePhotos(photosMap){
+  return new Promise(function(resolve){
+    try{
+      if(!_idb){resolve(false);return;}
+      var tx=_idb.transaction(IDB_PHOTOS_STORE,'readwrite');
+      tx.objectStore(IDB_PHOTOS_STORE).put(photosMap,'__photos__');
+      tx.oncomplete=function(){resolve(true);};
+      tx.onerror=function(){resolve(false);};
+    }catch(e){resolve(false);}
+  });
+}
+
+// تحميل قاموس الصور من مخزنها المنفصل
+function _idbLoadPhotos(){
+  return new Promise(function(resolve){
+    try{
+      if(!_idb){resolve({});return;}
+      var tx=_idb.transaction(IDB_PHOTOS_STORE,'readonly');
+      var req=tx.objectStore(IDB_PHOTOS_STORE).get('__photos__');
+      req.onsuccess=function(e){resolve(e.target.result||{});};
+      req.onerror=function(){resolve({});};
+    }catch(e){resolve({});}
+  });
+}
+
+// استخراج الصور من people الحالية وحفظها في مخزنها المنفصل
+async function _persistPhotosToIDB(){
+  try{
+    var photosMap={};
+    people.forEach(function(p){if(p.photo)photosMap[p.id]=p.photo;});
+    if(Object.keys(photosMap).length>0){
+      await _idbSavePhotos(photosMap);
+      console.log('[IDB] Persisted',Object.keys(photosMap).length,'photos to IDB photos store');
+    }
+  }catch(e){console.warn('[IDB] _persistPhotosToIDB failed',e);}
+}
+
+// دمج الصور المحفوظة في IDB مع people الحالية في الذاكرة
+async function _mergePhotosFromIDB(){
+  try{
+    var photosMap=await _idbLoadPhotos();
+    var count=0;
+    people.forEach(function(p){
+      if(!p.photo&&photosMap[p.id]){
+        p.photo=photosMap[p.id];
+        count++;
+      }
+    });
+    if(count>0)console.log('[IDB] Restored',count,'photos from IDB photos store');
+    return count;
+  }catch(e){console.warn('[IDB] _mergePhotosFromIDB failed',e);return 0;}
 }
 function _idbSave(payload){
   return new Promise(function(resolve){
@@ -7865,15 +7935,25 @@ function _lsLoad(){
 }
 
 function saveData(){
-  var payload={people:people,relPairs:relPairs,nextId:nextId};
-  // IDB + localStorage (مؤقت — مدعوم على الجهاز الشخصي)
+  // ── الصور تُحفظ في مخزن IDB منفصل — لا تُضمَّن في payload الرئيسي ──
+  // هذا يحل مشكلة: localStorage يفشل بصمت بسبب حجم الصور (5MB)
+  // وIDB الرئيسي يبقى خفيفاً قابلاً للقراءة السريعة
+  var peopleNoPhotos=people.map(function(p){
+    if(!p.photo)return p;
+    var c=Object.assign({},p);delete c.photo;return c;
+  });
+  var payload={people:peopleNoPhotos,relPairs:relPairs,nextId:nextId};
+
+  // حفظ البيانات (بدون صور) في IDB و localStorage
   _idbSave(payload).catch(function(){});
   _lsSave(payload);
+
+  // حفظ الصور منفصلةً في مخزن __photos__ — بدون قيود الحجم
+  _persistPhotosToIDB().catch(function(){});
+
   showSaveToast();
-  // ← الحفظ السحابي يدوي فقط (زر ☁️ مزامنة) — لا تشغيل تلقائي
   triggerFamilyUpload(); // ← الرفع الصامت (نسخة العائلة — لا إشعار)
   _fsaTriggerSave();     // ← كتابة مباشرة في الملف (File System Access API)
-  // ← إزالة index.html من كاش الـ SW حتى لا يُعيد تحميل البيانات المضمّنة القديمة
   _swInvalidateHtmlCache();
 }
 // يُزيل index.html من كاش الـ SW — يُشغَّل عند كل حفظ
@@ -8126,6 +8206,8 @@ deletePerson=function(id){
       people.forEach(function(p){expanded[p.id]=false;});
       migrateExternalSpouses();
       _markDeviceInit();
+      // ── استعادة الصور من مخزنها المنفصل ──
+      await _mergePhotosFromIDB();
       dataLoaded=true;
       console.log('[Init] Loaded from IDB:',people.length,'persons');
     }
