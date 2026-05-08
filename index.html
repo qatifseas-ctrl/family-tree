@@ -1689,7 +1689,9 @@ function scoreMatch(p,q){
   }
   return score;
 }
+let _demoDataLoaded=false; // يُشير إلى أن البيانات المحلية هي بيانات نموذجية فقط
 function initData(){
+  _demoDataLoaded=true; // نضع العلامة قبل إضافة أي شخص
   let r=addPerson({name:'جد العائلة',gender:'male',dob:'1930-01-01',dod:'2000-01-01',deceased:true,spouses:[{name:'جدة العائلة',gender:'female',deceased:true,divorced:false,dob:'1935-01-01',dod:'2005-01-01',relativeId:null}]});
   let c1=addPerson({name:'الابن الأكبر',gender:'male',dob:'1955-03-15',parentId:r.id,motherName:'جدة العائلة',spouses:[{name:'زوجة الابن',gender:'female',deceased:false,divorced:false,dob:'1960-06-20',relativeId:null}]});
   let c2=addPerson({name:'البنت',gender:'female',dob:'1958-07-10',parentId:r.id,motherName:'جدة العائلة',spouses:[{name:'زوج البنت',gender:'male',deceased:false,divorced:false,dob:'1955-11-05',relativeId:null}]});
@@ -1774,7 +1776,6 @@ function _updateSearchNavBar(){
 function _jumpToResult(idx){
   if(!_searchResultIds.length)return;
   idx=Math.max(0,Math.min(idx,_searchResultIds.length-1));
-  // استخدم searchNavigateTo مباشرةً: تحتوي على منطق الشجرة الخارجية والانهيار الصحيح
   searchNavigateTo(_searchResultIds[idx]);
 }
 
@@ -2654,7 +2655,6 @@ function highlightQueryHTML(text,q){
 }
 
 function focusPersonCard(id){
-  // تأخير 360ms لضمان انتهاء أنيميشن إغلاق لوحة البحث (280ms) وإكمال رسم الشجرة
   setTimeout(()=>{
     let el=document.querySelector(`[data-person-id="${id}"]`);
     if(el){
@@ -2897,12 +2897,11 @@ function searchNavigateTo(id){
     }
   }
 
-  // انهيار الشجرة + فتح مسار الشخص المحدد فقط (لا كل نتائج البحث)
+  // انهيار الشجرة + فتح مسار الشخص المحدد فقط
   people.forEach(p=>expanded[p.id]=false);
   (function eu(pid){let p=getPerson(pid);if(!p)return;if(p.parentId){expanded[p.parentId]=true;eu(p.parentId);}})(id);
   expanded[id]=false;
 
-  // التأكد من فتح تبويب الشجرة
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab')[0].classList.add('active');
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -2911,7 +2910,6 @@ function searchNavigateTo(id){
   renderTree();
   _updateSearchNavBar();
 
-  // تأخير 360ms لضمان انتهاء أنيميشن إغلاق لوحة البحث (280ms) قبل التمرير
   setTimeout(()=>{
     let el=document.querySelector(`[data-person-id="${id}"]`);
     if(el){
@@ -3542,19 +3540,21 @@ function navigateToPerson(id){
   document.getElementById('listPanel').classList.remove('active');
   document.getElementById('kinPanel').classList.remove('active');
   renderAll();
-  setTimeout(()=>{
-    let el=document.querySelector(`[data-person-id="${id}"]`);
-    if(el){
-      el.scrollIntoView({behavior:'smooth',block:'center'});
-      let hdr=el.querySelector('.node-header');
-      if(hdr){
-        hdr.style.transition='background .12s ease';
-        hdr.style.background='#fef9c3';
-        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';
-        setTimeout(()=>{hdr.style.transition='background .5s,box-shadow .5s';hdr.style.background='';hdr.style.boxShadow='';},800);
+  // تمييز سريع بدون وميض مطوّل
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      let el=document.querySelector(`[data-person-id="${id}"]`);
+      if(el){
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+        let hdr=el.querySelector('.node-header');
+        if(hdr){
+          hdr.style.transition='background .1s';
+          hdr.style.background='#fef9c3';
+          setTimeout(()=>{hdr.style.transition='background .4s';hdr.style.background='';},600);
+        }
       }
-    }
-  },360);
+    },80);
+  });
 }
 // Navigate back to main tree and highlight a specific person (used by external tree wife-links)
 function navigateToMainForPerson(personId){
@@ -5716,37 +5716,79 @@ async function cloudDecrypt(b64){
 function _gistHeaders(){
   return {'Authorization':'token '+CLOUD_CONFIG.GITHUB_PAT,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
 }
+// ── retry مع exponential backoff لطلبات GitHub API للمالك فقط ──
+// لا نستخدم ?_ts= (يُعطّل CDN ويسبب 503) — نعتمد retry فقط
+async function _ghOwnerFetch(url, opts, maxRetries){
+  maxRetries = maxRetries||3;
+  let delayMs = 1500;
+  let lastErr;
+  for(let attempt=0; attempt<maxRetries; attempt++){
+    if(attempt>0){
+      console.debug('[OwnerSync] retry',attempt,'after',delayMs,'ms');
+      await new Promise(r=>setTimeout(r,delayMs));
+      delayMs = Math.min(delayMs*2, 12000);
+    }
+    try{
+      let res = await fetch(url, opts);
+      // 429: احترم Retry-After
+      if(res.status===429){
+        let ra = parseInt(res.headers.get('Retry-After')||'15');
+        let wait = Math.min(ra*1000,30000);
+        console.warn('[OwnerSync] Rate limited — waiting',wait,'ms');
+        if(attempt<maxRetries-1){ await new Promise(r=>setTimeout(r,wait)); continue; }
+      }
+      // 5xx عابر: أعد المحاولة
+      if((res.status>=500||res.status===408) && attempt<maxRetries-1){
+        console.warn('[OwnerSync] HTTP',res.status,'— will retry');
+        lastErr = new Error(_ghErrMsg(res.status));
+        continue;
+      }
+      return res;
+    }catch(netErr){
+      lastErr = netErr;
+      if(attempt<maxRetries-1)continue;
+    }
+  }
+  throw lastErr||new Error('فشل الاتصال بـ GitHub');
+}
+
+function _ghErrMsg(status){
+  if(status===503||status===502||status===504)return 'GitHub غير متاح مؤقتاً ('+status+') — أعد المحاولة';
+  if(status===401||status===403)return 'خطأ مصادقة GitHub — تحقق من التوكن';
+  if(status===429)return 'تجاوزت حد طلبات GitHub — انتظر دقيقة';
+  if(status===404)return 'لم يُعثر على Gist — تحقق من الإعدادات';
+  return 'GitHub API: '+status;
+}
+
 async function _gistCreate(filesObj){
-  let res=await fetch('https://api.github.com/gists',{
+  let res=await _ghOwnerFetch('https://api.github.com/gists',{
     method:'POST',headers:_gistHeaders(),
     body:JSON.stringify({description:'Family Tree Encrypted Backup',public:false,files:filesObj})
   });
-  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  if(!res.ok)throw new Error(_ghErrMsg(res.status));
   let j=await res.json();return j.id;
 }
 async function _gistUpdate(gistId,filesObj){
-  let res=await fetch('https://api.github.com/gists/'+gistId,{
+  let res=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{
     method:'PATCH',headers:_gistHeaders(),
     body:JSON.stringify({files:filesObj})
   });
-  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  if(!res.ok)throw new Error(_ghErrMsg(res.status));
 }
 async function _gistReadFile(gistId,filename){
-  let res=await fetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()});
-  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  let res=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()});
+  if(!res.ok)throw new Error(_ghErrMsg(res.status));
   let j=await res.json();
   let f=j.files&&j.files[filename];
-  if(!f)return null; // الملف غير موجود — ليس خطأً
+  if(!f)return null;
   if(f.truncated&&f.raw_url){
-    // raw_url قد يفشل من file:// بسبب CORS — نستخدم API مباشرة
     try{
-      let r=await fetch(f.raw_url,{headers:_gistHeaders()});
+      let r=await _ghOwnerFetch(f.raw_url,{headers:_gistHeaders()},3);
       if(r.ok)return await r.text();
     }catch(e){}
-    // fallback: اقرأ الـ Gist بطلب منفصل طالباً الملف بصيغة raw
-    let r2=await fetch('https://api.github.com/gists/'+gistId,{
+    let r2=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{
       headers:{..._gistHeaders(),'Accept':'application/vnd.github.raw+json'}
-    });
+    },2);
     if(r2.ok){let j2=await r2.json();let f2=j2.files&&j2.files[filename];if(f2&&f2.content)return f2.content;}
     throw new Error('الملف كبير جداً ولم يُمكن تحميله ('+filename+')');
   }
@@ -6762,7 +6804,7 @@ function _showNewDeviceBanner(){
 async function _autoRestoreFromCloud(){
   var b=document.getElementById('newDeviceBanner');
   if(b)b.remove();
-  var d=await cloudLoad();
+  var d=await cloudLoad(true); // جهاز جديد → صور السحابة إلزامية
   if(!d)return;
   var res=_cloudSmartMerge(d);
   migrateExternalSpouses();_invalidateAll();
@@ -6929,7 +6971,9 @@ async function cloudSave(){
 }
 
 // ── تحميل من السحابة ──
-async function cloudLoad(){
+// forcePhotos=true → صور السحابة تُطبَّق دائماً (استعادة كاملة / جهاز جديد)
+// forcePhotos=false  → صور السحابة تفوز فقط إذا كانت مختلفة (تحديث من جهاز آخر)
+async function cloudLoad(forcePhotos){
   if(!_isCloudConfigured())return false;
   let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
   if(!gistId)return false;
@@ -6940,7 +6984,7 @@ async function cloudLoad(){
     let enc=await _gistRead(gistId);
     let d=JSON.parse(await cloudDecrypt(enc.trim()));
     if(!d.people||!Array.isArray(d.people))throw new Error('بيانات غير صالحة');
-    // ── ٢. الصور من السحابة — أضف لكل شخص صورته إن لم تكن موجودة محلياً ──
+    // ── ٢. الصور من السحابة ──
     try{
       let encP=await _gistReadFile(gistId,CLOUD_PHOTOS_FILE);
       if(encP){
@@ -6951,18 +6995,33 @@ async function cloudLoad(){
           let cPhoto=cloudPhotos[p.id]||cloudPhotos[String(p.id)];
           if(!cPhoto)return;
           let localP=people.find(lp=>lp.id===p.id);
-          // خذ الصورة من السحابة إذا لم تكن موجودة محلياً — المحلية الموجودة تبقى
-          p.photo = (localP&&localP.photo) ? localP.photo : cPhoto;
+          if(forcePhotos||!localP||!localP.photo){
+            // استعادة كاملة أو جهاز جديد أو لا توجد صورة محلية → خذ من السحابة
+            p.photo=cPhoto;
+          } else if(localP.photo.length!==cPhoto.length){
+            // الصورة مختلفة الحجم → تم تحديثها على جهاز آخر → السحابة تفوز
+            p.photo=cPhoto;
+            console.debug('[CloudLoad] Photo updated for',p.id,'cloud:',cPhoto.length,'local:',localP.photo.length);
+          } else {
+            p.photo=localP.photo; // نفس الصورة → استخدم المحلية (أسرع)
+          }
           newHashes[p.id]=p.photo.length;
           photoCount++;
         });
-        if(photoCount>0)_saveSyncedHashes(newHashes);
+        if(photoCount>0){
+          _saveSyncedHashes(newHashes);
+          console.debug('[CloudLoad] Photos applied:',photoCount);
+        }
       }
     }catch(pe){console.warn('[CloudLoad-photos]',pe.message);}
     return d;
   }catch(e){
     console.warn('[CloudLoad]',e);
-    _showCloudToast('❌ فشل التحميل: '+e.message,'error',4000);
+    let msg=e.message||'';
+    if(msg.includes('503')||msg.includes('502'))msg='GitHub غير متاح مؤقتاً — أعد المحاولة بعد قليل';
+    else if(msg.includes('401')||msg.includes('403'))msg='خطأ مصادقة — تحقق من GitHub Token';
+    else if(msg.includes('429'))msg='تجاوزت حد الطلبات — انتظر دقيقة';
+    _showCloudToast('❌ فشل التحميل: '+msg,'error',4000);
     return false;
   }
 }
@@ -7032,7 +7091,14 @@ function _cloudSmartMerge(cloudData, mergeOptions){
       if(k==='id' || _familyIsIgnoredField(k))return;
       if(k==='photo'){
         if(mode==='cloud'){
-          if(!out.photo && src.photo)out.photo=src.photo;
+          if(src.photo){
+            if(!out.photo){
+              out.photo=src.photo; // لا توجد صورة محلية → خذ من السحابة
+            } else if(out.photo.length!==src.photo.length){
+              out.photo=src.photo; // صورة مختلفة الحجم → تم تحديثها → السحابة تفوز
+            }
+            // نفس الحجم → نفس الصورة → لا تغيير
+          }
         }
         return;
       }
@@ -7047,8 +7113,12 @@ function _cloudSmartMerge(cloudData, mergeOptions){
       if(local && local.photo!==undefined)out.photo=local.photo;
       else if(out.photo===undefined)delete out.photo;
     } else {
-      if(local && local.photo)out.photo=local.photo;
-      else if(src.photo)out.photo=src.photo;
+      // للمالك: الأولوية مُعالَجة أعلاه في if(k==='photo')
+      // فقط إذا لم تُعيَّن الصورة بعد → خذ من المصدر المتاح
+      if(!out.photo){
+        if(local&&local.photo)out.photo=local.photo;
+        else if(src.photo)out.photo=src.photo;
+      }
     }
     return out;
   }
@@ -7337,7 +7407,8 @@ async function cloudRestorePrompt(){
 
 async function doCloudRestore(mode){
   closeModal();
-  let d=await cloudLoad();
+  // استعادة كاملة: صور السحابة تطغى على أي صور محلية
+  let d=await cloudLoad(mode==='replace');
   if(!d)return;
   try{
     if(mode==='replace'){
@@ -7756,18 +7827,28 @@ async function initCloud(){
           saveData();renderAll();updateMyPersonBtn();
           _showCloudToast('☁️ تم تحميل البيانات من السحابة ('+people.length+' فرد)','success',3000);
         } else {
-          // دمج ذكي — السحابة هي المرجع، تُضاف الفوارق للمحلية
-          let{added,updated}=_cloudSmartMerge(cloudData,{mode:'cloud'});
-          migrateExternalSpouses();_invalidateAll();
-          _markDeviceInit(); // ✅ إصلاح 1: تسجيل الجهاز كمُهيَّأ بعد الدمج
-          saveData();renderAll();updateMyPersonBtn();
-          if(added>0||updated>0){
-            let msg=added>0?'☁️ دُمج '+added+' شخص جديد من السحابة':'☁️ الحفظ السحابي مفعّل ✓';
-            _showCloudToast(msg,'success',3000);
-            // ✅ إصلاح 3: رفع الفوارق للسحابة حتى يراها الجهاز الثاني
-            setTimeout(()=>{if(!_isNewDevice())cloudSave();},4000);
+          // إذا كانت البيانات المحلية هي فقط البيانات النموذجية (initData) → استبدلها بالسحابة
+          if(_demoDataLoaded){
+            people=cloudData.people;nextId=cloudData.nextId||1;relPairs=cloudData.relPairs||[];
+            if(cloudData.myPersonId){myPersonId=parseInt(cloudData.myPersonId);saveMyPerson();}
+            expanded={};people.forEach(p=>{expanded[p.id]=false;});
+            migrateExternalSpouses();
+            if(people.length)expanded[people[0].id]=true;
+            _invalidateAll();
+            _markDeviceInit();
+            saveData();renderAll();updateMyPersonBtn();
+            _showCloudToast('☁️ تم تحميل البيانات من السحابة ('+people.length+' فرد)','success',3000);
           } else {
-            _showCloudToast('☁️ الحفظ السحابي مفعّل ✓','success',2000);
+            // دمج ذكي — السحابة هي المرجع، تُضاف الفوارق للمحلية
+            let{added,updated}=_cloudSmartMerge(cloudData,{mode:'cloud'});
+            migrateExternalSpouses();_invalidateAll();
+            _markDeviceInit();
+            saveData();renderAll();updateMyPersonBtn();
+            let msg=(added>0||updated>0)
+              ?'☁️ دُمج '+(added||0)+' جديد، تحديث '+(updated||0)+' من السحابة'
+              :'☁️ الحفظ السحابي مفعّل ✓';
+            _showCloudToast(msg,'success',2500);
+            // ملاحظة: لا نرفع تلقائياً بعد الدمج — المزامنة يدوية فقط
           }
         }
       } else {
@@ -8404,21 +8485,33 @@ function dismissInstallBanner(){
     .mob-fab-search { background:#1e40af;color:#fff; font-size:18px; }
     </style>
     <button id="mob-fab-search-btn" class="mob-fab-btn mob-fab-search" onclick="openSearchPanel()" title="بحث سريع">🔍</button>
-    <button class="mob-fab-btn mob-fab-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="للأعلى">↑</button>
+    <button id="mob-fab-top-btn" class="mob-fab-btn mob-fab-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="للأعلى" style="display:none">↑</button>
   `;
   document.body.appendChild(fab);
 
   // أظهر الزر عند التمرير للأسفل في وضع الجوال
+  let _fabHideTimer=null;
+  function _showFabTemp(){
+    let topBtn=document.getElementById('mob-fab-top-btn');
+    if(window.scrollY<100){
+      fab.classList.remove('visible');
+      if(topBtn)topBtn.style.display='none';
+      return;
+    }
+    if(topBtn)topBtn.style.display='flex';
+    fab.classList.add('visible');
+    clearTimeout(_fabHideTimer);
+    _fabHideTimer=setTimeout(function(){
+      fab.classList.remove('visible');
+    },2500);
+  }
   window.addEventListener('scroll',function(){
-    // الجوال: يظهر بعد 200px. الديسكتوب: يظهر دائماً عند التمرير (البحث مفيد)
-    fab.classList.toggle('visible',window.scrollY>200);
+    if(document.body.classList.contains('mobile-mode')){
+      _showFabTemp();
+    }
+    // على الديسكتوب: الـFAB لا يظهر (الشريط العلوي يكفي)
   },{passive:true});
-  // إظهار فوري للبحث حتى قبل التمرير
-  setTimeout(()=>fab.classList.add('visible'),400);
-
-  // أظهر/أخفِ عند تبديل وضع الجوال
-  let origApply=window._applyMobileMode||function(){};
-  // سيُعاد التحقق عند كل scroll
+  // لا نُظهره مباشرة عند التحميل — ينتظر أول تمرير
 })();
 
 // ══════════════════════════════════════════════════════════
