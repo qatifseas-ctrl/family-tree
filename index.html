@@ -873,6 +873,9 @@ body.mobile-mode #searchResultsPanel {
 body.mobile-mode .node-header { transition: none; }
 body.mobile-mode .node-children { transition: none; }
 body.mobile-mode #cloudSyncBtn,
+body.mobile-mode #cloudUploadBtn,
+body.mobile-mode #cloudDownloadBtn,
+body.mobile-mode #cloudLastSyncTime,
 body.mobile-mode #cloudRestoreBtn,
 body.mobile-mode #exportFamilyBtn,
 body.mobile-mode #familyUploadSetupBtn,
@@ -953,11 +956,10 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   <div id="cloudSetupBanner" style="display:none;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;padding:10px 16px;border-radius:10px;margin-bottom:12px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <span>☁️</span>
     <div style="flex:1;line-height:1.5">
-      <div style="font-weight:600">☁️ الحفظ السحابي اليدوي غير مفعّل</div>
-      <div style="font-size:11px;opacity:.85">الرفع والتنزيل يتمان بأزرار منفصلة فقط، مع نسخة رئيسية واحدة وصور مرتبطة.</div>
+      <div style="font-weight:600">☁️ الحفظ السحابي غير مفعّل في هذه النسخة</div>
+      <div style="font-size:11px;opacity:.85">إذا كنت المالك: اضغط ⚙️ إعداد — إذا كنت ضيفاً: استخدم 📤 تصدير JSON وأرسله للمالك</div>
     </div>
-    <button onclick="openCloudSetup()" style="padding:5px 14px;background:#fff;color:#1e40af;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⚙️ إعداد المالك</button>
-    <button onclick="openCloudDebugModal()" style="padding:5px 14px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">🧪 الصيانة</button>
+    <button onclick="openCloudSetup()" style="padding:5px 14px;background:#fff;color:#1e40af;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⚙️ إعداد (المالك)</button>
     <button onclick="closeBannerForever()" style="padding:5px 10px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap">✕ إغلاق</button>
   </div>
   <div id="saveToast"  style="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none;">✔ تم الحفظ</div>
@@ -995,10 +997,11 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button class="btn" id="mergeLogBtn" onclick="openMergeLogModal()" title="سجل الدمج" style="display:none;background:#f8fafc;border-color:#8b5cf6;color:#5b21b6">📜 سجل الدمج</button>
     <button class="btn" id="undoLastMergeBtn" onclick="undoLastMerge()" title="استرجاع آخر دمج" style="display:none;background:#fff7ed;border-color:#fb923c;color:#c2410c">↩ استرجاع قبل الدمج</button>
     <button class="btn" onclick="showExportJSONModal()" title="تصدير البيانات كملف JSON للنسخ الاحتياطي">📤 تصدير JSON</button>
-    <button class="btn" id="cloudSyncBtn" onclick="manualCloudSync()" title="رفع النسخة النظيفة إلى السحابة" style="display:none">⬆️ رفع إلى السحابة</button>
-    <button class="btn" id="cloudRestoreBtn" onclick="cloudRestorePrompt()" title="تنزيل البيانات من السحابة واستبدال المحلية" style="display:none">⬇️ تنزيل من السحابة</button>
-    <button class="btn" id="cloudDebugBtn" onclick="openCloudDebugModal()" title="سجل الصيانة والتشخيص" style="display:none;background:#f3f4f6;border-color:#9ca3af;color:#374151">🧪 صيانة</button>
-    <span id="cloudLastSyncBadge" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--card-border);background:var(--card-bg);color:var(--text2);font-size:11px;white-space:nowrap;">آخر مزامنة: —</span>
+    <button class="btn" id="cloudSyncBtn" onclick="manualCloudSync()" title="لوحة المزامنة السحابية" style="display:none">☁️ مزامنة</button>
+    <button class="btn" id="cloudUploadBtn" onclick="_doUploadToCloud()" title="رفع البيانات إلى السحابة" style="display:none;background:#eff6ff;border-color:#3b82f6;color:#1d4ed8">⬆️ رفع</button>
+    <button class="btn" id="cloudDownloadBtn" onclick="_doDownloadFromCloud(false)" title="تنزيل من السحابة ودمجه" style="display:none;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">⬇️ تنزيل</button>
+    <button class="btn" id="cloudRestoreBtn" onclick="cloudRestorePrompt()" title="استعادة البيانات من السحابة" style="display:none">🔄 استعادة</button>
+    <span id="cloudLastSyncTime" style="font-size:11px;color:var(--text2);display:none;align-self:center;white-space:nowrap"></span>
     <label class="btn" style="cursor:pointer;" title="استيراد من ملف HTML محفوظ أو JSON">📥 استيراد<input type="file" id="importFileInput" accept=".json,.html,.htm" onchange="handleImportFile(event)" style="display:none"></label>
   </div>
   <div class="tabs">
@@ -1218,6 +1221,9 @@ const CLOUD_CONFIG = {
 const CLOUD_PHOTOS_FILE = 'ft_photos.dat';
 // Gist ID يُحفظ تلقائياً في localStorage بعد أول رفع
 const CLOUD_GIST_KEY = 'ft_cloud_gist_id_v1';
+const CLOUD_META_FILE = 'ft_meta.dat';        // ملف metadata: وقت آخر مزامنة، إصدار، إحصائيات
+const CLOUD_SYNC_LOG_KEY = 'ft_sync_log_v1'; // سجل المزامنة في localStorage (آخر 50 عملية)
+const CLOUD_LAST_SYNC_KEY = 'ft_last_sync_v1';// وقت آخر مزامنة ناجحة
 // ── مفتاح تمييز الجهاز المُهيَّأ (يُضبط مرة واحدة بعد أول تحميل أو حفظ حقيقي) ──
 const DEVICE_INIT_KEY = 'ft_device_init_v1';
 function _isNewDevice(){
@@ -1692,7 +1698,9 @@ function scoreMatch(p,q){
   }
   return score;
 }
+let _demoDataLoaded=false; // يُشير إلى أن البيانات المحلية هي بيانات نموذجية فقط
 function initData(){
+  _demoDataLoaded=true; // نضع العلامة قبل إضافة أي شخص
   let r=addPerson({name:'جد العائلة',gender:'male',dob:'1930-01-01',dod:'2000-01-01',deceased:true,spouses:[{name:'جدة العائلة',gender:'female',deceased:true,divorced:false,dob:'1935-01-01',dod:'2005-01-01',relativeId:null}]});
   let c1=addPerson({name:'الابن الأكبر',gender:'male',dob:'1955-03-15',parentId:r.id,motherName:'جدة العائلة',spouses:[{name:'زوجة الابن',gender:'female',deceased:false,divorced:false,dob:'1960-06-20',relativeId:null}]});
   let c2=addPerson({name:'البنت',gender:'female',dob:'1958-07-10',parentId:r.id,motherName:'جدة العائلة',spouses:[{name:'زوج البنت',gender:'male',deceased:false,divorced:false,dob:'1955-11-05',relativeId:null}]});
@@ -1777,7 +1785,6 @@ function _updateSearchNavBar(){
 function _jumpToResult(idx){
   if(!_searchResultIds.length)return;
   idx=Math.max(0,Math.min(idx,_searchResultIds.length-1));
-  // استخدم searchNavigateTo مباشرةً: تحتوي على منطق الشجرة الخارجية والانهيار الصحيح
   searchNavigateTo(_searchResultIds[idx]);
 }
 
@@ -2657,7 +2664,6 @@ function highlightQueryHTML(text,q){
 }
 
 function focusPersonCard(id){
-  // تأخير 360ms لضمان انتهاء أنيميشن إغلاق لوحة البحث (280ms) وإكمال رسم الشجرة
   setTimeout(()=>{
     let el=document.querySelector(`[data-person-id="${id}"]`);
     if(el){
@@ -2900,12 +2906,11 @@ function searchNavigateTo(id){
     }
   }
 
-  // انهيار الشجرة + فتح مسار الشخص المحدد فقط (لا كل نتائج البحث)
+  // انهيار الشجرة + فتح مسار الشخص المحدد فقط
   people.forEach(p=>expanded[p.id]=false);
   (function eu(pid){let p=getPerson(pid);if(!p)return;if(p.parentId){expanded[p.parentId]=true;eu(p.parentId);}})(id);
   expanded[id]=false;
 
-  // التأكد من فتح تبويب الشجرة
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab')[0].classList.add('active');
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -2914,7 +2919,6 @@ function searchNavigateTo(id){
   renderTree();
   _updateSearchNavBar();
 
-  // تأخير 360ms لضمان انتهاء أنيميشن إغلاق لوحة البحث (280ms) قبل التمرير
   setTimeout(()=>{
     let el=document.querySelector(`[data-person-id="${id}"]`);
     if(el){
@@ -3545,19 +3549,21 @@ function navigateToPerson(id){
   document.getElementById('listPanel').classList.remove('active');
   document.getElementById('kinPanel').classList.remove('active');
   renderAll();
-  setTimeout(()=>{
-    let el=document.querySelector(`[data-person-id="${id}"]`);
-    if(el){
-      el.scrollIntoView({behavior:'smooth',block:'center'});
-      let hdr=el.querySelector('.node-header');
-      if(hdr){
-        hdr.style.transition='background .12s ease';
-        hdr.style.background='#fef9c3';
-        hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';
-        setTimeout(()=>{hdr.style.transition='background .5s,box-shadow .5s';hdr.style.background='';hdr.style.boxShadow='';},800);
+  // تمييز سريع بدون وميض مطوّل
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      let el=document.querySelector(`[data-person-id="${id}"]`);
+      if(el){
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+        let hdr=el.querySelector('.node-header');
+        if(hdr){
+          hdr.style.transition='background .1s';
+          hdr.style.background='#fef9c3';
+          setTimeout(()=>{hdr.style.transition='background .4s';hdr.style.background='';},600);
+        }
       }
-    }
-  },360);
+    },80);
+  });
 }
 // Navigate back to main tree and highlight a specific person (used by external tree wife-links)
 function navigateToMainForPerson(personId){
@@ -5719,37 +5725,79 @@ async function cloudDecrypt(b64){
 function _gistHeaders(){
   return {'Authorization':'token '+CLOUD_CONFIG.GITHUB_PAT,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
 }
+// ── retry مع exponential backoff لطلبات GitHub API للمالك فقط ──
+// لا نستخدم ?_ts= (يُعطّل CDN ويسبب 503) — نعتمد retry فقط
+async function _ghOwnerFetch(url, opts, maxRetries){
+  maxRetries = maxRetries||3;
+  let delayMs = 1500;
+  let lastErr;
+  for(let attempt=0; attempt<maxRetries; attempt++){
+    if(attempt>0){
+      console.debug('[OwnerSync] retry',attempt,'after',delayMs,'ms');
+      await new Promise(r=>setTimeout(r,delayMs));
+      delayMs = Math.min(delayMs*2, 12000);
+    }
+    try{
+      let res = await fetch(url, opts);
+      // 429: احترم Retry-After
+      if(res.status===429){
+        let ra = parseInt(res.headers.get('Retry-After')||'15');
+        let wait = Math.min(ra*1000,30000);
+        console.warn('[OwnerSync] Rate limited — waiting',wait,'ms');
+        if(attempt<maxRetries-1){ await new Promise(r=>setTimeout(r,wait)); continue; }
+      }
+      // 5xx عابر: أعد المحاولة
+      if((res.status>=500||res.status===408) && attempt<maxRetries-1){
+        console.warn('[OwnerSync] HTTP',res.status,'— will retry');
+        lastErr = new Error(_ghErrMsg(res.status));
+        continue;
+      }
+      return res;
+    }catch(netErr){
+      lastErr = netErr;
+      if(attempt<maxRetries-1)continue;
+    }
+  }
+  throw lastErr||new Error('فشل الاتصال بـ GitHub');
+}
+
+function _ghErrMsg(status){
+  if(status===503||status===502||status===504)return 'GitHub غير متاح مؤقتاً ('+status+') — أعد المحاولة';
+  if(status===401||status===403)return 'خطأ مصادقة GitHub — تحقق من التوكن';
+  if(status===429)return 'تجاوزت حد طلبات GitHub — انتظر دقيقة';
+  if(status===404)return 'لم يُعثر على Gist — تحقق من الإعدادات';
+  return 'GitHub API: '+status;
+}
+
 async function _gistCreate(filesObj){
-  let res=await fetch('https://api.github.com/gists',{
+  let res=await _ghOwnerFetch('https://api.github.com/gists',{
     method:'POST',headers:_gistHeaders(),
     body:JSON.stringify({description:'Family Tree Encrypted Backup',public:false,files:filesObj})
   });
-  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  if(!res.ok)throw new Error(_ghErrMsg(res.status));
   let j=await res.json();return j.id;
 }
 async function _gistUpdate(gistId,filesObj){
-  let res=await fetch('https://api.github.com/gists/'+gistId,{
+  let res=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{
     method:'PATCH',headers:_gistHeaders(),
     body:JSON.stringify({files:filesObj})
   });
-  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  if(!res.ok)throw new Error(_ghErrMsg(res.status));
 }
 async function _gistReadFile(gistId,filename){
-  let res=await fetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()});
-  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  let res=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()});
+  if(!res.ok)throw new Error(_ghErrMsg(res.status));
   let j=await res.json();
   let f=j.files&&j.files[filename];
-  if(!f)return null; // الملف غير موجود — ليس خطأً
+  if(!f)return null;
   if(f.truncated&&f.raw_url){
-    // raw_url قد يفشل من file:// بسبب CORS — نستخدم API مباشرة
     try{
-      let r=await fetch(f.raw_url,{headers:_gistHeaders()});
+      let r=await _ghOwnerFetch(f.raw_url,{headers:_gistHeaders()},3);
       if(r.ok)return await r.text();
     }catch(e){}
-    // fallback: اقرأ الـ Gist بطلب منفصل طالباً الملف بصيغة raw
-    let r2=await fetch('https://api.github.com/gists/'+gistId,{
+    let r2=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{
       headers:{..._gistHeaders(),'Accept':'application/vnd.github.raw+json'}
-    });
+    },2);
     if(r2.ok){let j2=await r2.json();let f2=j2.files&&j2.files[filename];if(f2&&f2.content)return f2.content;}
     throw new Error('الملف كبير جداً ولم يُمكن تحميله ('+filename+')');
   }
@@ -6765,7 +6813,7 @@ function _showNewDeviceBanner(){
 async function _autoRestoreFromCloud(){
   var b=document.getElementById('newDeviceBanner');
   if(b)b.remove();
-  var d=await cloudLoad();
+  var d=await cloudLoad(true); // جهاز جديد → صور السحابة إلزامية
   if(!d)return;
   var res=_cloudSmartMerge(d);
   migrateExternalSpouses();_invalidateAll();
@@ -6798,43 +6846,1084 @@ function _updateCloudBtn(state){
 }
 
 // ── رفع إلى السحابة ──
+// ══════════════════════════════════════════════════════════
+//  التحقق من صحة البيانات قبل الرفع
+// ══════════════════════════════════════════════════════════
+
+// هل هذا شخص نموذجي/تجريبي؟
+function _isDemoPerson(p){
+  const demoNames=['جد العائلة','جدة العائلة','الابن الأكبر','البنت','الابن الثاني',
+                   'الابن الثالث','زوجة الابن','زوج البنت','ابن الابن'];
+  return demoNames.includes((p.name||'').trim());
+}
+
+// تحقق من صحة البيانات قبل الرفع
+function _validateForUpload(peopleArr){
+  let issues=[];
+  // تحقق: عدد الأشخاص
+  if(!peopleArr||!peopleArr.length){
+    issues.push({type:'error',msg:'لا توجد بيانات للرفع'});
+    return{ok:false,issues};
+  }
+  // تحقق: هل كلهم نموذجيون؟
+  let demoCount=peopleArr.filter(_isDemoPerson).length;
+  if(demoCount>0&&demoCount===peopleArr.length){
+    issues.push({type:'error',msg:'البيانات كلها نموذجية (demo) — أضف أفراد حقيقيين أولاً'});
+    return{ok:false,issues};
+  }
+  // تحذير: يوجد بعض النموذجيين
+  if(demoCount>0){
+    issues.push({type:'warn',msg:demoCount+' شخص نموذجي سيُرفع مع البيانات — يُنصح بحذفهم أولاً'});
+  }
+  // تحقق: مراجع مكررة
+  let ids=peopleArr.map(p=>p.id);
+  let dupes=ids.filter((id,i)=>ids.indexOf(id)!==i);
+  if(dupes.length){
+    issues.push({type:'warn',msg:'يوجد '+dupes.length+' معرّف مكرر — قد يسبب مشاكل'});
+  }
+  // تحقق: أسماء فارغة
+  let noName=peopleArr.filter(p=>!(p.name||'').trim()).length;
+  if(noName>0){
+    issues.push({type:'warn',msg:noName+' شخص بلا اسم'});
+  }
+  return{ok:true,issues};
+}
+
+// تصفية الصور: تأكد أن الصورة موجودة في people قبل رفعها
+function _buildValidPhotosMap(peopleArr){
+  let map={};
+  let orphaned=0;
+  peopleArr.forEach(p=>{
+    if(p.photo&&typeof p.photo==='string'&&p.photo.length>100){
+      map[p.id]=p.photo;
+    } else if(p.photo){
+      orphaned++;
+    }
+  });
+  if(orphaned>0) _syncLog('warn','صور يتيمة أو فارغة تجاهلها:'+orphaned);
+  return map;
+}
+
+// ══════════════════════════════════════════════════════════
+//  رفع إلى السحابة — مع تحقق وتسجيل
+// ══════════════════════════════════════════════════════════
+async function cloudSave(){
+  if(!_isCloudConfigured()||_cloudSyncing)return;
+  _cloudSyncing=true;
+  _updateCloudBtn('syncing');
+  _syncLog('info','بدأ الرفع إلى السحابة','أشخاص: '+people.length);
+
+  try{
+    // ── التحقق من صحة البيانات ──
+    let validation=_validateForUpload(people);
+    if(!validation.ok){
+      let errMsg=validation.issues.map(i=>i.msg).join('\n');
+      _syncLog('error','فشل التحقق — رُفض الرفع',errMsg);
+      _showCloudToast('❌ '+validation.issues[0].msg,'error',5000);
+      _updateCloudBtn('error');
+      return;
+    }
+    // تسجيل التحذيرات (لكن نكمل الرفع)
+    validation.issues.filter(i=>i.type==='warn').forEach(i=>_syncLog('warn',i.msg));
+
+    let photoCount=people.filter(p=>p.photo).length;
+    let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
+    let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)} MB`:`${sizeKB} KB`;
+    _showCloudToast(`🔄 جارٍ الرفع${photoCount?' ('+photoCount+' صورة، '+sizeLabel+')':''}...`,'syncing',0);
+
+    // ── ١. بيانات بدون صور ──
+    let dataNoPhotos=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null}));
+    dataNoPhotos.people.forEach(p=>{if(p.photo)delete p.photo;});
+    // إضافة metadata للرفع
+    dataNoPhotos._meta={
+      uploadedAt:new Date().toISOString(),
+      deviceId:_getDeviceId(),
+      peopleCount:people.length,
+      photoCount,
+      appVersion:'v13'
+    };
+    let encData=await cloudEncrypt(JSON.stringify(dataNoPhotos));
+
+    // ── ٢. ملف الصور — مع تحقق من صحة كل صورة ──
+    let photosMap=_buildValidPhotosMap(people);
+    let encPhotos=Object.keys(photosMap).length>0?await cloudEncrypt(JSON.stringify(photosMap)):null;
+    _syncLog('info','صور مرفوعة: '+Object.keys(photosMap).length);
+
+    // ── ٣. ملف metadata عام ──
+    let meta={
+      lastUpload:new Date().toISOString(),
+      deviceId:_getDeviceId(),
+      peopleCount:people.length,
+      photoCount:Object.keys(photosMap).length,
+      hasPhotosFile:!!encPhotos,
+      appVersion:'v13'
+    };
+    let encMeta=await cloudEncrypt(JSON.stringify(meta));
+
+    // ── ٤. رفع الملفات في طلب واحد ──
+    let filesObj={
+      [CLOUD_CONFIG.GIST_FILE]:{content:encData},
+      [CLOUD_META_FILE]:{content:encMeta}
+    };
+    if(encPhotos)filesObj[CLOUD_PHOTOS_FILE]={content:encPhotos};
+
+    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+    if(gistId){
+      try{ await _gistUpdate(gistId,filesObj); }
+      catch(e){
+        // Gist محذوف — أنشئ جديداً
+        _syncLog('warn','الـ Gist غير موجود — إنشاء جديد');
+        gistId=await _gistCreate(filesObj);
+        localStorage.setItem(CLOUD_GIST_KEY,gistId);
+        CLOUD_CONFIG.GIST_ID=gistId;
+      }
+    } else {
+      gistId=await _gistCreate(filesObj);
+      localStorage.setItem(CLOUD_GIST_KEY,gistId);
+      CLOUD_CONFIG.GIST_ID=gistId;
+    }
+
+    // ── ٥. تحديث hashes وإظهار النجاح ──
+    let newHashes={};
+    people.forEach(p=>{if(p.photo)newHashes[p.id]=p.photo.length;});
+    _saveSyncedHashes(newHashes);
+    _setLastSync();
+    _syncLog('ok','اكتمل الرفع بنجاح',people.length+' فرد، '+Object.keys(photosMap).length+' صورة');
+
+    let doneMsg=`☁️ تم الرفع ✓ · ${people.length} فرد${photoCount?' · '+photoCount+' صورة':''}`;
+    _showCloudToast(doneMsg,'success',3000);
+    _updateCloudBtn('ok');
+
+  }catch(e){
+    let msg=e.message||'خطأ غير معروف';
+    _syncLog('error','فشل الرفع',msg);
+    if(msg.includes('503')||msg.includes('502'))msg='GitHub غير متاح مؤقتاً — أعد المحاولة';
+    else if(msg.includes('401')||msg.includes('403'))msg='خطأ مصادقة — تحقق من التوكن';
+    else if(msg.includes('429'))msg='تجاوزت حد الطلبات — انتظر دقيقة';
+    _showCloudToast('❌ فشل الرفع: '+msg,'error',5000);
+    _updateCloudBtn('error');
+  }finally{
+    _cloudSyncing=false;
+  }
+}
+
+// ── مُولّد deviceId ثابت لهذا الجهاز ──
+function _getDeviceId(){
+  try{
+    let id=localStorage.getItem('ft_device_id');
+    if(id)return id;
+    id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+    localStorage.setItem('ft_device_id',id);
+    return id;
+  }catch(e){return 'unknown';}
+}
 
 
+// ── مساعد: قاموس hash الصور المُرفوعة {id: length} ──
+const CLOUD_PHOTO_HASHES_KEY='ft_cloud_photo_hashes_v1';
+function _getSyncedHashes(){try{return JSON.parse(localStorage.getItem(CLOUD_PHOTO_HASHES_KEY)||'{}')}catch(e){return {};}}
+function _saveSyncedHashes(h){try{localStorage.setItem(CLOUD_PHOTO_HASHES_KEY,JSON.stringify(h));}catch(e){}}
+
+async function cloudSave(){
+  if(!_isCloudConfigured()||_cloudSyncing)return;
+  // ── حماية الجهاز الجديد: لا ترفع قبل أن تستعيد من السحابة أولاً ──
+  if(_isNewDevice()){
+    _showCloudToast('⚠️ جهاز جديد — استعد من السحابة أولاً قبل الرفع','error',4500);
+    _updateCloudBtn('idle');
+    var rb=document.getElementById('cloudRestoreBtn');
+    if(rb){rb.style.outline='2px solid #ef4444';rb.style.outlineOffset='2px';setTimeout(()=>{rb.style.outline='';rb.style.outlineOffset='';},3000);}
+    return;
+  }
+  _cloudSyncing=true;
+  _updateCloudBtn('syncing');
+  try{
+    // ── ١. ملف البيانات الرئيسية بدون صور ──
+    let dataNoPhotos=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null}));
+    dataNoPhotos.people.forEach(p=>{if(p.photo)delete p.photo;});
+    let encData=await cloudEncrypt(JSON.stringify(dataNoPhotos));
+    let filesObj={[CLOUD_CONFIG.GIST_FILE]:{content:encData}};
+
+    // ── ٢. رفع الصور الجديدة أو المعدَّلة فقط (delta) ──
+    let syncedHashes=_getSyncedHashes();
+    let newPhotosMap={};   // {id: base64} — الجديدة فقط
+    let allHashesNow={};   // {id: length} — كل الصور الحالية
+    people.forEach(p=>{
+      if(!p.photo)return;
+      let h=p.photo.length;
+      allHashesNow[p.id]=h;
+      if(syncedHashes[p.id]!==h) newPhotosMap[p.id]=p.photo; // جديدة أو تغيّرت
+    });
+
+    let newCount=Object.keys(newPhotosMap).length;
+    let totalCount=Object.keys(allHashesNow).length;
+    let newSizeKB=Math.round(Object.values(newPhotosMap).reduce((s,v)=>s+v.length*0.75/1024,0));
+    let label=newCount>0?(newSizeKB>1024?`${(newSizeKB/1024).toFixed(1)}MB`:`${newSizeKB}KB`):'';
+    _showCloudToast(`🔄 جارٍ الرفع${newCount>0?' · '+newCount+' صورة جديدة ('+label+')':totalCount>0?' · الصور محدَّثة ✓':''}...`,'syncing',0);
+
+    if(newCount>0){
+      // اقرأ قاموس الصور الموجود في السحابة ثم أضف الجديدة
+      let gistIdNow=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+      let existingMap={};
+      if(gistIdNow){
+        try{
+          let encP=await _gistReadFile(gistIdNow,CLOUD_PHOTOS_FILE);
+          if(encP)existingMap=JSON.parse(await cloudDecrypt(encP.trim()));
+        }catch(e){}
+      }
+      // دمج: الجديدة تُضاف/تُحدَّث، القديمة تبقى
+      let mergedMap=Object.assign({},existingMap,newPhotosMap);
+      // إزالة صور الأشخاص المحذوفين
+      let liveIds=new Set(people.map(p=>String(p.id)));
+      Object.keys(mergedMap).forEach(k=>{if(!liveIds.has(k))delete mergedMap[k];});
+      filesObj[CLOUD_PHOTOS_FILE]={content:await cloudEncrypt(JSON.stringify(mergedMap))};
+    }
+
+    // ── ٣. رفع ──
+    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+    if(gistId){
+      try{await _gistUpdate(gistId,filesObj);}
+      catch(e){
+        gistId=await _gistCreate(filesObj);
+        localStorage.setItem(CLOUD_GIST_KEY,gistId);
+        CLOUD_CONFIG.GIST_ID=gistId;
+      }
+    }else{
+      gistId=await _gistCreate(filesObj);
+      localStorage.setItem(CLOUD_GIST_KEY,gistId);
+      CLOUD_CONFIG.GIST_ID=gistId;
+    }
+    // حفظ الـ hashes بعد نجاح الرفع
+    _saveSyncedHashes(allHashesNow);
+    let doneMsg=newCount>0
+      ?`☁️ تم الحفظ ✓ · ${newCount} صورة جديدة · ${totalCount} إجمالاً`
+      :`☁️ تم الحفظ السحابي ✓${totalCount>0?' · '+totalCount+' صورة':''}`;
+    _showCloudToast(doneMsg,'success',2800);
+    _updateCloudBtn('ok');
+  }catch(e){
+    console.warn('[CloudSave]',e);
+    _showCloudToast('❌ فشل الحفظ السحابي: '+e.message,'error',4000);
+    _updateCloudBtn('error');
+  }finally{_cloudSyncing=false;}
+}
+
+// ── تحميل من السحابة ──
+// forcePhotos=true → صور السحابة تُطبَّق دائماً (استعادة كاملة / جهاز جديد)
+// forcePhotos=false  → صور السحابة تفوز فقط إذا كانت مختلفة (تحديث من جهاز آخر)
+async function cloudLoad(forcePhotos){
+  if(!_isCloudConfigured())return false;
+  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+  if(!gistId)return false;
+  if(!localStorage.getItem(CLOUD_GIST_KEY))try{localStorage.setItem(CLOUD_GIST_KEY,gistId);}catch(e){}
+  try{
+    _showCloudToast('🔄 جارٍ التحميل من السحابة...','syncing',0);
+    // ── ١. البيانات الرئيسية ──
+    let enc=await _gistRead(gistId);
+    let d=JSON.parse(await cloudDecrypt(enc.trim()));
+    if(!d.people||!Array.isArray(d.people))throw new Error('بيانات غير صالحة');
+    // ── ٢. الصور من السحابة ──
+    try{
+      let encP=await _gistReadFile(gistId,CLOUD_PHOTOS_FILE);
+      if(encP){
+        let cloudPhotos=JSON.parse(await cloudDecrypt(encP.trim()));
+        let newHashes=_getSyncedHashes();
+        let photoCount=0;
+        d.people.forEach(p=>{
+          let cPhoto=cloudPhotos[p.id]||cloudPhotos[String(p.id)];
+          if(!cPhoto)return;
+          let localP=people.find(lp=>lp.id===p.id);
+          if(forcePhotos||!localP||!localP.photo){
+            // استعادة كاملة أو جهاز جديد أو لا توجد صورة محلية → خذ من السحابة
+            p.photo=cPhoto;
+          } else if(localP.photo.length!==cPhoto.length){
+            // الصورة مختلفة الحجم → تم تحديثها على جهاز آخر → السحابة تفوز
+            p.photo=cPhoto;
+            console.debug('[CloudLoad] Photo updated for',p.id,'cloud:',cPhoto.length,'local:',localP.photo.length);
+          } else {
+            p.photo=localP.photo; // نفس الصورة → استخدم المحلية (أسرع)
+          }
+          newHashes[p.id]=p.photo.length;
+          photoCount++;
+        });
+        if(photoCount>0){
+          _saveSyncedHashes(newHashes);
+          console.debug('[CloudLoad] Photos applied:',photoCount);
+        }
+      }
+    }catch(pe){console.warn('[CloudLoad-photos]',pe.message);}
+    return d;
+  }catch(e){
+    console.warn('[CloudLoad]',e);
+    let msg=e.message||'';
+    if(msg.includes('503')||msg.includes('502'))msg='GitHub غير متاح مؤقتاً — أعد المحاولة بعد قليل';
+    else if(msg.includes('401')||msg.includes('403'))msg='خطأ مصادقة — تحقق من GitHub Token';
+    else if(msg.includes('429'))msg='تجاوزت حد الطلبات — انتظر دقيقة';
+    _showCloudToast('❌ فشل التحميل: '+msg,'error',4000);
+    return false;
+  }
+}
+
+// ── لوحة المزامنة الرئيسية ──
+function manualCloudSync(){
+  if(!_isCloudConfigured()){openCloudSetup();return;}
+  openCloudSyncPanel();
+}
+
+// ══════════════════════════════════════════════════════════
+//  لوحة المزامنة — Upload / Download / Reset / Debug
+// ══════════════════════════════════════════════════════════
+function openCloudSyncPanel(){
+  if(!_isCloudConfigured()){openCloudSetup();return;}
+  let lastSync=_getLastSync();
+  let lastSyncLabel=lastSync?new Date(lastSync).toLocaleString('ar-SA',{timeZone:'Asia/Riyadh'}):'لم تتم مزامنة بعد';
+  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+  let photoCount=people.filter(p=>p.photo).length;
+  let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
+  let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)} MB`:`${sizeKB} KB`;
+  let validation=_validateForUpload(people);
+  let validBadge=validation.ok
+    ?'<span style="color:#15803d;font-weight:600">✅ البيانات صالحة للرفع</span>'
+    :'<span style="color:#dc2626;font-weight:600">❌ '+validation.issues[0].msg+'</span>';
+  let warnHtml=validation.issues.filter(i=>i.type==='warn')
+    .map(i=>`<div style="color:#92400e;font-size:11px">⚠️ ${i.msg}</div>`).join('');
+
+  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:540px">
+    <h3 style="display:flex;align-items:center;gap:8px">☁️ المزامنة السحابية
+      <span id="cloudLastSyncTime" style="font-size:11px;font-weight:400;color:var(--text2);margin-right:auto"></span>
+    </h3>
+
+    <!-- حالة المزامنة -->
+    <div style="padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:10px;margin-bottom:14px;font-size:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:var(--text2)">آخر مزامنة ناجحة</span>
+        <span style="font-weight:600;color:var(--text)">${lastSyncLabel}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:var(--text2)">البيانات المحلية</span>
+        <span style="color:var(--text)">${people.length} فرد · ${photoCount} صورة · ${sizeLabel}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--text2)">الـ Gist</span>
+        <a href="https://gist.github.com/${gistId}" target="_blank" style="font-family:monospace;font-size:10px;color:#3b82f6">${gistId?gistId.slice(0,16)+'...':'غير مُعيَّن'}</a>
+      </div>
+    </div>
+
+    <!-- تحقق البيانات -->
+    <div style="padding:8px 12px;background:${validation.ok?'#d1fae5':'#fee2e2'};border:1px solid ${validation.ok?'#10b981':'#fca5a5'};border-radius:8px;margin-bottom:12px;font-size:12px">
+      ${validBadge}
+      ${warnHtml}
+    </div>
+
+    <!-- أزرار Upload / Download -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button class="btn primary" onclick="closeModal();_doUploadToCloud()" ${!validation.ok?'disabled title="'+validation.issues[0].msg+'"':''} style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span style="font-size:20px">☁️⬆️</span>
+        <span>رفع إلى السحابة</span>
+        <span style="font-size:10px;opacity:.7">${people.length} فرد · ${photoCount} صورة</span>
+      </button>
+      <button class="btn" onclick="closeModal();_doDownloadFromCloud(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">
+        <span style="font-size:20px">☁️⬇️</span>
+        <span>تنزيل من السحابة</span>
+        <span style="font-size:10px;opacity:.7">دمج مع المحلي</span>
+      </button>
+    </div>
+
+    <!-- أزرار ثانوية -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:#fff7ed;border-color:#fb923c;color:#c2410c">
+        ⬇️ استعادة كاملة (استبدال)
+      </button>
+      <button class="btn" onclick="openCloudResetPanel()" style="flex:1;font-size:12px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">
+        🗑 إعادة ضبط السحابة
+      </button>
+    </div>
+
+    <!-- Debug -->
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="openSyncDebugPanel()" style="flex:1;font-size:11px;color:var(--text2)">
+        🔍 سجل المزامنة
+      </button>
+      <button class="btn" onclick="closeModal();openCloudSetup()" style="flex:1;font-size:11px;color:var(--text2)">
+        ⚙️ إعدادات السحابة
+      </button>
+    </div>
+
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn" onclick="closeModal()">إغلاق</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=html;
+  _updateLastSyncUI(_getLastSync());
+}
+
+// ── رفع — مع تأكيد ──
+async function _doUploadToCloud(){
+  let photoCount=people.filter(p=>p.photo).length;
+  let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
+  let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)} MB`:`${sizeKB} KB`;
+  if(sizeKB>3000&&!confirm(`⚠️ حجم البيانات كبير\n${photoCount} صورة — ${sizeLabel}\n\nهل تريد المتابعة؟`))return;
+  await cloudSave();
+}
+
+// ── تنزيل — بدون استبدال كامل (دمج) ──
+async function _doDownloadFromCloud(forceReplace){
+  if(!_isCloudConfigured()){openCloudSetup();return;}
+  _showCloudToast('🔄 جارٍ التنزيل من السحابة...','syncing',0);
+  _syncLog('info','بدأ التنزيل من السحابة');
+  try{
+    let d=await cloudLoad(forceReplace);
+    if(!d){_syncLog('error','فشل التنزيل — لا بيانات');return;}
+    if(forceReplace){
+      people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+      if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
+      expanded={};people.forEach(p=>{expanded[p.id]=false;});
+      migrateExternalSpouses();if(people.length)expanded[people[0].id]=true;
+      _invalidateAll();
+      _markDeviceInit();
+      await _persistPhotosToIDB();
+      saveData();renderAll();updateMyPersonBtn();
+      _setLastSync();
+      _syncLog('ok','اكتمل الاستبدال الكامل',d.people.length+' فرد');
+      _showCloudToast('✅ تم الاستبدال الكامل — '+d.people.length+' فرد','success',4000);
+    } else {
+      let{added,updated}=_cloudSmartMerge(d,{mode:'cloud'});
+      migrateExternalSpouses();_invalidateAll();
+      _markDeviceInit();
+      await _persistPhotosToIDB();
+      saveData();renderAll();updateMyPersonBtn();
+      _setLastSync();
+      _syncLog('ok','اكتمل الدمج','+'+added+' جديد، تحديث '+updated);
+      let msg=added>0||updated>0
+        ?`✅ دُمج: +${added} جديد، تحديث ${updated}`
+        :'☁️ البيانات محدَّثة — لا يوجد تغييرات جديدة';
+      _showCloudToast(msg,'success',4000);
+    }
+  }catch(e){
+    _syncLog('error','فشل التنزيل',e.message);
+    _showCloudToast('❌ فشل التنزيل: '+e.message,'error',5000);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  إعادة ضبط السحابة — حذف بيانات فاسدة وإعادة بناء نظيفة
+// ══════════════════════════════════════════════════════════
+function openCloudResetPanel(){
+  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:480px">
+    <h3 style="color:#dc2626">🗑 إعادة ضبط السحابة</h3>
+    <div style="padding:12px 14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;margin-bottom:16px;font-size:13px;color:#991b1b;line-height:1.8">
+      <strong>⚠️ تحذير:</strong> هذه العملية ستحذف كل البيانات المخزنة في الـ Gist على GitHub.<br>
+      البيانات المحلية على هذا الجهاز <strong>لن تُمس</strong>.<br>
+      بعد الحذف، يمكنك رفع نسخة نظيفة جديدة.
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:8px">اختر ما تريد حذفه:</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="rst_data" checked> <span style="font-size:13px">📄 ملف البيانات الرئيسي (ft_encrypted.dat)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="rst_photos" checked> <span style="font-size:13px">🖼 ملف الصور (ft_photos.dat)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="rst_meta" checked> <span style="font-size:13px">📊 ملف الـ metadata (ft_meta.dat)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="rst_local"> <span style="font-size:13px">🗄 مسح سجل المزامنة المحلي وإعادة الضبط</span>
+      </label>
+    </div>
+    <div style="padding:10px 12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:12px;color:#065f46;margin-bottom:14px">
+      💡 بعد الحذف: اضغط <strong>"رفع إلى السحابة"</strong> لرفع نسخة نظيفة جديدة من بياناتك الحالية.
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal();openCloudSyncPanel()">إلغاء</button>
+      <button class="btn" style="background:#dc2626;color:#fff;border-color:#dc2626" onclick="_executeCloudReset()">🗑 تنفيذ الحذف</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=html;
+}
+
+async function _executeCloudReset(){
+  let delData=document.getElementById('rst_data')?.checked;
+  let delPhotos=document.getElementById('rst_photos')?.checked;
+  let delMeta=document.getElementById('rst_meta')?.checked;
+  let delLocal=document.getElementById('rst_local')?.checked;
+  if(!delData&&!delPhotos&&!delMeta&&!delLocal){alert('اختر شيئاً للحذف أولاً');return;}
+
+  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+  if(!gistId&&(delData||delPhotos||delMeta)){
+    alert('لا يوجد Gist مُعيَّن — لا شيء لحذفه على السحابة.');
+    if(delLocal)_resetLocalSyncState();
+    closeModal();return;
+  }
+
+  closeModal();
+  _showCloudToast('🗑 جارٍ إعادة ضبط السحابة...','syncing',0);
+  _syncLog('info','بدأت إعادة ضبط السحابة');
+
+  try{
+    if(gistId&&(delData||delPhotos||delMeta)){
+      // ── أولاً: اعرف الملفات الموجودة فعلاً في الـ Gist ──
+      let existingFiles={};
+      try{
+        let res=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()},2);
+        if(res.ok){let j=await res.json();existingFiles=j.files||{};}
+      }catch(e){ _syncLog('warn','تعذّر جلب قائمة الملفات',e.message); }
+
+      // ── ملاحظة GitHub API: ──
+      // • لحذف ملف موجود: أرسل {filename: null}
+      // • لا يمكن حذف الملف الأخير في الـ Gist (يُعيد 422)
+      // • إذا الملف غير موجود أصلاً: تجاهله (لا ترسله كـ null)
+      // الحل: استبدل المحتوى بعلامة RESET بدلاً من null — يعمل دائماً
+      const RESET_MARKER = 'RESET_'+new Date().toISOString();
+      let filesObj={};
+      let wantedFiles=[];
+      if(delData) wantedFiles.push(CLOUD_CONFIG.GIST_FILE);
+      if(delPhotos) wantedFiles.push(CLOUD_PHOTOS_FILE);
+      if(delMeta) wantedFiles.push(CLOUD_META_FILE);
+
+      wantedFiles.forEach(fname=>{
+        if(existingFiles[fname]){
+          // الملف موجود → استبدل محتواه بعلامة reset (لا ترسل null لتجنب 422)
+          filesObj[fname]={content:RESET_MARKER};
+        }
+        // إذا غير موجود → تجاهله تماماً
+      });
+
+      if(Object.keys(filesObj).length>0){
+        await _gistUpdate(gistId,filesObj);
+        _syncLog('ok','أُعيد ضبط الملفات السحابية',Object.keys(filesObj).join(', '));
+      } else {
+        _syncLog('info','لا توجد ملفات في الـ Gist لإعادة ضبطها');
+      }
+    }
+    if(delLocal) _resetLocalSyncState();
+    _showCloudToast('✅ تمت إعادة الضبط — الآن ارفع نسخة نظيفة','success',4000);
+  }catch(e){
+    _syncLog('error','فشلت إعادة الضبط',e.message);
+    let msg=e.message||'';
+    if(msg.includes('422'))msg='تعذّر تعديل الـ Gist — تحقق من أن التوكن يملك صلاحية الكتابة';
+    else if(msg.includes('401')||msg.includes('403'))msg='خطأ مصادقة — تحقق من التوكن';
+    _showCloudToast('❌ '+msg,'error',5000);
+  }
+}
+
+function _resetLocalSyncState(){
+  try{
+    localStorage.removeItem(CLOUD_SYNC_LOG_KEY);
+    localStorage.removeItem(CLOUD_LAST_SYNC_KEY);
+    localStorage.removeItem(CLOUD_PHOTO_HASHES_KEY);
+    localStorage.removeItem(DEVICE_INIT_KEY);
+    _demoDataLoaded=false;
+    _syncLog('info','أُعيد ضبط الحالة المحلية');
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════
+//  لوحة سجل المزامنة / Debug
+// ══════════════════════════════════════════════════════════
+function openSyncDebugPanel(){
+  let logs=_getSyncLog();
+  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+  let lastSync=_getLastSync();
+  let photoCount=people.filter(p=>p.photo).length;
+  let missingPhotos=people.filter(p=>!p.photo&&p.id).length; // تقريب
+  let hashes=_getSyncedHashes();
+  let unsynced=people.filter(p=>p.photo&&hashes[p.id]!==p.photo.length).length;
+
+  // فحص تكرارات
+  let ids=people.map(p=>p.id);
+  let dupes=ids.filter((id,i)=>ids.indexOf(id)!==i);
+  let demoCount=people.filter(_isDemoPerson).length;
+
+  let logHtml=logs.length?logs.map(l=>{
+    let icon=l.level==='ok'?'✅':l.level==='error'?'❌':l.level==='warn'?'⚠️':'ℹ️';
+    let d=new Date(l.ts);
+    let time=d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--card-border);font-size:11px">
+      <span style="white-space:nowrap;color:var(--text2)">${time}</span>
+      <span>${icon} ${l.msg}${l.detail?' <span style="color:var(--text2)">— '+l.detail+'</span>':''}</span>
+    </div>`;
+  }).join(''):'<div style="color:var(--text2);font-size:12px;text-align:center;padding:20px">لا يوجد سجل بعد</div>';
+
+  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:600px;width:min(600px,96vw)">
+    <h3>🔍 سجل المزامنة والتشخيص</h3>
+    
+    <!-- إحصائيات سريعة -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      ${[
+        ['👥 الأفراد',people.length,''],
+        ['🖼 الصور',photoCount,''],
+        ['📷 غير مزامنة',unsynced,unsynced>0?'#dc2626':'#15803d'],
+        ['🔁 مكررات',dupes.length,dupes.length>0?'#dc2626':'#15803d'],
+        ['🧪 نموذجيون',demoCount,demoCount>0?'#92400e':'#15803d'],
+        ['🕐 آخر مزامنة',lastSync?new Date(lastSync).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—','']
+      ].map(([label,val,color])=>`
+        <div style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;text-align:center">
+          <div style="font-size:11px;color:var(--text2)">${label}</div>
+          <div style="font-size:16px;font-weight:700;color:${color||'var(--text)'}">${val}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Gist info -->
+    <div style="padding:8px 12px;background:var(--bg-secondary);border-radius:8px;font-size:11px;color:var(--text2);margin-bottom:12px">
+      🔗 Gist: ${gistId?`<a href="https://gist.github.com/${gistId}" target="_blank" style="color:#3b82f6;font-family:monospace">${gistId}</a>`:'غير مُعيَّن'}
+      &nbsp;·&nbsp; الجهاز: <code style="font-size:10px">${_getDeviceId()}</code>
+    </div>
+
+    <!-- سجل العمليات -->
+    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">سجل العمليات (آخر 50)</div>
+    <div style="max-height:40vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:8px 12px">
+      ${logHtml}
+    </div>
+
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn" onclick="_clearSyncLog();openSyncDebugPanel()" style="font-size:11px">🗑 مسح السجل</button>
+      <button class="btn" onclick="closeModal();openCloudSyncPanel()">رجوع</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=html;
+}
+
+// ── استعادة من السحابة ──
+// ════════════════════════════════════════════════════════
+// الدمج الذكي
+// ════════════════════════════════════════════════════════
+function _cloudSmartMerge(cloudData, mergeOptions){
+  let opts=mergeOptions||{};
+  let mode=(opts.mode||'cloud').toLowerCase(); // cloud | family
+  let incoming=(cloudData.people||[]);
+  let incomingRel=(cloudData.relPairs||[]);
+  let added=0,updated=0;
+  let cloudMaxId=incoming.length?Math.max(...incoming.map(p=>p.id)):0;
+  if(cloudMaxId>=nextId)nextId=cloudMaxId+1;
+
+  let localMap=new Map((people||[]).map(p=>[p.id,p]));
+  let incomingMap=new Map(incoming.map(p=>[p.id,p]));
+
+  function _spouseKey(sp, map){
+    return JSON.stringify(_familySpouseIdentity(sp,{personMap:map}));
+  }
+
+  function _mergeSpouseEntry(localSp, incomingSp){
+    let out=_familyCloneValue(localSp||{});
+    let src=incomingSp||{};
+    Object.keys(src).forEach(k=>{
+      if(k==='photo' || _familyIsIgnoredField(k))return;
+      if((k==='personId' || k==='relativeId') && out[k]!=null && out[k]!==undefined)return;
+      let v=src[k];
+      if(v!==undefined)out[k]=_familyCloneValue(v);
+    });
+    return out;
+  }
+
+  function _mergeSpouseLists(localList,incomingList){
+    let store=new Map();
+    (Array.isArray(localList)?localList:[]).forEach(sp=>{
+      store.set(_spouseKey(sp,localMap), _familyCloneValue(sp));
+    });
+    (Array.isArray(incomingList)?incomingList:[]).forEach(sp=>{
+      let key=_spouseKey(sp,incomingMap);
+      if(store.has(key))store.set(key, _mergeSpouseEntry(store.get(key), sp));
+      else store.set(key, _familyCloneValue(sp));
+    });
+    return Array.from(store.values());
+  }
+
+  function _mergePersonFields(local, incomingPerson){
+    let out=_familyCloneValue(local||{});
+    let src=incomingPerson||{};
+    Object.keys(src).forEach(k=>{
+      if(k==='id' || _familyIsIgnoredField(k))return;
+      if(k==='photo'){
+        if(mode==='cloud'){
+          if(src.photo){
+            if(!out.photo){
+              out.photo=src.photo; // لا توجد صورة محلية → خذ من السحابة
+            } else if(out.photo.length!==src.photo.length){
+              out.photo=src.photo; // صورة مختلفة الحجم → تم تحديثها → السحابة تفوز
+            }
+            // نفس الحجم → نفس الصورة → لا تغيير
+          }
+        }
+        return;
+      }
+      if(k==='spouses'){
+        out.spouses=_mergeSpouseLists(out.spouses||[], src.spouses||[]);
+        return;
+      }
+      let v=src[k];
+      if(v!==undefined)out[k]=_familyCloneValue(v);
+    });
+    if(mode==='family'){
+      if(local && local.photo!==undefined)out.photo=local.photo;
+      else if(out.photo===undefined)delete out.photo;
+    } else {
+      // للمالك: الأولوية مُعالَجة أعلاه في if(k==='photo')
+      // فقط إذا لم تُعيَّن الصورة بعد → خذ من المصدر المتاح
+      if(!out.photo){
+        if(local&&local.photo)out.photo=local.photo;
+        else if(src.photo)out.photo=src.photo;
+      }
+    }
+    return out;
+  }
+
+  function _findLocal(cp){
+    let byId=people.find(lp=>lp.id===cp.id);
+    if(byId)return {match:byId,how:'id'};
+    let inParent=incoming.find(x=>x.id===cp.parentId);
+    let byName=people.find(lp=>{
+      if(normalizeAr(lp.name)!==normalizeAr(cp.name))return false;
+      if(cp.gender&&lp.gender&&cp.gender!==lp.gender)return false;
+      if(inParent){let lp2=getPerson(lp.parentId);return lp2?normalizeAr(lp2.name)===normalizeAr(inParent.name):false;}
+      return !cp.parentId&&!lp.parentId;
+    });
+    if(byName)return {match:byName,how:'name'};
+    return null;
+  }
+
+  let idMap=new Map();
+  let trulyNew=[];
+  incoming.forEach(cp=>{
+    let found=_findLocal(cp);
+    if(found){
+      let lp=found.match;
+      idMap.set(cp.id, lp.id);
+      let merged=_mergePersonFields(lp, cp);
+      Object.assign(lp, merged, {id:lp.id});
+      updated++;
+    } else {
+      idMap.set(cp.id, cp.id);
+      trulyNew.push(_familyCloneValue(cp));
+      added++;
+    }
+  });
+
+  trulyNew.forEach(cp=>{
+    let targetId=cp.id;
+    if(people.find(lp=>lp.id===targetId)){
+      targetId=nextId++;
+      idMap.set(cp.id, targetId);
+    }
+    if(targetId>=nextId)nextId=targetId+1;
+    cp.id=targetId;
+    if(mode==='family' && cp.photo!==undefined)delete cp.photo;
+    people.push(cp);
+    expanded[cp.id]=false;
+  });
+
+  trulyNew.forEach(cp=>{
+    if(cp.parentId!=null && idMap.has(cp.parentId))cp.parentId=idMap.get(cp.parentId);
+    if(cp.motherId!=null && idMap.has(cp.motherId))cp.motherId=idMap.get(cp.motherId);
+    if(cp.fatherId!=null && idMap.has(cp.fatherId))cp.fatherId=idMap.get(cp.fatherId);
+  });
+
+  incomingRel.forEach(pair=>{
+    let a=idMap.has(pair[0])?idMap.get(pair[0]):pair[0];
+    let b=idMap.has(pair[1])?idMap.get(pair[1]):pair[1];
+    if(!relPairs.some(rp=>(rp[0]===a&&rp[1]===b)||(rp[0]===b&&rp[1]===a)))relPairs.push([a,b]);
+  });
+
+  let maxId=Math.max(...people.map(p=>p.id), nextId-1);
+  nextId=maxId+1;
+  return {added,updated};
+}
+
+
+function _cloneMergeState(){
+  return {
+    people: JSON.parse(JSON.stringify(people || [])),
+    relPairs: JSON.parse(JSON.stringify(relPairs || [])),
+    nextId: nextId,
+    myPersonId: (typeof myPersonId !== 'undefined' ? myPersonId : null),
+    expanded: JSON.parse(JSON.stringify(expanded || {}))
+  };
+}
+
+function _persistMergeHistory(){
+  try{
+    sessionStorage.setItem(MERGE_HISTORY_KEY, JSON.stringify(mergeHistory));
+  }catch(e1){
+    try{
+      localStorage.setItem(MERGE_HISTORY_KEY + '_meta', JSON.stringify(
+        mergeHistory.map(function(entry){
+          let copy = Object.assign({}, entry);
+          delete copy.backup;
+          return copy;
+        })
+      ));
+    }catch(e2){}
+  }
+  _refreshMergeHistoryButtons();
+}
+
+function _recordMergeHistory(meta, backup){
+  let entry = Object.assign({
+    id: Date.now() + '_' + Math.random().toString(16).slice(2),
+    ts: Date.now(),
+    backup: backup
+  }, meta || {});
+  mergeHistory.unshift(entry);
+  if(mergeHistory.length > MERGE_HISTORY_LIMIT) mergeHistory.length = MERGE_HISTORY_LIMIT;
+  _persistMergeHistory();
+}
+
+function _refreshMergeHistoryButtons(){
+  let hasLog = !!(mergeHistory && mergeHistory.length);
+  let logBtn = document.getElementById('mergeLogBtn');
+  let undoBtn = document.getElementById('undoLastMergeBtn');
+  if(logBtn) logBtn.style.display = hasLog ? 'inline-flex' : 'none';
+  if(undoBtn) undoBtn.style.display = hasLog ? 'inline-flex' : 'none';
+}
+
+function _restoreMergeState(snapshot){
+  if(!snapshot) return false;
+
+  people = JSON.parse(JSON.stringify(snapshot.people || []));
+  relPairs = JSON.parse(JSON.stringify(snapshot.relPairs || []));
+  nextId = snapshot.nextId || 1;
+  if(typeof myPersonId !== 'undefined'){
+    myPersonId = snapshot.myPersonId || null;
+    try{ saveMyPerson(); }catch(e){}
+  }
+  expanded = JSON.parse(JSON.stringify(snapshot.expanded || {}));
+
+  try{
+    migrateExternalSpouses();
+  }catch(e){}
+
+  try{ _invalidateAll(); }catch(e){}
+  try{ saveData(); }catch(e){}
+  try{ renderAll(); }catch(e){}
+  try{ updateMyPersonBtn(); }catch(e){}
+  return true;
+}
+
+function undoLastMerge(){
+  if(!mergeHistory.length){
+    alert('لا يوجد دمج سابق للاسترجاع');
+    return;
+  }
+  let last = mergeHistory[0];
+  if(!last.backup){
+    alert('السجل موجود، لكن نسخة الاسترجاع غير متاحة بعد إعادة التحميل.');
+    return;
+  }
+  if(!confirm('سيتم استرجاع الحالة قبل آخر دمج. هل تريد المتابعة؟')) return;
+
+  mergeHistory.shift();
+  _restoreMergeState(last.backup);
+  _persistMergeHistory();
+  if(typeof _showCloudToast === 'function') _showCloudToast('↩ تم استرجاع الحالة قبل آخر دمج','success',2500);
+}
+
+function openMergeLogModal(){
+  let rows = (mergeHistory || []).map(function(h, idx){
+    let ts = h.ts ? new Date(h.ts).toLocaleString('ar-SA', {
+      timeZone: 'Asia/Riyadh',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : '—';
+    let kind = h.kind === 'all' ? 'دمج الكل' : 'دمج نسخة';
+    let src = h.devId ? ` · ${h.devId}` : '';
+    let counts = `➕ ${h.added || 0} · 🔄 ${h.updated || 0}`;
+    let keep = h.backup ? 'قابل للاسترجاع' : 'سجل فقط';
+    let color = h.backup ? '#059669' : '#b45309';
+    return `
+      <div class="sub-item" style="align-items:flex-start;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;color:var(--text)">${kind}${src}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.7">${ts} · ${counts}</div>
+          ${h.note ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${h.note}</div>` : ''}
+        </div>
+        <div style="font-size:11px;color:${color};white-space:nowrap">${keep}</div>
+      </div>`;
+  }).join('');
+
+  if(!rows) rows = '<div class="no-results">لا يوجد سجل دمج بعد</div>';
+
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="max-width:760px;width:min(760px,96vw)">
+        <h3>📜 سجل الدمج</h3>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.7">
+          يعرض هذا السجل آخر عمليات الدمج. الاسترجاع يعمل إذا كانت نسخة الدمج ما زالت محفوظة في الجلسة الحالية.
+        </div>
+        <div style="max-height:58vh;overflow-y:auto;padding-left:2px">${rows}</div>
+        <div class="modal-footer" style="flex-wrap:wrap">
+          <button class="btn primary" onclick="undoLastMerge()">↩ استرجاع قبل الدمج</button>
+          <button class="btn" onclick="closeModal()">إغلاق</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function _applyFamilyMergeWithHistory(dataObj, meta){
+  let backup = _cloneMergeState();
+  let result = _cloudSmartMerge(dataObj,{mode:(meta&&meta.mergeMode)||'family'});
+  _recordMergeHistory(Object.assign({
+    source: 'family-update',
+    kind: 'single',
+    added: result.added || 0,
+    updated: result.updated || 0
+  }, meta || {}), backup);
+
+  try{ migrateExternalSpouses(); }catch(e){}
+  try{ _invalidateAll(); }catch(e){}
+  try{ saveData(); }catch(e){}
+  try{ renderAll(); }catch(e){}
+  try{ updateMyPersonBtn(); }catch(e){}
+  return result;
+}
+
+// ── بحث تلقائي عن Gist الخاص بالشجرة في حساب GitHub ──
+async function _findCloudGist(){
+  if(!CLOUD_CONFIG.GITHUB_PAT)return null;
+  try{
+    _showCloudToast('🔍 جارٍ البحث عن نسخة سحابية...','syncing',0);
+    _syncLog('info','جارٍ البحث عن Gist في السحابة');
+    for(let page=1;page<=5;page++){
+      let res=await _ghOwnerFetch('https://api.github.com/gists?per_page=30&page='+page,{headers:_gistHeaders()},3);
+      if(!res.ok)break;
+      let list=await res.json();
+      if(!list||!list.length)break;
+      for(let g of list){
+        let files=Object.keys(g.files||{});
+        if(files.includes(CLOUD_CONFIG.GIST_FILE)){
+          // وجدنا الـ Gist
+          localStorage.setItem(CLOUD_GIST_KEY,g.id);
+          CLOUD_CONFIG.GIST_ID=g.id;
+          _showCloudToast('✅ تم العثور على النسخة السحابية','success',2500);
+          return g.id;
+        }
+      }
+      if(list.length<30)break; // آخر صفحة
+    }
+    _showCloudToast('','info',1);
+    return null;
+  }catch(e){
+    _showCloudToast('❌ فشل البحث: '+e.message,'error',3000);
+    return null;
+  }
+}
+
+async function cloudRestorePrompt(){
+  if(!_isCloudConfigured()){openCloudSetup();return;}
+  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:460px">
+    <h3>⬇️ استعادة من السحابة</h3>
+    <div style="padding:10px 14px;background:#fef9c3;border:1px solid #eab308;border-radius:10px;margin-bottom:16px;font-size:12px;color:#713f12;line-height:1.8">
+      <strong>⚠️ الاستبدال الكامل</strong> سيحذف جميع البيانات الحالية على هذا الجهاز ويضع بيانات السحابة بدلاً منها.<br>
+      استخدم <strong>الدمج</strong> إذا أردت الاحتفاظ بالبيانات الحالية وإضافة ما في السحابة.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button class="btn" onclick="closeModal();_doDownloadFromCloud(false)" style="padding:12px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;background:#d1fae5;border-color:#10b981;color:#065f46">
+        <span style="font-size:20px">🔀</span>
+        <span style="font-weight:600">دمج مع الموجود</span>
+        <span style="font-size:10px;opacity:.8">البيانات الحالية تبقى + يُضاف ما في السحابة</span>
+      </button>
+      <button class="btn" onclick="closeModal();doCloudRestore('replace')" style="padding:12px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">
+        <span style="font-size:20px">🔄</span>
+        <span style="font-weight:600">استبدال كامل</span>
+        <span style="font-size:10px;opacity:.8">تحذير: تُحذف البيانات الحالية نهائياً</span>
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=html;
+}
+
+
+async function doCloudRestore(mode){
+  closeModal();
+  // استعادة كاملة: صور السحابة تطغى على أي صور محلية
+  let d=await cloudLoad(mode==='replace');
+  if(!d)return;
+  try{
+    if(mode==='replace'){
+      if(!confirm('هل أنت متأكد؟ ستُفقد جميع البيانات والصور الحالية.'))return;
+      people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+      if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
+      expanded={};people.forEach(p=>{expanded[p.id]=false;});
+      migrateExternalSpouses();if(people.length)expanded[people[0].id]=true;
+      // إعادة ضبط hashes الصور بعد الاستبدال الكامل
+      let newH={};people.forEach(p=>{if(p.photo)newH[p.id]=p.photo.length;});_saveSyncedHashes(newH);
+      _markDeviceInit();
+      saveData();
+      // ── تأكيد حفظ الصور في IDB منفصلاً بعد الاستعادة السحابية ──
+      await _persistPhotosToIDB();
+      renderAll();updateMyPersonBtn();
+      _showCloudToast('✅ تم الاستبدال الكامل ('+people.length+' فرد)','success',3000);
+    } else {
+      let{added,updated}=_cloudSmartMerge(d,{mode:'cloud'});
+      migrateExternalSpouses();_invalidateAll();_markDeviceInit();
+      saveData();
+      // ── تأكيد حفظ الصور في IDB منفصلاً بعد الدمج السحابي ──
+      await _persistPhotosToIDB();
+      renderAll();updateMyPersonBtn();
+      _showCloudToast('✅ دُمج: +'+added+' جديد، تحديث '+updated+' موجود','success',3500);
+    }
+  }catch(e){_showCloudToast('❌ خطأ: '+e.message,'error',4000);}
+}
+
+// ── واجهة الإعداد ──
 function openCloudSetup(){
   let currentPAT=CLOUD_CONFIG.GITHUB_PAT||'';
   let currentKey=CLOUD_CONFIG.KEY_HEX||'';
-  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||'';
+  // Generate a random key for the user if none exists
   let generatedKey='';
   if(!currentKey){
     let bytes=crypto.getRandomValues(new Uint8Array(32));
     generatedKey=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
   }
   let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:540px">
-    <h3>☁️ إعداد السحابة اليدوي للمالك</h3>
-    <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.8">
-      هذا الوضع لا يرفع أو ينزّل تلقائيًا. استخدم فقط <strong>رفع إلى السحابة</strong> و<strong>تنزيل من السحابة</strong> يدويًا.
-      <br>الصور تُحفظ كملفات منفصلة داخل السحابة، ثم يُعاد ربطها عند التنزيل.
+  <div class="modal" style="max-width:500px">
+    <h3>☁️ إعداد الحفظ السحابي المشفَّر</h3>
+    <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.7">
+      <strong style="color:var(--text)">كيف يعمل؟</strong><br>
+      يُشفَّر ملف JSON ببياناتك (بدون صور) بتشفير AES-256 ويُرفع تلقائياً إلى GitHub Gist الخاصة بك.
+      <br>فقط أنت تملك المفتاح، ولا أحد غيرك يستطيع فك التشفير — حتى لو وصل للملف في GitHub.
     </div>
     <div class="form-row">
-      <label>🔑 مفتاح التشفير AES-256</label>
+      <label>🔑 مفتاح التشفير AES-256 (احتفظ به في مكان آمن — لا يمكن استرداد البيانات بدونه)</label>
       <div style="display:flex;gap:6px">
         <input id="cs_key" type="password" value="${currentKey||generatedKey}" style="font-family:monospace;font-size:11px;flex:1" placeholder="64 حرف hex...">
         <button class="btn" onclick="document.getElementById('cs_key').type=document.getElementById('cs_key').type==='password'?'text':'password'" style="font-size:11px">👁</button>
-        <button class="btn" onclick="let k=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');document.getElementById('cs_key').value=k;document.getElementById('cs_key').type='text'" style="font-size:11px">🎲 جديد</button>
+        <button class="btn" onclick="let k=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');document.getElementById('cs_key').value=k;document.getElementById('cs_key').type='text'" style="font-size:11px" title="توليد مفتاح عشوائي">🎲 جديد</button>
       </div>
+      <div style="font-size:11px;color:#ef4444;margin-top:4px">⚠️ إذا غيّرت المفتاح لن تتمكن من فك تشفير النسخ القديمة</div>
     </div>
     <div class="form-row">
-      <label>🐱 GitHub PAT — نطاق gist فقط</label>
+      <label>🐱 GitHub Personal Access Token — نطاق: <code>gist</code> فقط</label>
       <div style="display:flex;gap:6px">
-        <input id="cs_pat" type="password" value="${currentPAT}" style="font-family:monospace;font-size:11px;flex:1" placeholder="github_pat_...">
+        <input id="cs_pat" type="password" value="${currentPAT}" style="font-family:monospace;font-size:11px;flex:1" placeholder="github_pat_xxxxxxxx...">
         <button class="btn" onclick="document.getElementById('cs_pat').type=document.getElementById('cs_pat').type==='password'?'text':'password'" style="font-size:11px">👁</button>
       </div>
+      <div style="margin-top:5px"><a href="https://github.com/settings/tokens/new?scopes=gist&description=FamilyTree" target="_blank" style="font-size:11px;color:#3b82f6">← إنشاء توكن جديد في GitHub (نطاق gist فقط)</a></div>
     </div>
-    ${gistId?`<div class="form-row"><label>🔗 Gist ID الحالي</label><input type="text" value="${gistId}" readonly style="font-size:11px;font-family:monospace;background:var(--bg-secondary)"></div>`:`<div class="form-row"><label>🔗 Gist ID (اختياري)</label><input id="cs_gist" type="text" style="font-family:monospace;font-size:11px" placeholder="اتركه فارغًا للبحث التلقائي عند التنزيل"></div>`}
+    ${gistId?`<div class="form-row"><label>🔗 معرّف Gist الحالي (للقراءة فقط)</label><input type="text" value="${gistId}" readonly style="font-size:11px;font-family:monospace;background:var(--bg-secondary)"><button class="btn" style="font-size:11px;margin-top:4px;color:#ef4444" onclick="if(confirm('هل تريد حذف الربط بـ Gist الحالي؟ لن يُحذف الـ Gist من GitHub.'))localStorage.removeItem('${CLOUD_GIST_KEY.replace("'","\'")}');closeModal();openCloudSetup()">✕ إلغاء الربط</button></div>`
+    :`<div class="form-row"><label>🔗 معرّف Gist (اختياري — اتركه فارغاً للبحث التلقائي)</label><input id="cs_gist" type="text" style="font-family:monospace;font-size:11px" placeholder="يُملأ تلقائياً — أو الصق الـ ID يدوياً"></div>`}
+    <div style="padding:10px 12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:12px;color:#065f46;margin-bottom:8px">
+      <strong>✅ الإعدادات تُحفظ تلقائياً</strong> في هذا المتصفح على هذا الجهاز.<br>
+      لنقلها لجهاز آخر: بعد الإعداد اضغط <strong>💾 حفظ نسخة</strong> — ستُضمَّن الإعدادات في ملف HTML.
+    </div>
+    <div style="padding:10px 12px;background:#ede9fe;border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:#5b21b6;margin-bottom:14px">
+      <strong>📐 هيكلية الأمان:</strong><br>
+      🔑 <strong>أنت (المالك):</strong> نسختك تحتوي الإعدادات → حفظ وتحميل سحابي تلقائي<br>
+      👥 <strong>أفراد العائلة:</strong> نسختهم بلا إعدادات → يعملون محلياً → يُصدّرون JSON ويُرسلونه لك<br>
+      📥 <strong>لاستقبال بياناتهم:</strong> اضغط <strong>📥 استيراد</strong> ثم اختر <strong>"إضافة إلى الشجرة"</strong>
+    </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal()">إلغاء</button>
-      <button class="btn primary" onclick="applyCloudSetup()">✓ حفظ الإعدادات</button>
+      <button class="btn primary" onclick="applyCloudSetup()">✓ تطبيق وحفظ</button>
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=html;
@@ -6847,260 +7936,284 @@ function applyCloudSetup(){
   if(!pat){alert('الرجاء إدخال GitHub PAT');return;}
   CLOUD_CONFIG.KEY_HEX=key;
   CLOUD_CONFIG.GITHUB_PAT=pat;
-  try{
-    localStorage.setItem('ft_cloud_key_v1',key);
-    localStorage.setItem('ft_cloud_pat_v1',pat);
-  }catch(e){}
+  // حفظ في localStorage للاستمرارية بين الجلسات
+  try{localStorage.setItem('ft_cloud_key_v1',key);localStorage.setItem('ft_cloud_pat_v1',pat);}catch(e){}
+  // GIST_ID اليدوي (حقل الجهاز الجديد)
   let manualGist=(document.getElementById('cs_gist')?.value||'').trim();
   if(manualGist){localStorage.setItem(CLOUD_GIST_KEY,manualGist);CLOUD_CONFIG.GIST_ID=manualGist;}
   _cloudEnabled=true;
   _showCloudButtons(true);
-  _updateCloudStatusUI();
+  let banner=document.getElementById('cloudSetupBanner');
+  if(banner)banner.style.display='none';
   closeModal();
-  _showCloudToast('✅ تم تفعيل السحابة. استخدم الرفع/التنزيل يدويًا فقط.','success',3000);
-}
-
-async function _findCloudGist(){
-  try{
-    let pat=CLOUD_CONFIG.GITHUB_PAT||'';
-    if(!pat) return null;
-    let headers={'Authorization':'token '+pat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
-    for(let page=1;page<10;page++){
-      let res=await fetch('https://api.github.com/gists?per_page=100&page='+page,{headers});
-      if(!res.ok) break;
-      let list=await res.json();
-      if(!Array.isArray(list)||!list.length) break;
-      for(let g of list){
-        let files=Object.keys(g.files||{});
-        if(files.includes(OWNER_CLOUD_PACKAGE_FILE) || files.includes('ft_owner_sync_v2.json') || files.includes(OWNER_CLOUD_LEGACY_DATA_FILE)){
-          try{localStorage.setItem(CLOUD_GIST_KEY,g.id);}catch(e){}
-          CLOUD_CONFIG.GIST_ID=g.id;
-          _logOwnerCloud('info','Cloud gist found',g.id);
-          return g.id;
-        }
+  // ── جهاز جديد: ابحث أولاً عن Gist موجود → اعرض خيار الاستعادة ──
+  if(_isNewDevice()){
+    _showCloudToast('✅ تم الإعداد — جارٍ البحث عن نسخة سحابية...','success',2000);
+    setTimeout(async()=>{
+      let found=await _findCloudGist();
+      if(found){
+        // وُجد Gist → اعرض خيار الاستعادة مباشرة
+        setTimeout(()=>cloudRestorePrompt(),400);
+      }else{
+        // لا يوجد Gist بعد → أول رفع
+        _showCloudToast('لم تُعثر على نسخة سابقة — جارٍ إنشاء نسخة جديدة...','info',2500);
+        setTimeout(()=>cloudSave(),600);
       }
-      if(list.length<30) break;
-    }
-  }catch(e){
-    _logOwnerCloud('error','Cloud gist search failed',e.message);
+    },300);
+  } else {
+    _showCloudToast('✅ تم إعداد الحفظ السحابي — جارٍ أول رفع...','success',2000);
+    setTimeout(()=>cloudSave(),500);
   }
-  return null;
 }
 
-async function cloudLoad(){
-  if(!_isCloudConfigured()) return false;
-  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
-  if(!gistId){
-    gistId=await _findCloudGist();
-    if(!gistId) return false;
-  }
-  try{
-    let pkg=await _readOwnerCloudPackage(gistId);
-    if(!pkg) return false;
-    _ownerCloudState.package=pkg;
-    _ownerCloudState.lastCheckedAt=_cloudNowIso();
-    _ownerCloudState.warnings=(pkg.warnings||[]).slice();
-    return pkg;
-  }catch(e){
-    _logOwnerCloud('error','Cloud load failed',e.message);
-    _showCloudToast('❌ فشل التنزيل: '+e.message,'error',4500);
-    return false;
-  }
+function closeBannerForever(){
+  let b=document.getElementById('cloudSetupBanner');
+  if(b)b.style.display='none';
+  try{localStorage.setItem('ft_cloud_banner_dismissed','1');}catch(e){}
 }
-async function cloudSave(){
-  if(!_isCloudConfigured()||_cloudSyncing||IS_FAMILY_COPY) return;
-  let currentDevice=_getOwnerDeviceId();
-  let existingPrimary=_getPrimaryDeviceId();
-  if(existingPrimary && existingPrimary!==currentDevice){
-    _showCloudToast('⚠️ هذا الجهاز ليس المصدر الرئيسي. استخدم تنزيل من السحابة بدل الرفع.','error',5000);
-    _logOwnerCloud('warn','Upload blocked because device is not primary',{currentDevice,existingPrimary});
+
+function _showCloudButtons(show){
+  let b1=document.getElementById('cloudSyncBtn');
+  let b2=document.getElementById('cloudRestoreBtn');
+  let b3=document.getElementById('exportFamilyBtn');
+  let b4=document.getElementById('familyUploadSetupBtn');
+  let b5=document.getElementById('familyUpdatesBtn');
+  let bUp=document.getElementById('cloudUploadBtn');
+  let bDn=document.getElementById('cloudDownloadBtn');
+  let bTime=document.getElementById('cloudLastSyncTime');
+  if(bUp)bUp.style.display=show?'':'none';
+  if(bDn)bDn.style.display=show?'':'none';
+  if(bTime){bTime.style.display=show?'':'none';if(show)_updateLastSyncUI(_getLastSync());}
+  if(b1)b1.style.display=show?'':'none';
+  if(b2)b2.style.display=show?'':'none';
+  if(b3)b3.style.display=show?'':'none';
+  // أزرار إدارة نسخة العائلة — للمالك فقط (يظهر عند تفعيل السحابة)
+  if(b4)b4.style.display=show?'':'none';
+  if(b5)b5.style.display=show?'':'none';
+}
+
+// ── حفظ نسخة للعائلة (بلا إعدادات سحابية) ──
+// ══════════════════════════════════════════════════════════════
+//  exportFamilyCopy — يُصدِّر ZIP كامل يعمل كـ PWA مباشرةً
+// ══════════════════════════════════════════════════════════════
+async function exportFamilyCopy(){
+  closeModal();
+
+  // ── تحقق من وجود JSZip ──
+  if(typeof JSZip==='undefined'){
+    alert('⚠️ مكتبة JSZip غير محملة بعد.\nتأكد من اتصالك بالإنترنت وأعد المحاولة.');
     return;
   }
-  _cloudSyncing=true;
-  _updateCloudBtn('syncing');
+
+  // ── مؤشر تحميل ──
+  var _toast=document.createElement('div');
+  _toast.id='export-progress-toast';
+  _toast.innerHTML='⏳ جارٍ تجهيز حزمة الـ PWA...';
+  Object.assign(_toast.style,{
+    position:'fixed',bottom:'80px',right:'50%',transform:'translateX(50%)',
+    background:'var(--card-bg,#fff)',border:'1px solid var(--card-border,#e5e7eb)',
+    borderRadius:'12px',padding:'12px 20px',fontSize:'14px',fontWeight:'600',
+    color:'var(--text,#111)',boxShadow:'0 4px 20px rgba(0,0,0,.15)',
+    zIndex:'99999',whiteSpace:'nowrap'
+  });
+  document.body.appendChild(_toast);
+  var _removeToast=function(){var t=document.getElementById('export-progress-toast');if(t)t.remove();};
+
   try{
-    let cloudInfo=await _buildOwnerCloudPackage();
-    let pkg=cloudInfo.packageObj;
-    if(!existingPrimary){
-      pkg.primaryDeviceId=currentDevice;
-      _setPrimaryDeviceId(currentDevice);
-    }
-    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
-    let filesObj={
-      [OWNER_CLOUD_PACKAGE_FILE]:{content:JSON.stringify(pkg,null,2)},
-      [OWNER_CLOUD_LEGACY_DATA_FILE]:null,
-      [OWNER_CLOUD_LEGACY_PHOTOS_FILE]:null,
-    };
-    let prevRefs=[];
-    try{prevRefs=JSON.parse(localStorage.getItem(OWNER_CLOUD_IMAGE_INDEX_KEY)||'[]')||[];}catch(e){prevRefs=[];}
-    let currRefs=Object.keys(cloudInfo.imageFiles||{});
-    prevRefs.filter(r=>!currRefs.includes(r)).forEach(r=>{filesObj[r]=null;});
-    currRefs.forEach(r=>{filesObj[r]=cloudInfo.imageFiles[r];});
-    _showCloudToast('🔄 جارٍ رفع النسخة النظيفة...','syncing',0);
-    if(gistId){
-      try{await _gistUpdate(gistId,filesObj);}catch(e){
-        _logOwnerCloud('warn','Patch existing gist failed, creating a new one',e.message);
-        gistId=await _gistCreate(filesObj);
-      }
-    }else{
-      gistId=await _gistCreate(filesObj);
-    }
-    try{localStorage.setItem(CLOUD_GIST_KEY,gistId);}catch(e){}
-    CLOUD_CONFIG.GIST_ID=gistId;
-    try{localStorage.setItem(OWNER_CLOUD_IMAGE_INDEX_KEY,JSON.stringify(currRefs));}catch(e){}
-    _setLastSyncTime(pkg.updatedAt);
-    _ownerCloudState.package=pkg;
-    _ownerCloudState.warnings=cloudInfo.warnings||[];
-    _markDeviceInit();
-    _logOwnerCloud('info','Cloud upload completed',{gistId,people:pkg.counts.people,images:pkg.counts.images,relPairs:pkg.counts.relPairs,warnings:cloudInfo.warnings.length});
-    _showCloudToast('✅ تم رفع النسخة النظيفة · '+pkg.counts.people+' فرد · '+pkg.counts.images+' صورة','success',3500);
-    _updateCloudBtn('ok');
-    _updateCloudStatusUI();
-  }catch(e){
-    _logOwnerCloud('error','Cloud upload failed',e.message);
-    console.warn('[OwnerCloudSave]',e);
-    _showCloudToast('❌ فشل الرفع: '+e.message,'error',5000);
-    _updateCloudBtn('error');
-  }finally{
-    _cloudSyncing=false;
+    // ════ 1. بناء الكود الرئيسي لنسخة العائلة ════
+    var htmlAttrs='';
+    Array.from(document.documentElement.attributes).forEach(function(a){
+      htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
+    });
+
+    var cleanAppHTML='';
+    try{
+      var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
+      var tApp=tDoc.getElementById('app');
+      if(tApp)cleanAppHTML=tApp.outerHTML;
+    }catch(ex){}
+    if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+
+    // الكود المصدري — تعديل الثوابت
+    var mainSrc=document.scripts[document.scripts.length-1].textContent;
+
+    // 1a. حذف CLOUD_CONFIG كاملاً — لا مفاتيح المالك السحابية في نسخة العائلة
+    mainSrc=mainSrc.replace(
+      /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
+      "const CLOUD_CONFIG = {\n  KEY_HEX: '',\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  GIST_FILE: 'ft_encrypted.dat',\n}"
+    );
+
+    // 1b. FAMILY_UPLOAD_CONFIG فارغ في الـ HTML — المفاتيح تأتي فقط من ملف JSON عند الاستيراد
+    // (أكثر أماناً: الـ PWA لا يحمل أي مفاتيح — تُفعَّل فقط بعد استيراد JSON يحتوي _familyMeta)
+    mainSrc=mainSrc.replace(
+      /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
+      "const FAMILY_UPLOAD_CONFIG = {\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  KEY_HEX: '',\n}"
+    );
+
+    // 1c. تمييز النسخة كـ "نسخة عائلة"
+    mainSrc=mainSrc.replace(/const IS_FAMILY_COPY\s*=\s*false/,'const IS_FAMILY_COPY = true');
+
+    // 1d. Device ID فريد لكل نسخة مصدَّرة
+    var _newDid=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    mainSrc=mainSrc.replace(/const FAMILY_DEVICE_ID\s*=\s*'[^']*'/,"const FAMILY_DEVICE_ID = '"+_newDid+"'");
+
+    // ── بناء head نظيف (بدون JSZip) ──
+    var headClone=document.head.cloneNode(true);
+    headClone.querySelectorAll('script').forEach(function(s){
+      if(s.src&&s.src.includes('jszip'))s.remove();
+    });
+
+    // ✅ لا dataTag — الشجرة فارغة، المستخدم يستورد JSON بنفسه
+    var familyHTML=
+      '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+
+      headClone.outerHTML+'\n'+
+      '<body>\n'+
+      cleanAppHTML+'\n'+
+      '<div id="modalContainer"></div>\n'+
+      '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+      '</body>\n</html>';
+
+    // ════ 2. manifest.json ════
+    var manifestContent=JSON.stringify({
+      name:'شجرة العائلة',short_name:'العائلة',
+      description:'شجرة عائلية تفاعلية',
+      start_url:'./index.html',scope:'./',display:'standalone',orientation:'any',
+      background_color:'#f3f4f6',theme_color:'#3b82f6',lang:'ar',dir:'rtl',
+      icons:[
+        {src:'icons/icon-72x72.png',sizes:'72x72',type:'image/png',purpose:'any'},
+        {src:'icons/icon-96x96.png',sizes:'96x96',type:'image/png',purpose:'any'},
+        {src:'icons/icon-128x128.png',sizes:'128x128',type:'image/png',purpose:'any'},
+        {src:'icons/icon-144x144.png',sizes:'144x144',type:'image/png',purpose:'any'},
+        {src:'icons/icon-152x152.png',sizes:'152x152',type:'image/png',purpose:'any'},
+        {src:'icons/icon-192x192.png',sizes:'192x192',type:'image/png',purpose:'any'},
+        {src:'icons/icon-384x384.png',sizes:'384x384',type:'image/png',purpose:'any'},
+        {src:'icons/icon-512x512.png',sizes:'512x512',type:'image/png',purpose:'any'},
+        {src:'icons/icon-maskable-192x192.png',sizes:'192x192',type:'image/png',purpose:'maskable'},
+        {src:'icons/icon-maskable-512x512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}
+      ]
+    },null,2);
+
+    // ════ 3. sw.js — Network-First لـ index.html (يمنع تحميل HTML قديم من الكاش) ════
+    var swContent=`/* شجرة العائلة — Service Worker */
+const CACHE_NAME='family-tree-v1';
+const SHELL_CACHE='family-tree-shell-v1';
+const STATIC_ASSETS=['./manifest.json','./icons/icon-192x192.png','./icons/icon-512x512.png','./icons/apple-touch-icon.png'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL_CACHE).then(c=>c.addAll(STATIC_ASSETS)).then(()=>self.skipWaiting()).catch(()=>self.skipWaiting()));});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME&&k!==SHELL_CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET'||!e.request.url.startsWith('http'))return;
+  var u=new URL(e.request.url);
+  if(u.origin!==self.location.origin){e.respondWith(fetch(e.request).catch(()=>new Response('',{status:503})));return;}
+  var isPage=e.request.mode==='navigate'||e.request.url.endsWith('index.html')||e.request.url.endsWith('/');
+  e.respondWith(isPage?networkFirst(e.request):cacheFirst(e.request));
+});
+async function networkFirst(req){
+  var cache=await caches.open(SHELL_CACHE);
+  try{var r=await fetch(req);if(r&&r.status===200)cache.put(req,r.clone());return r;}
+  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p></body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
+}
+async function cacheFirst(req){
+  var c=await caches.match(req);if(c)return c;
+  try{var r=await fetch(req);if(r&&r.status===200){var cache=await caches.open(SHELL_CACHE);cache.put(req,r.clone());}return r;}
+  catch{return new Response('',{status:503});}
+}
+self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting();});`;
+
+    // ════ 4. جلب الأيقونات ════
+    _toast.innerHTML='⏳ جارٍ تحميل الأيقونات...';
+    var iconFiles=[
+      'icons/apple-touch-icon.png','icons/icon-72x72.png','icons/icon-96x96.png',
+      'icons/icon-128x128.png','icons/icon-144x144.png','icons/icon-152x152.png',
+      'icons/icon-192x192.png','icons/icon-384x384.png','icons/icon-512x512.png',
+      'icons/icon-maskable-192x192.png','icons/icon-maskable-512x512.png'
+    ];
+    var iconData={};
+    await Promise.all(iconFiles.map(async function(path){
+      try{var resp=await fetch('./'+path);if(resp.ok)iconData[path]=await resp.arrayBuffer();}
+      catch(e){console.warn('Could not fetch icon:',path);}
+    }));
+
+    // ════ 5. دليل الاستضافة ════
+    var guide=`# 🌳 شجرة العائلة — دليل رفع نسخة العائلة
+
+## هيكل الملفات
+\`\`\`
+family-tree-pwa/
+├── index.html       ← التطبيق (بدون بيانات — يطلب استيراد JSON)
+├── manifest.json
+├── sw.js
+└── icons/  (11 أيقونة PNG)
+\`\`\`
+
+## رفع على GitHub Pages (مجاني — مُوصى به)
+1. github.com/new ← اسم المستودع: family-tree ← Public ← Create
+2. ارفع جميع الملفات (بما فيها مجلد icons/)
+3. Settings → Pages → Source: main / (root) → Save
+4. انتظر دقيقتين ← رابطك: https://USERNAME.github.io/family-tree/
+
+## رفع على Netlify (أسرع — سحب وإفلات)
+1. netlify.com ← سجّل دخول
+2. اسحب مجلد family-tree-pwa وأفلته في لوحة التحكم
+3. رابطك جاهز فوراً: https://xxxx.netlify.app
+
+## التثبيت كـ PWA
+- Android/Chrome: بانر التثبيت يظهر تلقائياً
+- iPhone/Safari: زر المشاركة ⬆️ ← "إضافة إلى الشاشة الرئيسية"
+- كمبيوتر: أيقونة ➕ في شريط العنوان
+
+## تدفق الاستخدام
+1. المالك يرسل الرابط + ملف JSON للبيانات
+2. فرد العائلة يفتح الرابط → يضغط "استيراد ملف JSON"
+3. البيانات تُحفظ محلياً — يعمل التطبيق بدون إنترنت
+`;
+
+    // ════ 6. تجميع ZIP ════
+    _toast.innerHTML='⏳ جارٍ ضغط الملفات...';
+    var zip=new JSZip();
+    var folder=zip.folder('family-tree-pwa');
+    folder.file('index.html',familyHTML);
+    folder.file('manifest.json',manifestContent);
+    folder.file('sw.js',swContent);
+    folder.file('INSTALL.md',guide);
+    var iconsFolder=folder.folder('icons');
+    Object.entries(iconData).forEach(function(entry){
+      iconsFolder.file(entry[0].replace('icons/',''),entry[1]);
+    });
+    var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+
+    // ════ 7. تنزيل ZIP ════
+    _removeToast();
+    var d=new Date();
+    var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var url=URL.createObjectURL(zipBlob);
+    var lnk=document.createElement('a');
+    lnk.href=url;lnk.download='family-tree-pwa-'+stamp+'.zip';
+    document.body.appendChild(lnk);lnk.click();
+    setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},2000);
+
+    showSaveToast();
+    setTimeout(function(){
+      alert(
+        '✅ تم تصدير حزمة الـ PWA\n\n'+
+        '📦 الملف: family-tree-pwa-'+stamp+'.zip\n\n'+
+        'خطوات التوزيع:\n'+
+        '1. ارفع المجلد على GitHub Pages أو Netlify\n'+
+        '2. أرسل الرابط + ملف JSON للبيانات لأفراد العائلة\n'+
+        '3. كل فرد يستورد الـ JSON من داخل التطبيق\n\n'+
+        '📄 راجع INSTALL.md داخل الحزمة للتفاصيل'
+      );
+    },300);
+
+  }catch(err){
+    _removeToast();
+    alert('خطأ في التصدير: '+err.message);
+    console.error('[exportFamilyCopy]',err);
   }
 }
 
-async function manualCloudSync(){
-  if(!_isCloudConfigured()){openCloudSetup();return;}
-  await cloudSave();
-}
-
-function _applyOwnerCloudState(pkg,mode){
-  let data=_extractPackageData(pkg);
-  let photos=_relinkOwnerPhotosFromPackage(pkg);
-  let restoredPeople=photos.people;
-  let relPairsIncoming=Array.isArray(data.relPairs)?data.relPairs:[];
-  let summary={people:restoredPeople.length,images:photos.count,missing:photos.missing};
-  if(mode==='replace'){
-    people=restoredPeople;
-    relPairs=_normalizeCloudRelPairs(relPairsIncoming,new Set(restoredPeople.map(p=>String(p.id))));
-    nextId=data.nextId||1;
-    if(data.myPersonId!=null){myPersonId=parseInt(data.myPersonId);saveMyPerson();}
-    expanded={};people.forEach(p=>{expanded[p.id]=false;});
-    migrateExternalSpouses();
-    if(people.length)expanded[people[0].id]=true;
-    _invalidateAll();
-    _markDeviceInit();
-    saveData();
-    return summary;
-  }
-  let mergeData={people:restoredPeople,relPairs:relPairsIncoming,nextId:data.nextId||1,myPersonId:data.myPersonId||null};
-  let mergeResult=_cloudSmartMerge(mergeData,{mode:'cloud'});
-  migrateExternalSpouses();
-  _invalidateAll();
-  _markDeviceInit();
-  saveData();
-  return {people:summary.people,images:summary.images,missing:summary.missing,added:mergeResult.added,updated:mergeResult.updated};
-}
-
-async function doCloudRestore(mode){
-  closeModal();
-  if(!_isCloudConfigured()) return;
-  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
-  if(!gistId){
-    gistId=await _findCloudGist();
-    if(!gistId){
-      _showCloudToast('لا توجد نسخة سحابية لهذا المعرّف','error',4000);
-      return;
-    }
-  }
-  if(mode!=='merge') mode='replace';
-  if(mode==='replace' && !confirm('سيتم استبدال البيانات المحلية بالكامل وتنزيل الصور المرتبطة أيضاً. هل تريد المتابعة؟')) return;
-  try{
-    _showCloudToast('🔄 جارٍ تنزيل النسخة النظيفة...','syncing',0);
-    let pkg=await cloudLoad();
-    if(!pkg) throw new Error('تعذّر تحميل النسخة السحابية');
-    if(!pkg.primaryDeviceId){
-      pkg.primaryDeviceId=_getPrimaryDeviceId()||_getOwnerDeviceId();
-      _setPrimaryDeviceId(pkg.primaryDeviceId);
-    }
-    let result=_applyOwnerCloudState(pkg,mode);
-    let now=_cloudNowIso();
-    _setLastSyncTime(now);
-    _ownerCloudState.package=pkg;
-    _ownerCloudState.warnings=(pkg.warnings||[]).slice();
-    _logOwnerCloud('info','Cloud restore completed',result);
-    if(result.missing){
-      _showCloudToast('✅ تم الاستبدال الكامل · '+result.people+' فرد · '+result.images+' صورة · '+result.missing+' مفقودة','success',4500);
-    }else if(mode==='merge'){
-      _showCloudToast('✅ تم الدمج · '+result.added+' جديد · '+result.updated+' محدّث','success',4000);
-    }else{
-      _showCloudToast('✅ تم الاستبدال الكامل · '+result.people+' فرد · '+result.images+' صورة','success',4000);
-    }
-    _updateCloudBtn('ok');
-    _updateCloudStatusUI();
-  }catch(e){
-    _logOwnerCloud('error','Cloud restore failed',e.message);
-    _showCloudToast('❌ خطأ في الاستعادة: '+e.message,'error',5000);
-    _updateCloudBtn('error');
-  }
-}
-
-function cloudRestorePrompt(){
-  if(!_isCloudConfigured()){openCloudSetup();return;}
-  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:520px">
-    <h3>⬇️ تنزيل من السحابة</h3>
-    <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;line-height:1.8;margin-bottom:14px">
-      الاستعادة هنا يدوية فقط، ولا يوجد دمج تلقائي بعد التعديلات.
-      <br>يتم تنزيل الحزمة النظيفة ثم إعادة ربط الصور المحلية من نفس البيانات.
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn primary" onclick="doCloudRestore('replace')" style="justify-content:center">⬇️ استبدال كامل وتنزيل</button>
-      <button class="btn" onclick="openCloudDebugModal()" style="justify-content:center">🧪 الصيانة والسجلات</button>
-      <button class="btn" onclick="closeModal()" style="justify-content:center">إلغاء</button>
-    </div>
-  </div></div>`;
-  document.getElementById('modalContainer').innerHTML=html;
-}
-
-function openCloudDebugModal(){
-  if(!document.getElementById('modalContainer')) return;
-  let logs=_loadOwnerCloudLogs();
-  let last=_getLastSyncTime();
-  let primary=_getPrimaryDeviceId();
-  let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
-  let warnings=(_ownerCloudState.warnings||[]).slice(-12);
-  let logsHtml=logs.slice(0,20).map(l=>`<div style="padding:8px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--bg-secondary);margin-bottom:8px;line-height:1.6">
-    <div style="font-size:11px;color:var(--text2)">${_cloudPrettyTime(l.ts)} · ${String(l.level||'info').toUpperCase()}</div>
-    <div style="font-size:12px;color:var(--text)">${String(l.message||'')}</div>
-    ${l.details?`<div style="font-size:11px;color:var(--text2);margin-top:3px;word-break:break-word">${typeof l.details==='string'?l.details:JSON.stringify(l.details)}</div>`:''}
-  </div>`).join('') || '<div style="font-size:12px;color:var(--text2)">لا توجد سجلات بعد.</div>';
-  let warnHtml=warnings.map(w=>`<div style="padding:8px 10px;border:1px solid #f59e0b;border-radius:8px;background:#fffbeb;margin-bottom:8px;font-size:12px;color:#92400e;line-height:1.6">⚠️ ${w}</div>`).join('') || '<div style="font-size:12px;color:var(--text2)">لا توجد تحذيرات.</div>';
-  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:720px;max-height:85vh;overflow:auto">
-    <h3>🧪 الصيانة والتشخيص</h3>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;font-size:12px">
-      <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg)"><strong>آخر مزامنة</strong><div style="margin-top:4px;color:var(--text2)">${last?_cloudPrettyTime(last):'—'}</div></div>
-      <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg)"><strong>المصدر الرئيسي</strong><div style="margin-top:4px;color:var(--text2);word-break:break-all">${primary||'غير محدد'}</div></div>
-      <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg)"><strong>Gist</strong><div style="margin-top:4px;color:var(--text2);word-break:break-all">${gistId||'—'}</div></div>
-      <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg)"><strong>الجهاز الحالي</strong><div style="margin-top:4px;color:var(--text2);word-break:break-all">${_getOwnerDeviceId()}</div></div>
-    </div>
-    <div style="margin-bottom:12px">
-      <h4 style="margin:0 0 8px 0;font-size:13px">تحذيرات البيانات</h4>
-      ${warnHtml}
-    </div>
-    <div style="margin-bottom:12px">
-      <h4 style="margin:0 0 8px 0;font-size:13px">سجل الصيانة</h4>
-      ${logsHtml}
-    </div>
-    <div class="modal-footer" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start">
-      <button class="btn" onclick="cloudSave()">⬆️ رفع نسخة نظيفة</button>
-      <button class="btn" onclick="cloudRestorePrompt()">⬇️ تنزيل/استبدال</button>
-      <button class="btn" onclick="localStorage.removeItem('${OWNER_CLOUD_LOG_KEY}');openCloudDebugModal()">🧹 مسح السجل</button>
-      <button class="btn" onclick="closeModal()">إغلاق</button>
-    </div>
-  </div></div>`;
-  document.getElementById('modalContainer').innerHTML=html;
-}
-
+// ── تهيئة السحابة عند بدء التطبيق ──
 async function initCloud(){
+  // تحميل الإعدادات من localStorage إذا لم تكن محدَّدة في الكود
   if(!CLOUD_CONFIG.KEY_HEX||!CLOUD_CONFIG.GITHUB_PAT){
     try{
       let sk=localStorage.getItem('ft_cloud_key_v1');
@@ -7109,32 +8222,126 @@ async function initCloud(){
       if(sp&&sp.trim())CLOUD_CONFIG.GITHUB_PAT=sp.trim();
     }catch(e){}
   }
+  // تحميل GIST_ID من localStorage إذا لم يكن مُضمَّناً في الكود
   if(!CLOUD_CONFIG.GIST_ID){
-    try{let sg=localStorage.getItem(CLOUD_GIST_KEY);if(sg&&sg.trim())CLOUD_CONFIG.GIST_ID=sg.trim();}catch(e){}
-  }else{
+    try{
+      let sg=localStorage.getItem(CLOUD_GIST_KEY);
+      if(sg&&sg.trim())CLOUD_CONFIG.GIST_ID=sg.trim();
+    }catch(e){}
+  } else {
+    // إذا كان GIST_ID مُضمَّناً في الكود → ضعه في localStorage أيضاً
     try{localStorage.setItem(CLOUD_GIST_KEY,CLOUD_CONFIG.GIST_ID);}catch(e){}
   }
+  // تحميل إعدادات رفع العائلة
   _loadFamilyUploadSettings();
+  // ── نسخة العائلة: إخفاء كل شيء متعلق بالسحابة، لا تحميل من السحابة أبداً ──
   if(IS_FAMILY_COPY){
     let banner=document.getElementById('cloudSetupBanner');
     if(banner)banner.style.display='none';
-    ['familyUploadSetupBtn','familyUpdatesBtn','cloudSyncBtn','cloudRestoreBtn','cloudDebugBtn'].forEach(function(id){let b=document.getElementById(id);if(b)b.style.display='none';});
+    ['familyUploadSetupBtn','familyUpdatesBtn','cloudSyncBtn','cloudRestoreBtn'].forEach(function(id){
+      let b=document.getElementById(id);if(b)b.style.display='none';
+    });
     try{localStorage.setItem('ft_cloud_banner_dismissed','1');}catch(e){}
+    // نسخة العائلة: الرفع الصامت سيعمل عبر triggerFamilyUpload() في saveData
+    // ولا نحمّل من السحابة أبداً
     return;
   }
-  _updateCloudStatusUI();
+  // ── نسخة المالك: تحميل وتزامن كاملان ──
   if(_isCloudConfigured()){
     _cloudEnabled=true;
+    _showCloudButtons(true);
     let banner=document.getElementById('cloudSetupBanner');
     if(banner)banner.style.display='none';
-    _showCloudButtons(true);
-  }else{
+    // تحميل من السحابة عند كل فتح — مع fallback لـ CLOUD_CONFIG.GIST_ID
+    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+    if(gistId){
+      let cloudData=await cloudLoad();
+      if(cloudData&&cloudData.people&&cloudData.people.length){
+        let localCount=people.length;
+        if(localCount===0){
+          people=cloudData.people;nextId=cloudData.nextId||1;relPairs=cloudData.relPairs||[];
+          if(cloudData.myPersonId){myPersonId=parseInt(cloudData.myPersonId);saveMyPerson();}
+          expanded={};people.forEach(p=>{expanded[p.id]=false;});
+          migrateExternalSpouses();
+          if(people.length)expanded[people[0].id]=true;
+          _invalidateAll();
+          _markDeviceInit(); // ✅ إصلاح 1: تسجيل الجهاز كمُهيَّأ بعد التحميل البكر
+          saveData();renderAll();updateMyPersonBtn();
+          _showCloudToast('☁️ تم تحميل البيانات من السحابة ('+people.length+' فرد)','success',3000);
+        } else {
+          // إذا كانت البيانات المحلية هي فقط البيانات النموذجية (initData) → استبدلها بالسحابة
+          if(_demoDataLoaded){
+            people=cloudData.people;nextId=cloudData.nextId||1;relPairs=cloudData.relPairs||[];
+            if(cloudData.myPersonId){myPersonId=parseInt(cloudData.myPersonId);saveMyPerson();}
+            expanded={};people.forEach(p=>{expanded[p.id]=false;});
+            migrateExternalSpouses();
+            if(people.length)expanded[people[0].id]=true;
+            _invalidateAll();
+            _markDeviceInit();
+            saveData();renderAll();updateMyPersonBtn();
+            _showCloudToast('☁️ تم تحميل البيانات من السحابة ('+people.length+' فرد)','success',3000);
+          } else {
+            // دمج ذكي — السحابة هي المرجع، تُضاف الفوارق للمحلية
+            let{added,updated}=_cloudSmartMerge(cloudData,{mode:'cloud'});
+            migrateExternalSpouses();_invalidateAll();
+            _markDeviceInit();
+            saveData();renderAll();updateMyPersonBtn();
+            let msg=(added>0||updated>0)
+              ?'☁️ دُمج '+(added||0)+' جديد، تحديث '+(updated||0)+' من السحابة'
+              :'☁️ الحفظ السحابي مفعّل ✓';
+            _showCloudToast(msg,'success',2500);
+            // ملاحظة: لا نرفع تلقائياً بعد الدمج — المزامنة يدوية فقط
+          }
+        }
+      } else {
+        _showCloudToast('☁️ الحفظ السحابي مفعّل ✓','success',2000);
+      }
+    }
+    // تحديث وقت آخر مزامنة في الـUI
+    setTimeout(()=>_updateLastSyncUI(_getLastSync()),500);
+  } else {
     let banner=document.getElementById('cloudSetupBanner');
     let dismissed=false;try{dismissed=localStorage.getItem('ft_cloud_banner_dismissed')==='1';}catch(e){}
     if(banner&&!dismissed)banner.style.display='flex';
   }
 }
-function triggerCloudSync(){return;}
+
+// المزامنة يدوية فقط — triggerCloudSync لا تفعل شيئاً
+// (محتفظ بالاسم لعدم كسر أي استدعاءات موجودة)
+function triggerCloudSync(){ /* manual sync only — no auto-push */ }
+
+// ── سجل المزامنة ──
+function _syncLog(level, msg, detail){
+  try{
+    let logs=JSON.parse(localStorage.getItem(CLOUD_SYNC_LOG_KEY)||'[]');
+    logs.unshift({ts:new Date().toISOString(),level,msg,detail:detail||''});
+    if(logs.length>50)logs=logs.slice(0,50);
+    localStorage.setItem(CLOUD_SYNC_LOG_KEY,JSON.stringify(logs));
+  }catch(e){}
+  if(level==='error')console.warn('[CloudSync]',msg,detail||'');
+  else console.debug('[CloudSync]',msg,detail||'');
+}
+function _getSyncLog(){ try{return JSON.parse(localStorage.getItem(CLOUD_SYNC_LOG_KEY)||'[]');}catch(e){return [];} }
+function _clearSyncLog(){ try{localStorage.removeItem(CLOUD_SYNC_LOG_KEY);}catch(e){} }
+
+// وقت آخر مزامنة ناجحة
+function _getLastSync(){ return localStorage.getItem(CLOUD_LAST_SYNC_KEY)||''; }
+function _setLastSync(){ 
+  let ts=new Date().toISOString();
+  try{localStorage.setItem(CLOUD_LAST_SYNC_KEY,ts);}catch(e){}
+  _updateLastSyncUI(ts);
+}
+function _updateLastSyncUI(ts){
+  let el=document.getElementById('cloudLastSyncTime');
+  if(!el)return;
+  if(!ts){el.textContent='';return;}
+  let d=new Date(ts);
+  let now=new Date();
+  let diffMin=Math.floor((now-d)/60000);
+  let label=diffMin<1?'الآن':diffMin<60?diffMin+' دقيقة':Math.floor(diffMin/60)+' ساعة';
+  el.textContent='آخر مزامنة: '+label+' مضت';
+}
+
 // ══════════════════════════════════════════════════════════
 //  IndexedDB — التخزين الرئيسي (أكثر ثباتاً على الجوال)
 // ══════════════════════════════════════════════════════════
@@ -7751,21 +8958,33 @@ function dismissInstallBanner(){
     .mob-fab-search { background:#1e40af;color:#fff; font-size:18px; }
     </style>
     <button id="mob-fab-search-btn" class="mob-fab-btn mob-fab-search" onclick="openSearchPanel()" title="بحث سريع">🔍</button>
-    <button class="mob-fab-btn mob-fab-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="للأعلى">↑</button>
+    <button id="mob-fab-top-btn" class="mob-fab-btn mob-fab-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="للأعلى" style="display:none">↑</button>
   `;
   document.body.appendChild(fab);
 
   // أظهر الزر عند التمرير للأسفل في وضع الجوال
+  let _fabHideTimer=null;
+  function _showFabTemp(){
+    let topBtn=document.getElementById('mob-fab-top-btn');
+    if(window.scrollY<100){
+      fab.classList.remove('visible');
+      if(topBtn)topBtn.style.display='none';
+      return;
+    }
+    if(topBtn)topBtn.style.display='flex';
+    fab.classList.add('visible');
+    clearTimeout(_fabHideTimer);
+    _fabHideTimer=setTimeout(function(){
+      fab.classList.remove('visible');
+    },2500);
+  }
   window.addEventListener('scroll',function(){
-    // الجوال: يظهر بعد 200px. الديسكتوب: يظهر دائماً عند التمرير (البحث مفيد)
-    fab.classList.toggle('visible',window.scrollY>200);
+    if(document.body.classList.contains('mobile-mode')){
+      _showFabTemp();
+    }
+    // على الديسكتوب: الـFAB لا يظهر (الشريط العلوي يكفي)
   },{passive:true});
-  // إظهار فوري للبحث حتى قبل التمرير
-  setTimeout(()=>fab.classList.add('visible'),400);
-
-  // أظهر/أخفِ عند تبديل وضع الجوال
-  let origApply=window._applyMobileMode||function(){};
-  // سيُعاد التحقق عند كل scroll
+  // لا نُظهره مباشرة عند التحميل — ينتظر أول تمرير
 })();
 
 // ══════════════════════════════════════════════════════════
@@ -8233,393 +9452,6 @@ function _setVoiceActive(on){
   document.body.appendChild(sheet);
 })();
 document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMergeHistoryButtons,0);});
-
-// ══════════════════════════════════════════════════════════
-//  Owner cloud sync hotfix (chunked image storage + safer restore)
-//  هذا البلوك يعيد تعريف دوال السحابة في نهاية الملف لضمان
-//  استخدام النسخة المصححة فقط.
-// ══════════════════════════════════════════════════════════
-const OWNER_CLOUD_IMAGE_CHUNK_SIZE = 750000; // أقل من حد 1MB الفعلي لكل ملف مع هامش أمان
-
-function _ownerCloudChunkString(text, chunkSize){
-  let s = String(text || '');
-  let size = Math.max(100000, parseInt(chunkSize, 10) || OWNER_CLOUD_IMAGE_CHUNK_SIZE);
-  let out = [];
-  for(let i = 0; i < s.length; i += size){
-    out.push(s.slice(i, i + size));
-  }
-  return out.length ? out : [''];
-}
-
-function _ownerCloudChunkFileBase(hash, ext){
-  return 'owner_photo_' + String(hash || '').slice(0, 24) + '_' + String(ext || 'png').replace(/[^a-z0-9]/gi, '');
-}
-
-function _ownerCloudChunkFileNames(fileBase, chunkCount){
-  let names = [];
-  let total = Math.max(1, parseInt(chunkCount, 10) || 1);
-  for(let i = 0; i < total; i++){
-    let n = String(i + 1).padStart(3, '0');
-    names.push('images__' + fileBase + '__p' + n + '.dat');
-  }
-  return names;
-}
-
-async function _gistHttpError(res, fallback){
-  let base = fallback || ('GitHub API: ' + res.status + ' ' + res.statusText);
-  try{
-    let txt = await res.text();
-    if(!txt) return base;
-    try{
-      let j = JSON.parse(txt);
-      let msg = j && (j.message || j.error || j.errors);
-      if(msg){
-        if(Array.isArray(msg)) msg = msg.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' | ');
-        return base + ' — ' + msg;
-      }
-    }catch(e){}
-    return base + ' — ' + txt.slice(0, 240);
-  }catch(e){
-    return base;
-  }
-}
-
-async function _gistCreate(filesObj){
-  let res = await fetch('https://api.github.com/gists', {
-    method: 'POST',
-    headers: _gistHeaders(),
-    body: JSON.stringify({ description: 'Family Tree Owner Cloud Backup', public: false, files: filesObj })
-  });
-  if(!res.ok) throw new Error(await _gistHttpError(res));
-  let j = await res.json();
-  return j.id;
-}
-
-async function _gistUpdate(gistId, filesObj){
-  let res = await fetch('https://api.github.com/gists/' + gistId, {
-    method: 'PATCH',
-    headers: _gistHeaders(),
-    body: JSON.stringify({ files: filesObj })
-  });
-  if(!res.ok) throw new Error(await _gistHttpError(res));
-}
-
-async function _gistReadMultiFiles(gistId, fileNames){
-  let parts = [];
-  for(let fn of (Array.isArray(fileNames) ? fileNames : [])){
-    if(!fn) continue;
-    let c = await _gistReadFile(gistId, fn);
-    if(c == null) return null;
-    parts.push(String(c));
-  }
-  return parts.join('');
-}
-
-function _ownerCloudOldImageFilesFromPackage(pkg){
-  let out = [];
-  let images = (pkg && pkg.images) || {};
-  Object.keys(images).forEach(ref => {
-    let meta = images[ref] || {};
-    if(Array.isArray(meta.fileNames) && meta.fileNames.length){
-      meta.fileNames.forEach(n => n && out.push(n));
-    }else if(meta.fileName){
-      out.push(meta.fileName);
-    }else if(meta.fileBase){
-      let count = Math.max(1, parseInt(meta.chunkCount || 1, 10) || 1);
-      _ownerCloudChunkFileNames(meta.fileBase, count).forEach(n => out.push(n));
-    }
-  });
-  return Array.from(new Set(out));
-}
-
-async function _buildOwnerCloudPackage(){
-  let now = _cloudNowIso();
-  let sanitized = _sanitizeOwnerPeopleForCloud();
-  let cleanedPeople = sanitized.people;
-  let warnings = sanitized.warnings.slice();
-  let liveIds = new Set(cleanedPeople.map(p => String(p.id)));
-  let images = {};
-  let imageFiles = {};
-  let photoCount = 0;
-
-  for(let p of cleanedPeople){
-    if(!_isValidDataUrl(p.photo)){
-      if(p.photo) warnings.push('تم تجاهل صورة غير صالحة لـ ' + p.name);
-      delete p.photo;
-      continue;
-    }
-
-    let hash = await _sha256Hex(p.photo);
-    let ext = _imageExtFromDataUrl(p.photo);
-    let ref = 'images/photo_' + hash.slice(0, 24) + '.' + ext;
-    let fileBase = _ownerCloudChunkFileBase(hash, ext);
-    let chunks = _ownerCloudChunkString(p.photo, OWNER_CLOUD_IMAGE_CHUNK_SIZE);
-    let fileNames = _ownerCloudChunkFileNames(fileBase, chunks.length);
-    let mime = (String(p.photo).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i) || [])[1] || 'image/png';
-
-    images[ref] = {
-      ref,
-      cloudPath: '/images/' + fileBase,
-      mime,
-      hash,
-      fileBase,
-      fileNames,
-      chunkCount: chunks.length,
-      ext,
-      linkedPersonIds: [String(p.id)]
-    };
-
-    chunks.forEach((chunk, idx) => {
-      imageFiles[fileNames[idx]] = { content: String(chunk) };
-    });
-
-    p.photoRef = ref;
-    delete p.photo;
-    photoCount++;
-  }
-
-  let relPairsClean = _normalizeCloudRelPairs(relPairs, liveIds);
-  let nextClean = Math.max(1, ...cleanedPeople.map(p => parseInt(p.id, 10) || 0), nextId || 1) + 1;
-
-  let data = {
-    people: cleanedPeople,
-    relPairs: relPairsClean,
-    nextId: nextClean,
-    myPersonId: myPersonId || null
-  };
-
-  let packageObj = {
-    schema: 'owner-sync-v2',
-    version: 2,
-    source: 'owner',
-    createdAt: now,
-    updatedAt: now,
-    primaryDeviceId: _getPrimaryDeviceId() || _getOwnerDeviceId(),
-    sourceDeviceId: _getOwnerDeviceId(),
-    structure: OWNER_CLOUD_STRUCTURE,
-    counts: { people: cleanedPeople.length, images: Object.keys(images).length, relPairs: relPairsClean.length },
-    warnings,
-    data,
-    images,
-    backups: { latest: { createdAt: now, note: 'clean master copy' } },
-    temp: {}
-  };
-
-  return { packageObj, warnings, photoCount, imageFiles };
-}
-
-async function _readOwnerCloudPackage(gistId){
-  if(!gistId) return null;
-  try{
-    let raw = await _gistReadFile(gistId, OWNER_CLOUD_PACKAGE_FILE);
-    if(raw){
-      let pkg = JSON.parse(raw);
-      if(pkg && pkg.schema === 'owner-sync-v2'){
-        let images = pkg.images || {};
-        let loadedImages = {};
-        for(let key of Object.keys(images)){
-          let meta = images[key] || {};
-          let payload = '';
-
-          if(Array.isArray(meta.fileNames) && meta.fileNames.length){
-            payload = await _gistReadMultiFiles(gistId, meta.fileNames);
-          }else if(meta.fileName){
-            payload = await _gistReadFile(gistId, meta.fileName);
-          }else if(meta.fileBase){
-            let count = Math.max(1, parseInt(meta.chunkCount || 1, 10) || 1);
-            let names = _ownerCloudChunkFileNames(meta.fileBase, count);
-            payload = await _gistReadMultiFiles(gistId, names);
-          }else{
-            let guess = String(meta.ref || key || '').replace(/^\/+/, '');
-            if(guess) payload = await _gistReadFile(gistId, guess);
-          }
-
-          if(payload){
-            let trimmed = String(payload).trim();
-            if(trimmed && _isValidDataUrl(trimmed)){
-              loadedImages[key] = Object.assign({}, meta, { dataUrl: trimmed });
-            }else if(trimmed && /^data:image\//i.test(trimmed)){
-              loadedImages[key] = Object.assign({}, meta, { dataUrl: trimmed });
-            }else if(trimmed){
-              loadedImages[key] = Object.assign({}, meta, { dataUrl: trimmed });
-            }
-          }else{
-            _logOwnerCloud('warn', 'Image download failed', { ref: key, meta });
-          }
-        }
-        pkg.images = loadedImages;
-        if(!Array.isArray(pkg.warnings)) pkg.warnings = [];
-        let missingCount = Object.keys(images).length - Object.keys(loadedImages).length;
-        if(missingCount > 0) pkg.warnings.push('تعذّر تنزيل ' + missingCount + ' صورة من السحابة');
-        return pkg;
-      }
-      if(pkg && pkg.data && pkg.images){
-        return pkg;
-      }
-    }
-  }catch(e){
-    _logOwnerCloud('warn', 'New package read failed, falling back to legacy', e.message);
-  }
-  try{
-    return await _readLegacyOwnerCloudPackage(gistId);
-  }catch(e){
-    throw e;
-  }
-}
-
-
-async function cloudSave(){
-  if(!_isCloudConfigured()||_cloudSyncing||IS_FAMILY_COPY) return;
-  let currentDevice=_getOwnerDeviceId();
-  let existingPrimary=_getPrimaryDeviceId();
-  if(existingPrimary && existingPrimary!==currentDevice){
-    _showCloudToast('⚠️ هذا الجهاز ليس المصدر الرئيسي. استخدم تنزيل من السحابة بدل الرفع.','error',5000);
-    _logOwnerCloud('warn','Upload blocked because device is not primary',{currentDevice,existingPrimary});
-    return;
-  }
-  _cloudSyncing=true;
-  _updateCloudBtn('syncing');
-  try{
-    let cloudInfo=await _buildOwnerCloudPackage();
-    let pkg=cloudInfo.packageObj;
-    if(!existingPrimary){
-      pkg.primaryDeviceId=currentDevice;
-      _setPrimaryDeviceId(currentDevice);
-    }
-    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
-    let filesObj={
-      [OWNER_CLOUD_PACKAGE_FILE]:{content:JSON.stringify(pkg,null,2)},
-      [OWNER_CLOUD_LEGACY_DATA_FILE]:null,
-      [OWNER_CLOUD_LEGACY_PHOTOS_FILE]:null,
-    };
-    let prevRefs=[];
-    try{prevRefs=JSON.parse(localStorage.getItem(OWNER_CLOUD_IMAGE_INDEX_KEY)||'[]')||[];}catch(e){prevRefs=[];}
-    let currRefs=Object.keys(cloudInfo.imageFiles||{});
-    prevRefs.filter(r=>!currRefs.includes(r)).forEach(r=>{filesObj[r]=null;});
-    currRefs.forEach(r=>{filesObj[r]=cloudInfo.imageFiles[r];});
-    _showCloudToast('🔄 جارٍ رفع النسخة النظيفة...','syncing',0);
-    if(gistId){
-      try{await _gistUpdate(gistId,filesObj);}catch(e){
-        _logOwnerCloud('warn','Patch existing gist failed, creating a new one',e.message);
-        gistId=await _gistCreate(filesObj);
-      }
-    }else{
-      gistId=await _gistCreate(filesObj);
-    }
-    try{localStorage.setItem(CLOUD_GIST_KEY,gistId);}catch(e){}
-    CLOUD_CONFIG.GIST_ID=gistId;
-    try{localStorage.setItem(OWNER_CLOUD_IMAGE_INDEX_KEY,JSON.stringify(currRefs));}catch(e){}
-    _setLastSyncTime(pkg.updatedAt);
-    _ownerCloudState.package=pkg;
-    _ownerCloudState.warnings=cloudInfo.warnings||[];
-    _markDeviceInit();
-    _logOwnerCloud('info','Cloud upload completed',{gistId,people:pkg.counts.people,images:pkg.counts.images,relPairs:pkg.counts.relPairs,warnings:cloudInfo.warnings.length});
-    _showCloudToast('✅ تم رفع النسخة النظيفة · '+pkg.counts.people+' فرد · '+pkg.counts.images+' صورة','success',3500);
-    _updateCloudBtn('ok');
-    _updateCloudStatusUI();
-  }catch(e){
-    _logOwnerCloud('error','Cloud upload failed',e.message);
-    console.warn('[OwnerCloudSave]',e);
-    _showCloudToast('❌ فشل الرفع: '+e.message,'error',5000);
-    _updateCloudBtn('error');
-  }finally{
-    _cloudSyncing=false;
-  }
-}
-
-async function manualCloudSync(){
-  if(!_isCloudConfigured()){openCloudSetup();return;}
-  await cloudSave();
-}
-
-function _applyOwnerCloudState(pkg, mode){
-  let data = _extractPackageData(pkg);
-  let relPairsIncoming = Array.isArray(data.relPairs) ? data.relPairs : [];
-  let photos = _relinkOwnerPhotosFromPackage(pkg);
-  let restoredPeople = photos.people.map(p => {
-    let cp = _safeClone(p);
-    if(cp.photoRef) delete cp.photoRef;
-    return cp;
-  });
-
-  if(mode === 'replace'){
-    people = restoredPeople;
-    relPairs = _normalizeCloudRelPairs(relPairsIncoming, new Set(restoredPeople.map(p => String(p.id))));
-    nextId = data.nextId || 1;
-    if(data.myPersonId != null){ myPersonId = parseInt(data.myPersonId); saveMyPerson(); }
-    expanded = {};
-    people.forEach(p => { expanded[p.id] = false; });
-    migrateExternalSpouses();
-    if(people.length) expanded[people[0].id] = true;
-    _invalidateAll();
-    _markDeviceInit();
-    saveData();
-    renderAll();
-    updateMyPersonBtn();
-    return { people: people.length, images: photos.count, missing: photos.missing };
-  }
-  return { people: restoredPeople.length, images: photos.count, missing: photos.missing };
-}
-
-async function doCloudRestore(mode){
-  closeModal();
-  if(!_isCloudConfigured()) return;
-  let gistId = localStorage.getItem(CLOUD_GIST_KEY) || CLOUD_CONFIG.GIST_ID || '';
-  if(!gistId){
-    gistId = await _findCloudGist();
-    if(!gistId){
-      _showCloudToast('لم يُعثر على نسخة سحابية.', 'error', 4000);
-      return;
-    }
-  }
-  if(mode !== 'replace') mode = 'replace';
-  if(!confirm('سيتم استبدال البيانات المحلية بالكامل وتنزيل الصور المرتبطة أيضاً. هل تريد المتابعة؟')) return;
-  try{
-    _showCloudToast('🔄 جارٍ تنزيل النسخة النظيفة...', 'syncing', 0);
-    let pkg = await cloudLoad();
-    if(!pkg) throw new Error('تعذّر تحميل النسخة السحابية');
-    if(!pkg.primaryDeviceId) pkg.primaryDeviceId = _getPrimaryDeviceId() || _getOwnerDeviceId();
-    _setPrimaryDeviceId(pkg.primaryDeviceId || _getOwnerDeviceId());
-
-    let result = _applyOwnerCloudState(pkg, 'replace');
-    let now = _cloudNowIso();
-    _setLastSyncTime(now);
-    _ownerCloudState.package = pkg;
-    _ownerCloudState.lastCheckedAt = now;
-    _logOwnerCloud('info', 'Cloud restore completed', result);
-    if(result.missing){
-      _showCloudToast('✅ تم الاستبدال الكامل · ' + result.people + ' فرد · ' + result.images + ' صورة · ' + result.missing + ' مفقودة', 'success', 4500);
-    }else{
-      _showCloudToast('✅ تم الاستبدال الكامل · ' + result.people + ' فرد · ' + result.images + ' صورة', 'success', 4000);
-    }
-    _updateCloudBtn('ok');
-    _updateCloudStatusUI();
-  }catch(e){
-    _logOwnerCloud('error', 'Cloud restore failed', e.message);
-    _showCloudToast('❌ خطأ في الاستعادة: ' + e.message, 'error', 5000);
-    _updateCloudBtn('error');
-  }
-}
-
-function cloudRestorePrompt(){
-  if(!_isCloudConfigured()){openCloudSetup();return;}
-  let html = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:500px">
-    <h3>⬇️ تنزيل من السحابة</h3>
-    <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;line-height:1.8;margin-bottom:14px">
-      سيتم تحميل النسخة الرئيسية النظيفة واستبدال البيانات المحلية.<br>
-      الصور المرتبطة تُنزل وتُعاد ربطها محلياً تلقائياً.<br>
-      لا يوجد دمج مع البيانات القديمة.
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn primary" onclick="doCloudRestore('replace')" style="justify-content:center">⬇️ استبدال كامل وتنزيل</button>
-      <button class="btn" onclick="openCloudDebugModal()" style="justify-content:center">🧪 الصيانة والسجلات</button>
-      <button class="btn" onclick="closeModal()" style="justify-content:center">إلغاء</button>
-    </div>
-  </div></div>`;
-  document.getElementById('modalContainer').innerHTML = html;
-}
-
 </script>
 </body>
 </html>
