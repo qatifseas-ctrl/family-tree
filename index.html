@@ -1,12 +1,3 @@
-async async function doCloudRestore(mode){
-  if(mode==='replace'){
-    if(!confirm('⚠️ هل أنت متأكد؟ ستُحذف جميع البيانات والصور الحالية ويُستبدَل بما في السحابة.'))return;
-    await _doDownloadFromCloud(true);
-  } else {
-    await _doDownloadFromCloud(false);
-  }
-}
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
