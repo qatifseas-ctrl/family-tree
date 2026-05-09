@@ -7357,26 +7357,53 @@ async function _executeCloudReset(){
   }
 
   closeModal();
-  _showCloudToast('🗑 جارٍ حذف ملفات السحابة...','syncing',0);
+  _showCloudToast('🗑 جارٍ إعادة ضبط السحابة...','syncing',0);
   _syncLog('info','بدأت إعادة ضبط السحابة');
 
   try{
     if(gistId&&(delData||delPhotos||delMeta)){
+      // ── أولاً: اعرف الملفات الموجودة فعلاً في الـ Gist ──
+      let existingFiles={};
+      try{
+        let res=await _ghOwnerFetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()},2);
+        if(res.ok){let j=await res.json();existingFiles=j.files||{};}
+      }catch(e){ _syncLog('warn','تعذّر جلب قائمة الملفات',e.message); }
+
+      // ── ملاحظة GitHub API: ──
+      // • لحذف ملف موجود: أرسل {filename: null}
+      // • لا يمكن حذف الملف الأخير في الـ Gist (يُعيد 422)
+      // • إذا الملف غير موجود أصلاً: تجاهله (لا ترسله كـ null)
+      // الحل: استبدل المحتوى بعلامة RESET بدلاً من null — يعمل دائماً
+      const RESET_MARKER = 'RESET_'+new Date().toISOString();
       let filesObj={};
-      if(delData)filesObj[CLOUD_CONFIG.GIST_FILE]=null;
-      if(delPhotos)filesObj[CLOUD_PHOTOS_FILE]=null;
-      if(delMeta)filesObj[CLOUD_META_FILE]=null;
-      // إرسال null يحذف الملف من الـ Gist
-      await _gistUpdate(gistId,filesObj);
-      _syncLog('ok','حُذفت ملفات السحابة',Object.keys(filesObj).join(', '));
+      let wantedFiles=[];
+      if(delData) wantedFiles.push(CLOUD_CONFIG.GIST_FILE);
+      if(delPhotos) wantedFiles.push(CLOUD_PHOTOS_FILE);
+      if(delMeta) wantedFiles.push(CLOUD_META_FILE);
+
+      wantedFiles.forEach(fname=>{
+        if(existingFiles[fname]){
+          // الملف موجود → استبدل محتواه بعلامة reset (لا ترسل null لتجنب 422)
+          filesObj[fname]={content:RESET_MARKER};
+        }
+        // إذا غير موجود → تجاهله تماماً
+      });
+
+      if(Object.keys(filesObj).length>0){
+        await _gistUpdate(gistId,filesObj);
+        _syncLog('ok','أُعيد ضبط الملفات السحابية',Object.keys(filesObj).join(', '));
+      } else {
+        _syncLog('info','لا توجد ملفات في الـ Gist لإعادة ضبطها');
+      }
     }
-    if(delLocal){
-      _resetLocalSyncState();
-    }
+    if(delLocal) _resetLocalSyncState();
     _showCloudToast('✅ تمت إعادة الضبط — الآن ارفع نسخة نظيفة','success',4000);
   }catch(e){
     _syncLog('error','فشلت إعادة الضبط',e.message);
-    _showCloudToast('❌ فشل الحذف: '+e.message,'error',5000);
+    let msg=e.message||'';
+    if(msg.includes('422'))msg='تعذّر تعديل الـ Gist — تحقق من أن التوكن يملك صلاحية الكتابة';
+    else if(msg.includes('401')||msg.includes('403'))msg='خطأ مصادقة — تحقق من التوكن';
+    _showCloudToast('❌ '+msg,'error',5000);
   }
 }
 
