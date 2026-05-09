@@ -7839,7 +7839,7 @@ async function _buildOwnerCloudPackage(){
   let warnings=sanitized.warnings.slice();
   let liveIds=new Set(cleanedPeople.map(p=>String(p.id)));
   let images={};
-  let imageFiles={};
+  let refByHash={};
   let photoCount=0;
   for(let p of cleanedPeople){
     if(!_isValidDataUrl(p.photo)){
@@ -7850,11 +7850,10 @@ async function _buildOwnerCloudPackage(){
     let hash=await _sha256Hex(p.photo);
     let ext=_imageExtFromDataUrl(p.photo);
     let ref='images/photo_'+hash.slice(0,24)+'.'+ext;
-    let fileName='images__photo_'+hash.slice(0,24)+'.'+ext;
     let mime=(String(p.photo).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i)||[])[1]||'image/png';
     if(!images[ref]){
-      images[ref]={ref,cloudPath:'/images/'+fileName,mime,hash,fileName,linkedPersonIds:[String(p.id)]};
-      imageFiles[fileName]={content:String(p.photo)};
+      images[ref]={ref,mime,hash,dataUrl:p.photo,createdAt:now,linkedPersonIds:[String(p.id)]};
+      refByHash[hash]=ref;
     }else{
       images[ref].linkedPersonIds.push(String(p.id));
     }
@@ -7886,7 +7885,7 @@ async function _buildOwnerCloudPackage(){
     backups:{latest:{createdAt:now,note:'clean master copy'}},
     temp:{},
   };
-  return {packageObj,warnings,photoCount,imageFiles};
+  return {packageObj,warnings,photoCount};
 }
 function _extractPackageData(pkg){
   let data=pkg&&pkg.data?pkg.data:{};
@@ -7903,13 +7902,9 @@ function _relinkOwnerPhotosFromPackage(pkg){
   let restoredPeople=_extractPackageData(pkg).people.map(p=>{
     let cp=_safeClone(p);
     if(cp.photoRef){
-      let img=images[cp.photoRef] || images[String(cp.photoRef).replace(/^\/+/, '')];
-      let payload=img&&typeof img==='object' ? (img.dataUrl||img.content||img.photo||'') : (typeof img==='string' ? img : '');
-      if(payload && _isValidDataUrl(payload)){
-        cp.photo=payload;
-        count++;
-      }else if(payload && /^data:image\//i.test(String(payload))){
-        cp.photo=String(payload);
+      let img=images[cp.photoRef] || images[String(cp.photoRef).replace(/^\//,'')];
+      if(img&&img.dataUrl&&_isValidDataUrl(img.dataUrl)){
+        cp.photo=img.dataUrl;
         count++;
       }else{
         missing++;
@@ -7967,28 +7962,7 @@ async function _readOwnerCloudPackage(gistId){
     let raw=await _gistReadFile(gistId,OWNER_CLOUD_PACKAGE_FILE);
     if(raw){
       let pkg=JSON.parse(raw);
-      if(pkg && pkg.schema==='owner-sync-v2'){
-        let images=pkg.images||{};
-        let loadedImages={};
-        for(let key of Object.keys(images)){
-          let meta=images[key]||{};
-          let fileName=meta.fileName || String(key).replace(/^\/+/, '');
-          try{
-            let content=await _gistReadFile(gistId,fileName);
-            if(content){
-              let payload=String(content).trim();
-              if(payload) loadedImages[key]={...meta,dataUrl:payload};
-            }
-          }catch(e){
-            _logOwnerCloud('warn','Image download failed',{ref:key,fileName,message:e.message});
-          }
-        }
-        pkg.images=loadedImages;
-        if(!Array.isArray(pkg.warnings)) pkg.warnings=[];
-        let missingCount=Object.keys(images).length-Object.keys(loadedImages).length;
-        if(missingCount>0) pkg.warnings.push('تعذّر تنزيل '+missingCount+' صورة من السحابة');
-        return pkg;
-      }
+      if(pkg && pkg.schema==='owner-sync-v2') return pkg;
       if(pkg && pkg.data && pkg.images){
         return pkg;
       }
@@ -8092,7 +8066,6 @@ async function cloudSave(){
       [OWNER_CLOUD_LEGACY_DATA_FILE]:null,
       [OWNER_CLOUD_LEGACY_PHOTOS_FILE]:null,
     };
-    Object.entries(cloudInfo.imageFiles||{}).forEach(([fileName,fileObj])=>{filesObj[fileName]=fileObj;});
     _showCloudToast('🔄 جارٍ رفع النسخة النظيفة...','syncing',0);
     if(gistId){
       try{await _gistUpdate(gistId,filesObj);}catch(e){
@@ -9483,6 +9456,433 @@ function _setVoiceActive(on){
   document.body.appendChild(sheet);
 })();
 document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMergeHistoryButtons,0);});
+
+// ══════════════════════════════════════════════════════════
+//  Owner cloud sync hotfix (chunked image storage + safer restore)
+//  هذا البلوك يعيد تعريف دوال السحابة في نهاية الملف لضمان
+//  استخدام النسخة المصححة فقط.
+// ══════════════════════════════════════════════════════════
+const OWNER_CLOUD_IMAGE_CHUNK_SIZE = 750000; // أقل من حد 1MB الفعلي لكل ملف مع هامش أمان
+
+function _ownerCloudChunkString(text, chunkSize){
+  let s = String(text || '');
+  let size = Math.max(100000, parseInt(chunkSize, 10) || OWNER_CLOUD_IMAGE_CHUNK_SIZE);
+  let out = [];
+  for(let i = 0; i < s.length; i += size){
+    out.push(s.slice(i, i + size));
+  }
+  return out.length ? out : [''];
+}
+
+function _ownerCloudChunkFileBase(hash, ext){
+  return 'owner_photo_' + String(hash || '').slice(0, 24) + '_' + String(ext || 'png').replace(/[^a-z0-9]/gi, '');
+}
+
+function _ownerCloudChunkFileNames(fileBase, chunkCount){
+  let names = [];
+  let total = Math.max(1, parseInt(chunkCount, 10) || 1);
+  for(let i = 0; i < total; i++){
+    let n = String(i + 1).padStart(3, '0');
+    names.push('images__' + fileBase + '__p' + n + '.dat');
+  }
+  return names;
+}
+
+async function _gistHttpError(res, fallback){
+  let base = fallback || ('GitHub API: ' + res.status + ' ' + res.statusText);
+  try{
+    let txt = await res.text();
+    if(!txt) return base;
+    try{
+      let j = JSON.parse(txt);
+      let msg = j && (j.message || j.error || j.errors);
+      if(msg){
+        if(Array.isArray(msg)) msg = msg.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' | ');
+        return base + ' — ' + msg;
+      }
+    }catch(e){}
+    return base + ' — ' + txt.slice(0, 240);
+  }catch(e){
+    return base;
+  }
+}
+
+async function _gistCreate(filesObj){
+  let res = await fetch('https://api.github.com/gists', {
+    method: 'POST',
+    headers: _gistHeaders(),
+    body: JSON.stringify({ description: 'Family Tree Owner Cloud Backup', public: false, files: filesObj })
+  });
+  if(!res.ok) throw new Error(await _gistHttpError(res));
+  let j = await res.json();
+  return j.id;
+}
+
+async function _gistUpdate(gistId, filesObj){
+  let res = await fetch('https://api.github.com/gists/' + gistId, {
+    method: 'PATCH',
+    headers: _gistHeaders(),
+    body: JSON.stringify({ files: filesObj })
+  });
+  if(!res.ok) throw new Error(await _gistHttpError(res));
+}
+
+async function _gistReadMultiFiles(gistId, fileNames){
+  let parts = [];
+  for(let fn of (Array.isArray(fileNames) ? fileNames : [])){
+    if(!fn) continue;
+    let c = await _gistReadFile(gistId, fn);
+    if(c == null) return null;
+    parts.push(String(c));
+  }
+  return parts.join('');
+}
+
+function _ownerCloudOldImageFilesFromPackage(pkg){
+  let out = [];
+  let images = (pkg && pkg.images) || {};
+  Object.keys(images).forEach(ref => {
+    let meta = images[ref] || {};
+    if(Array.isArray(meta.fileNames) && meta.fileNames.length){
+      meta.fileNames.forEach(n => n && out.push(n));
+    }else if(meta.fileName){
+      out.push(meta.fileName);
+    }else if(meta.fileBase){
+      let count = Math.max(1, parseInt(meta.chunkCount || 1, 10) || 1);
+      _ownerCloudChunkFileNames(meta.fileBase, count).forEach(n => out.push(n));
+    }
+  });
+  return Array.from(new Set(out));
+}
+
+async function _buildOwnerCloudPackage(){
+  let now = _cloudNowIso();
+  let sanitized = _sanitizeOwnerPeopleForCloud();
+  let cleanedPeople = sanitized.people;
+  let warnings = sanitized.warnings.slice();
+  let liveIds = new Set(cleanedPeople.map(p => String(p.id)));
+  let images = {};
+  let imageFiles = {};
+  let photoCount = 0;
+
+  for(let p of cleanedPeople){
+    if(!_isValidDataUrl(p.photo)){
+      if(p.photo) warnings.push('تم تجاهل صورة غير صالحة لـ ' + p.name);
+      delete p.photo;
+      continue;
+    }
+
+    let hash = await _sha256Hex(p.photo);
+    let ext = _imageExtFromDataUrl(p.photo);
+    let ref = 'images/photo_' + hash.slice(0, 24) + '.' + ext;
+    let fileBase = _ownerCloudChunkFileBase(hash, ext);
+    let chunks = _ownerCloudChunkString(p.photo, OWNER_CLOUD_IMAGE_CHUNK_SIZE);
+    let fileNames = _ownerCloudChunkFileNames(fileBase, chunks.length);
+    let mime = (String(p.photo).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i) || [])[1] || 'image/png';
+
+    images[ref] = {
+      ref,
+      cloudPath: '/images/' + fileBase,
+      mime,
+      hash,
+      fileBase,
+      fileNames,
+      chunkCount: chunks.length,
+      ext,
+      linkedPersonIds: [String(p.id)]
+    };
+
+    chunks.forEach((chunk, idx) => {
+      imageFiles[fileNames[idx]] = { content: String(chunk) };
+    });
+
+    p.photoRef = ref;
+    delete p.photo;
+    photoCount++;
+  }
+
+  let relPairsClean = _normalizeCloudRelPairs(relPairs, liveIds);
+  let nextClean = Math.max(1, ...cleanedPeople.map(p => parseInt(p.id, 10) || 0), nextId || 1) + 1;
+
+  let data = {
+    people: cleanedPeople,
+    relPairs: relPairsClean,
+    nextId: nextClean,
+    myPersonId: myPersonId || null
+  };
+
+  let packageObj = {
+    schema: 'owner-sync-v2',
+    version: 2,
+    source: 'owner',
+    createdAt: now,
+    updatedAt: now,
+    primaryDeviceId: _getPrimaryDeviceId() || _getOwnerDeviceId(),
+    sourceDeviceId: _getOwnerDeviceId(),
+    structure: OWNER_CLOUD_STRUCTURE,
+    counts: { people: cleanedPeople.length, images: Object.keys(images).length, relPairs: relPairsClean.length },
+    warnings,
+    data,
+    images,
+    backups: { latest: { createdAt: now, note: 'clean master copy' } },
+    temp: {}
+  };
+
+  return { packageObj, warnings, photoCount, imageFiles };
+}
+
+async function _readOwnerCloudPackage(gistId){
+  if(!gistId) return null;
+  try{
+    let raw = await _gistReadFile(gistId, OWNER_CLOUD_PACKAGE_FILE);
+    if(raw){
+      let pkg = JSON.parse(raw);
+      if(pkg && pkg.schema === 'owner-sync-v2'){
+        let images = pkg.images || {};
+        let loadedImages = {};
+        for(let key of Object.keys(images)){
+          let meta = images[key] || {};
+          let payload = '';
+
+          if(Array.isArray(meta.fileNames) && meta.fileNames.length){
+            payload = await _gistReadMultiFiles(gistId, meta.fileNames);
+          }else if(meta.fileName){
+            payload = await _gistReadFile(gistId, meta.fileName);
+          }else if(meta.fileBase){
+            let count = Math.max(1, parseInt(meta.chunkCount || 1, 10) || 1);
+            let names = _ownerCloudChunkFileNames(meta.fileBase, count);
+            payload = await _gistReadMultiFiles(gistId, names);
+          }else{
+            let guess = String(meta.ref || key || '').replace(/^\/+/, '');
+            if(guess) payload = await _gistReadFile(gistId, guess);
+          }
+
+          if(payload){
+            let trimmed = String(payload).trim();
+            if(trimmed && _isValidDataUrl(trimmed)){
+              loadedImages[key] = Object.assign({}, meta, { dataUrl: trimmed });
+            }else if(trimmed && /^data:image\//i.test(trimmed)){
+              loadedImages[key] = Object.assign({}, meta, { dataUrl: trimmed });
+            }else if(trimmed){
+              loadedImages[key] = Object.assign({}, meta, { dataUrl: trimmed });
+            }
+          }else{
+            _logOwnerCloud('warn', 'Image download failed', { ref: key, meta });
+          }
+        }
+        pkg.images = loadedImages;
+        if(!Array.isArray(pkg.warnings)) pkg.warnings = [];
+        let missingCount = Object.keys(images).length - Object.keys(loadedImages).length;
+        if(missingCount > 0) pkg.warnings.push('تعذّر تنزيل ' + missingCount + ' صورة من السحابة');
+        return pkg;
+      }
+      if(pkg && pkg.data && pkg.images){
+        return pkg;
+      }
+    }
+  }catch(e){
+    _logOwnerCloud('warn', 'New package read failed, falling back to legacy', e.message);
+  }
+  try{
+    return await _readLegacyOwnerCloudPackage(gistId);
+  }catch(e){
+    throw e;
+  }
+}
+
+async function cloudSave(){
+  if(!_isCloudConfigured() || _cloudSyncing || IS_FAMILY_COPY) return;
+  let currentDevice = _getOwnerDeviceId();
+  let existingPrimary = _getPrimaryDeviceId();
+  if(existingPrimary && existingPrimary !== currentDevice){
+    _showCloudToast('⚠️ هذا الجهاز ليس المصدر الرئيسي. استخدم تنزيل من السحابة بدل الرفع.', 'error', 5000);
+    _logOwnerCloud('warn', 'Upload blocked because device is not primary', { currentDevice, existingPrimary });
+    return;
+  }
+
+  _cloudSyncing = true;
+  _updateCloudBtn('syncing');
+
+  try{
+    let cloudInfo = await _buildOwnerCloudPackage();
+    let pkg = cloudInfo.packageObj;
+
+    if(!existingPrimary){
+      pkg.primaryDeviceId = currentDevice;
+      _setPrimaryDeviceId(currentDevice);
+    }
+
+    let gistId = localStorage.getItem(CLOUD_GIST_KEY) || CLOUD_CONFIG.GIST_ID || '';
+    let filesObj = {
+      [OWNER_CLOUD_PACKAGE_FILE]: { content: JSON.stringify(pkg, null, 2) },
+      [OWNER_CLOUD_LEGACY_DATA_FILE]: null,
+      [OWNER_CLOUD_LEGACY_PHOTOS_FILE]: null
+    };
+    Object.entries(cloudInfo.imageFiles || {}).forEach(([fileName, fileObj]) => {
+      filesObj[fileName] = fileObj;
+    });
+
+    let oldPkg = _ownerCloudState && _ownerCloudState.package ? _ownerCloudState.package : null;
+    _ownerCloudOldImageFilesFromPackage(oldPkg).forEach(oldFile => {
+      if(!filesObj[oldFile]) filesObj[oldFile] = null;
+    });
+
+    _showCloudToast('🔄 جارٍ رفع النسخة النظيفة...', 'syncing', 0);
+
+    if(gistId){
+      try{
+        await _gistUpdate(gistId, filesObj);
+      }catch(e){
+        _logOwnerCloud('warn', 'Patch existing gist failed, creating a new one', e.message);
+        gistId = await _gistCreate(filesObj);
+      }
+    }else{
+      gistId = await _gistCreate(filesObj);
+    }
+
+    localStorage.setItem(CLOUD_GIST_KEY, gistId);
+    CLOUD_CONFIG.GIST_ID = gistId;
+
+    let now = _cloudNowIso();
+    _setLastSyncTime(now);
+    _markDeviceInit();
+    _ownerCloudState.package = pkg;
+    _ownerCloudState.warnings = cloudInfo.warnings || [];
+    _logOwnerCloud('info', 'Cloud upload completed', {
+      gistId,
+      people: pkg.counts.people,
+      images: pkg.counts.images,
+      relPairs: pkg.counts.relPairs,
+      warnings: cloudInfo.warnings.length
+    });
+    if(cloudInfo.warnings && cloudInfo.warnings.length) console.warn('[OwnerCloud warnings]', cloudInfo.warnings);
+    _showCloudToast('✅ تم رفع النسخة النظيفة · ' + pkg.counts.people + ' فرد · ' + pkg.counts.images + ' صورة', 'success', 3500);
+    _updateCloudBtn('ok');
+    _updateCloudStatusUI();
+  }catch(e){
+    _logOwnerCloud('error', 'Cloud upload failed', e.message);
+    console.warn('[OwnerCloudSave]', e);
+    _showCloudToast('❌ فشل الرفع: ' + e.message, 'error', 5000);
+    _updateCloudBtn('error');
+  }finally{
+    _cloudSyncing = false;
+  }
+}
+
+async function cloudLoad(){
+  if(!_isCloudConfigured()) return false;
+  let gistId = localStorage.getItem(CLOUD_GIST_KEY) || CLOUD_CONFIG.GIST_ID || '';
+  if(!gistId){
+    gistId = await _findCloudGist();
+    if(!gistId) return false;
+  }
+  try{
+    let pkg = await _readOwnerCloudPackage(gistId);
+    if(!pkg) return false;
+    _ownerCloudState.package = pkg;
+    _ownerCloudState.lastCheckedAt = _cloudNowIso();
+    _ownerCloudState.warnings = (pkg.warnings || []).slice();
+    return pkg;
+  }catch(e){
+    _logOwnerCloud('error', 'Cloud load failed', e.message);
+    _showCloudToast('❌ فشل التنزيل: ' + e.message, 'error', 4500);
+    return false;
+  }
+}
+
+async function manualCloudSync(){
+  if(!_isCloudConfigured()){openCloudSetup();return;}
+  await cloudSave();
+}
+
+function _applyOwnerCloudState(pkg, mode){
+  let data = _extractPackageData(pkg);
+  let relPairsIncoming = Array.isArray(data.relPairs) ? data.relPairs : [];
+  let photos = _relinkOwnerPhotosFromPackage(pkg);
+  let restoredPeople = photos.people.map(p => {
+    let cp = _safeClone(p);
+    if(cp.photoRef) delete cp.photoRef;
+    return cp;
+  });
+
+  if(mode === 'replace'){
+    people = restoredPeople;
+    relPairs = _normalizeCloudRelPairs(relPairsIncoming, new Set(restoredPeople.map(p => String(p.id))));
+    nextId = data.nextId || 1;
+    if(data.myPersonId != null){ myPersonId = parseInt(data.myPersonId); saveMyPerson(); }
+    expanded = {};
+    people.forEach(p => { expanded[p.id] = false; });
+    migrateExternalSpouses();
+    if(people.length) expanded[people[0].id] = true;
+    _invalidateAll();
+    _markDeviceInit();
+    saveData();
+    renderAll();
+    updateMyPersonBtn();
+    return { people: people.length, images: photos.count, missing: photos.missing };
+  }
+  return { people: restoredPeople.length, images: photos.count, missing: photos.missing };
+}
+
+async function doCloudRestore(mode){
+  closeModal();
+  if(!_isCloudConfigured()) return;
+  let gistId = localStorage.getItem(CLOUD_GIST_KEY) || CLOUD_CONFIG.GIST_ID || '';
+  if(!gistId){
+    gistId = await _findCloudGist();
+    if(!gistId){
+      _showCloudToast('لم يُعثر على نسخة سحابية.', 'error', 4000);
+      return;
+    }
+  }
+  if(mode !== 'replace') mode = 'replace';
+  if(!confirm('سيتم استبدال البيانات المحلية بالكامل وتنزيل الصور المرتبطة أيضاً. هل تريد المتابعة؟')) return;
+  try{
+    _showCloudToast('🔄 جارٍ تنزيل النسخة النظيفة...', 'syncing', 0);
+    let pkg = await cloudLoad();
+    if(!pkg) throw new Error('تعذّر تحميل النسخة السحابية');
+    if(!pkg.primaryDeviceId) pkg.primaryDeviceId = _getPrimaryDeviceId() || _getOwnerDeviceId();
+    _setPrimaryDeviceId(pkg.primaryDeviceId || _getOwnerDeviceId());
+
+    let result = _applyOwnerCloudState(pkg, 'replace');
+    let now = _cloudNowIso();
+    _setLastSyncTime(now);
+    _ownerCloudState.package = pkg;
+    _ownerCloudState.lastCheckedAt = now;
+    _logOwnerCloud('info', 'Cloud restore completed', result);
+    if(result.missing){
+      _showCloudToast('✅ تم الاستبدال الكامل · ' + result.people + ' فرد · ' + result.images + ' صورة · ' + result.missing + ' مفقودة', 'success', 4500);
+    }else{
+      _showCloudToast('✅ تم الاستبدال الكامل · ' + result.people + ' فرد · ' + result.images + ' صورة', 'success', 4000);
+    }
+    _updateCloudBtn('ok');
+    _updateCloudStatusUI();
+  }catch(e){
+    _logOwnerCloud('error', 'Cloud restore failed', e.message);
+    _showCloudToast('❌ خطأ في الاستعادة: ' + e.message, 'error', 5000);
+    _updateCloudBtn('error');
+  }
+}
+
+function cloudRestorePrompt(){
+  if(!_isCloudConfigured()){openCloudSetup();return;}
+  let html = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:500px">
+    <h3>⬇️ تنزيل من السحابة</h3>
+    <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;line-height:1.8;margin-bottom:14px">
+      سيتم تحميل النسخة الرئيسية النظيفة واستبدال البيانات المحلية.<br>
+      الصور المرتبطة تُنزل وتُعاد ربطها محلياً تلقائياً.<br>
+      لا يوجد دمج مع البيانات القديمة.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn primary" onclick="doCloudRestore('replace')" style="justify-content:center">⬇️ استبدال كامل وتنزيل</button>
+      <button class="btn" onclick="openCloudDebugModal()" style="justify-content:center">🧪 الصيانة والسجلات</button>
+      <button class="btn" onclick="closeModal()" style="justify-content:center">إلغاء</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML = html;
+}
+
 </script>
 </body>
 </html>
