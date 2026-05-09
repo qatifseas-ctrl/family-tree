@@ -1,4 +1,4 @@
-async function doCloudRestore(mode){
+async async function doCloudRestore(mode){
   if(mode==='replace'){
     if(!confirm('⚠️ هل أنت متأكد؟ ستُحذف جميع البيانات والصور الحالية ويُستبدَل بما في السحابة.'))return;
     await _doDownloadFromCloud(true);
@@ -7763,7 +7763,7 @@ function _applyFamilyMergeWithHistory(dataObj, meta){
 }
 
 // ── بحث تلقائي عن Gist الخاص بالشجرة في حساب GitHub ──
-async async function _findCloudGist(){
+async function _findCloudGist(){
   if(!CLOUD_CONFIG.GITHUB_PAT)return null;
   try{
     _showCloudToast('🔍 جارٍ البحث عن نسخة سحابية...','syncing',0);
