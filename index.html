@@ -7839,7 +7839,7 @@ async function _buildOwnerCloudPackage(){
   let warnings=sanitized.warnings.slice();
   let liveIds=new Set(cleanedPeople.map(p=>String(p.id)));
   let images={};
-  let refByHash={};
+  let imageFiles={};
   let photoCount=0;
   for(let p of cleanedPeople){
     if(!_isValidDataUrl(p.photo)){
@@ -7850,10 +7850,11 @@ async function _buildOwnerCloudPackage(){
     let hash=await _sha256Hex(p.photo);
     let ext=_imageExtFromDataUrl(p.photo);
     let ref='images/photo_'+hash.slice(0,24)+'.'+ext;
+    let fileName='images__photo_'+hash.slice(0,24)+'.'+ext;
     let mime=(String(p.photo).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i)||[])[1]||'image/png';
     if(!images[ref]){
-      images[ref]={ref,mime,hash,dataUrl:p.photo,createdAt:now,linkedPersonIds:[String(p.id)]};
-      refByHash[hash]=ref;
+      images[ref]={ref,cloudPath:'/images/'+fileName,mime,hash,fileName,linkedPersonIds:[String(p.id)]};
+      imageFiles[fileName]={content:String(p.photo)};
     }else{
       images[ref].linkedPersonIds.push(String(p.id));
     }
@@ -7885,7 +7886,7 @@ async function _buildOwnerCloudPackage(){
     backups:{latest:{createdAt:now,note:'clean master copy'}},
     temp:{},
   };
-  return {packageObj,warnings,photoCount};
+  return {packageObj,warnings,photoCount,imageFiles};
 }
 function _extractPackageData(pkg){
   let data=pkg&&pkg.data?pkg.data:{};
@@ -7902,9 +7903,13 @@ function _relinkOwnerPhotosFromPackage(pkg){
   let restoredPeople=_extractPackageData(pkg).people.map(p=>{
     let cp=_safeClone(p);
     if(cp.photoRef){
-      let img=images[cp.photoRef] || images[String(cp.photoRef).replace(/^\//,'')];
-      if(img&&img.dataUrl&&_isValidDataUrl(img.dataUrl)){
-        cp.photo=img.dataUrl;
+      let img=images[cp.photoRef] || images[String(cp.photoRef).replace(/^\/+/, '')];
+      let payload=img&&typeof img==='object' ? (img.dataUrl||img.content||img.photo||'') : (typeof img==='string' ? img : '');
+      if(payload && _isValidDataUrl(payload)){
+        cp.photo=payload;
+        count++;
+      }else if(payload && /^data:image\//i.test(String(payload))){
+        cp.photo=String(payload);
         count++;
       }else{
         missing++;
@@ -7962,7 +7967,28 @@ async function _readOwnerCloudPackage(gistId){
     let raw=await _gistReadFile(gistId,OWNER_CLOUD_PACKAGE_FILE);
     if(raw){
       let pkg=JSON.parse(raw);
-      if(pkg && pkg.schema==='owner-sync-v2') return pkg;
+      if(pkg && pkg.schema==='owner-sync-v2'){
+        let images=pkg.images||{};
+        let loadedImages={};
+        for(let key of Object.keys(images)){
+          let meta=images[key]||{};
+          let fileName=meta.fileName || String(key).replace(/^\/+/, '');
+          try{
+            let content=await _gistReadFile(gistId,fileName);
+            if(content){
+              let payload=String(content).trim();
+              if(payload) loadedImages[key]={...meta,dataUrl:payload};
+            }
+          }catch(e){
+            _logOwnerCloud('warn','Image download failed',{ref:key,fileName,message:e.message});
+          }
+        }
+        pkg.images=loadedImages;
+        if(!Array.isArray(pkg.warnings)) pkg.warnings=[];
+        let missingCount=Object.keys(images).length-Object.keys(loadedImages).length;
+        if(missingCount>0) pkg.warnings.push('تعذّر تنزيل '+missingCount+' صورة من السحابة');
+        return pkg;
+      }
       if(pkg && pkg.data && pkg.images){
         return pkg;
       }
@@ -8066,6 +8092,7 @@ async function cloudSave(){
       [OWNER_CLOUD_LEGACY_DATA_FILE]:null,
       [OWNER_CLOUD_LEGACY_PHOTOS_FILE]:null,
     };
+    Object.entries(cloudInfo.imageFiles||{}).forEach(([fileName,fileObj])=>{filesObj[fileName]=fileObj;});
     _showCloudToast('🔄 جارٍ رفع النسخة النظيفة...','syncing',0);
     if(gistId){
       try{await _gistUpdate(gistId,filesObj);}catch(e){
