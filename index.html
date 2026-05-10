@@ -5717,132 +5717,45 @@ function _gistHeaders(){
   return {'Authorization':'token '+CLOUD_CONFIG.GITHUB_PAT,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
 }
 async function _gistCreate(filesObj){
-  let res=await _ghFetch('https://api.github.com/gists',{
+  let res=await fetch('https://api.github.com/gists',{
     method:'POST',headers:_gistHeaders(),
     body:JSON.stringify({description:'Family Tree Encrypted Backup',public:false,files:filesObj})
-  }, 3);
+  });
   if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
   let j=await res.json();return j.id;
 }
 async function _gistUpdate(gistId,filesObj){
-  let res=await _ghFetch('https://api.github.com/gists/'+gistId,{
+  let res=await fetch('https://api.github.com/gists/'+gistId,{
     method:'PATCH',headers:_gistHeaders(),
     body:JSON.stringify({files:filesObj})
-  }, 3);
+  });
   if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
-  // ابطل ETag cache بعد كل write — حتى تُجلب البيانات الجديدة في القراءة التالية
-  _invalidateGistCache(gistId);
 }
-// ══════════════════════════════════════════════════════════
-//  طبقة GitHub API — مع retry وETag وحماية من 503/429
-// ══════════════════════════════════════════════════════════
-
-// ETag cache: {gistId: {etag, files: {filename: content}}}
-let _gistETagCache = {};
-
-// تأخير قابل للانتظار
-function _apiDelay(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-// هل يجب إعادة المحاولة بناءً على كود الاستجابة؟
-function _isRetryable(status){
-  return status===503||status===502||status===504||status===429||status===408;
-}
-
-// طلب GitHub API مع retry تلقائي (exponential backoff)
-async function _ghFetch(url, opts, retries){
-  retries = retries===undefined ? 3 : retries;
-  let delay = 1500; // ms
-  let lastErr;
-  for(let attempt=0; attempt<retries; attempt++){
-    if(attempt>0){
-      console.debug('[GHFetch] retry',attempt,'after',delay,'ms for',url.split('?')[0].split('/').pop());
-      await _apiDelay(delay);
-      delay = Math.min(delay*2, 15000);
-    }
+async function _gistReadFile(gistId,filename){
+  let res=await fetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()});
+  if(!res.ok)throw new Error('GitHub API: '+res.status+' '+res.statusText);
+  let j=await res.json();
+  let f=j.files&&j.files[filename];
+  if(!f)return null; // الملف غير موجود — ليس خطأً
+  if(f.truncated&&f.raw_url){
+    // raw_url قد يفشل من file:// بسبب CORS — نستخدم API مباشرة
     try{
-      let res = await fetch(url, opts);
-      // 429 → احترم Retry-After إن وُجد
-      if(res.status===429){
-        let ra = parseInt(res.headers.get('Retry-After')||'10');
-        let waitMs = Math.min(ra*1000, 30000);
-        console.warn('[GHFetch] Rate limited, waiting',waitMs,'ms');
-        if(attempt<retries-1){ await _apiDelay(waitMs); continue; }
-      }
-      if(_isRetryable(res.status) && attempt<retries-1){
-        console.warn('[GHFetch] HTTP',res.status,'— will retry');
-        lastErr = new Error('GitHub API: '+res.status+' '+res.statusText);
-        continue;
-      }
-      return res; // نجح أو خطأ غير قابل للإعادة (401,403,404...)
-    }catch(netErr){
-      lastErr=netErr;
-      if(attempt<retries-1)continue;
-    }
+      let r=await fetch(f.raw_url,{headers:_gistHeaders()});
+      if(r.ok)return await r.text();
+    }catch(e){}
+    // fallback: اقرأ الـ Gist بطلب منفصل طالباً الملف بصيغة raw
+    let r2=await fetch('https://api.github.com/gists/'+gistId,{
+      headers:{..._gistHeaders(),'Accept':'application/vnd.github.raw+json'}
+    });
+    if(r2.ok){let j2=await r2.json();let f2=j2.files&&j2.files[filename];if(f2&&f2.content)return f2.content;}
+    throw new Error('الملف كبير جداً ولم يُمكن تحميله ('+filename+')');
   }
-  throw lastErr||new Error('فشل الاتصال بـ GitHub بعد '+retries+' محاولات');
+  return f.content;
 }
-
-// قراءة كامل Gist مرة واحدة وتخزين كل الملفات → تقليل عدد الطلبات
-async function _gistFetchAll(gistId){
-  let cached = _gistETagCache[gistId];
-  let headers = {..._gistHeaders()};
-  if(cached&&cached.etag) headers['If-None-Match'] = cached.etag;
-
-  let res = await _ghFetch('https://api.github.com/gists/'+gistId, {headers});
-
-  // 304 Not Modified → استخدم النسخة المخزنة
-  if(res.status===304 && cached){
-    console.debug('[GistFetch] 304 Not Modified — using cached version');
-    return cached.files;
-  }
-  if(!res.ok) throw new Error('GitHub API: '+res.status+' '+res.statusText);
-
-  let j = await res.json();
-  let etag = res.headers.get('ETag')||'';
-  let files = {};
-
-  // استخرج محتوى كل الملفات
-  for(let fname of Object.keys(j.files||{})){
-    let f = j.files[fname];
-    if(!f)continue;
-    if(f.truncated && f.raw_url){
-      // ملف كبير: اجلبه من raw_url (له token فريد من GitHub — لا نضيف شيئاً)
-      try{
-        let rr = await _ghFetch(f.raw_url, {headers:_gistHeaders()}, 3);
-        if(rr.ok){ files[fname] = await rr.text(); continue; }
-      }catch(e){ console.warn('[GistFetch] raw_url failed for',fname,e.message); }
-      // fallback: طلب raw+json
-      try{
-        let rr2 = await _ghFetch('https://api.github.com/gists/'+gistId,
-          {headers:{..._gistHeaders(),'Accept':'application/vnd.github.raw+json'}}, 2);
-        if(rr2.ok){ let j2=await rr2.json(); if(j2.files?.[fname]?.content)files[fname]=j2.files[fname].content; }
-      }catch(e2){ console.warn('[GistFetch] raw+json fallback failed',e2.message); }
-    } else {
-      files[fname] = f.content;
-    }
-  }
-
-  // خزّن مع ETag للطلبات التالية
-  _gistETagCache[gistId] = {etag, files};
-  return files;
-}
-
-// قراءة ملف واحد من Gist (تستخدم _gistFetchAll داخلياً)
-async function _gistReadFile(gistId, filename){
-  let files = await _gistFetchAll(gistId);
-  return files[filename]||null;
-}
-
-// قراءة ملف البيانات الرئيسي
 async function _gistRead(gistId){
-  let content = await _gistReadFile(gistId, CLOUD_CONFIG.GIST_FILE);
-  if(!content) throw new Error('الملف غير موجود في Gist');
+  let content=await _gistReadFile(gistId,CLOUD_CONFIG.GIST_FILE);
+  if(!content)throw new Error('الملف غير موجود في Gist');
   return content;
-}
-
-// دالة مساعدة: ابطل ETag cache بعد كل write حتى تُجلب البيانات الجديدة
-function _invalidateGistCache(gistId){
-  if(gistId) delete _gistETagCache[gistId];
 }
 
 // ── حالة السحابة ──
@@ -5896,14 +5809,14 @@ async function _doSilentFamilyUpload(){
     let gistId=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||'';
     let headers={'Authorization':'token '+FAMILY_UPLOAD_CONFIG.GITHUB_PAT,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     if(gistId){
-      let res=await _ghFetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify({files:{[_getFamilyGistFileName()]:{content}}})});
+      let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify({files:{[_getFamilyGistFileName()]:{content}}})});
       if(!res.ok){
         // Gist ربما محذوف — أنشئ جديداً
-        let r2=await _ghFetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
+        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
         if(r2.ok){let j=await r2.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
       }
     } else {
-      let res=await _ghFetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
+      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
       if(res.ok){let j=await res.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
     }
   }catch(e){
@@ -5986,7 +5899,7 @@ async function createFamilyGistNow(){
   let btn=event.target;btn.disabled=true;btn.textContent='⏳ جارٍ الإنشاء...';
   try{
     let headers={'Authorization':'token '+pat,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
-    let res=await _ghFetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Updates',public:false,files:{[_getFamilyGistFileName()]:{content:'{}'}}}),},3); 
+    let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Updates',public:false,files:{[_getFamilyGistFileName()]:{content:'{}'}}})}); 
     if(!res.ok)throw new Error('GitHub API: '+res.status);
     let j=await res.json();
     document.getElementById('fu_gid').value=j.id;
@@ -6221,7 +6134,7 @@ async function _findFamilyUploadsGist(){
   try{
     let headers={'Authorization':'token '+pat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     for(let page=1;page<=5;page++){
-      let res=await _ghFetch('https://api.github.com/gists?per_page=30&page='+page,{headers},3);
+      let res=await fetch('https://api.github.com/gists?per_page=30&page='+page,{headers});
       if(!res.ok)break;
       let list=await res.json();
       if(!Array.isArray(list)||!list.length)break;
@@ -6446,7 +6359,7 @@ async function openFamilyUpdatesModal(){
   document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay"><div class="modal" style="max-width:480px;text-align:center"><div style="font-size:32px;margin-bottom:12px">📡</div><div style="font-size:14px;color:var(--text)">جارٍ جلب تحديثات العائلة...</div></div></div>`;
   try{
     let headers={'Authorization':'token '+readPat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
-    let res=await _ghFetch('https://api.github.com/gists/'+gistId,{headers},3);
+    let res=await fetch('https://api.github.com/gists/'+gistId,{headers});
 
     // ── معالجة 401 / 403 بذكاء ──
     if(res.status===401||res.status===403){
@@ -6621,7 +6534,7 @@ async function _applyFamilyPATFix(){
   try{
     let testHeaders={'Authorization':'token '+newPat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     // /gists يفشل بـ 401 إذا لم تكن صلاحية gist مُفعَّلة
-    let testRes=await _ghFetch('https://api.github.com/gists?per_page=1',{headers:testHeaders},2);
+    let testRes=await fetch('https://api.github.com/gists?per_page=1',{headers:testHeaders});
     if(testRes.status===401){
       btn.disabled=false;btn.textContent='✓ حفظ وإعادة المحاولة';
       alert('❌ التوكن لا يملك صلاحية gist\n\nالحل:\n1. اذهب إلى github.com/settings/tokens\n2. أنشئ توكناً جديداً\n3. فعّل ✅ gist فقط\n4. انسخه والصقه هنا');
@@ -6755,7 +6668,7 @@ async function _deleteFamilyUpdateFile(u){
     let headers={'Authorization':'token '+pat,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     let body={files:{}};
     body.files[u.filename]=null;
-    let res=await _ghFetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify(body)},3);
+    let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify(body)});
     if(!res.ok)throw new Error('GitHub API: '+res.status);
     window._familyUpdates=(window._familyUpdates||[]).filter(x=>x.filename!==u.filename);
     openFamilyUpdatesModal();
@@ -6849,8 +6762,7 @@ function _showNewDeviceBanner(){
 async function _autoRestoreFromCloud(){
   var b=document.getElementById('newDeviceBanner');
   if(b)b.remove();
-  // جهاز جديد بلا بيانات محلية → اجبر على صور السحابة
-  var d=await cloudLoad(true);
+  var d=await cloudLoad();
   if(!d)return;
   var res=_cloudSmartMerge(d);
   migrateExternalSpouses();_invalidateAll();
@@ -6883,6 +6795,52 @@ function _updateCloudBtn(state){
 }
 
 // ── رفع إلى السحابة ──
+async function cloudSave(){
+  if(!_isCloudConfigured()||_cloudSyncing)return;
+  _cloudSyncing=true;
+  _updateCloudBtn('syncing');
+  let photoCount=people.filter(p=>p.photo).length;
+  let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
+  let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)}MB`:`${sizeKB}KB`;
+  _showCloudToast(`🔄 جارٍ التشفير والرفع${photoCount?' ('+photoCount+' صورة، '+sizeLabel+')':''}...`,'syncing',0);
+  try{
+    // ── ملف البيانات بدون صور (يبقى صغيراً < 1MB دائماً) ──
+    let dataNoPhotos=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null}));
+    dataNoPhotos.people.forEach(p=>{if(p.photo)delete p.photo;});
+    let encData=await cloudEncrypt(JSON.stringify(dataNoPhotos));
+
+    // ── ملف الصور المنفصل {id: base64} ──
+    let photosMap={};
+    people.forEach(p=>{if(p.photo)photosMap[p.id]=p.photo;});
+    let encPhotos=photoCount>0?await cloudEncrypt(JSON.stringify(photosMap)):null;
+
+    // ── رفع الملفين في طلب واحد ──
+    let filesObj={[CLOUD_CONFIG.GIST_FILE]:{content:encData}};
+    if(encPhotos)filesObj[CLOUD_PHOTOS_FILE]={content:encPhotos};
+
+    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
+    if(gistId){
+      try{await _gistUpdate(gistId,filesObj);}
+      catch(e){
+        gistId=await _gistCreate(filesObj);
+        localStorage.setItem(CLOUD_GIST_KEY,gistId);
+        CLOUD_CONFIG.GIST_ID=gistId;
+      }
+    } else {
+      gistId=await _gistCreate(filesObj);
+      localStorage.setItem(CLOUD_GIST_KEY,gistId);
+      CLOUD_CONFIG.GIST_ID=gistId;
+    }
+    let doneMsg=`☁️ تم الحفظ السحابي ✓${photoCount?' · '+photoCount+' صورة':''}`;
+    _showCloudToast(doneMsg,'success',2500);
+    _updateCloudBtn('ok');
+  }catch(e){
+    console.warn('[CloudSave]',e);
+    _showCloudToast('❌ فشل الحفظ السحابي: '+e.message,'error',4000);
+    _updateCloudBtn('error');
+  }finally{_cloudSyncing=false;}
+}
+
 // ── مساعد: قاموس hash الصور المُرفوعة {id: length} ──
 const CLOUD_PHOTO_HASHES_KEY='ft_cloud_photo_hashes_v1';
 function _getSyncedHashes(){try{return JSON.parse(localStorage.getItem(CLOUD_PHOTO_HASHES_KEY)||'{}')}catch(e){return {};}}
@@ -6925,13 +6883,14 @@ async function cloudSave(){
     _showCloudToast(`🔄 جارٍ الرفع${newCount>0?' · '+newCount+' صورة جديدة ('+label+')':totalCount>0?' · الصور محدَّثة ✓':''}...`,'syncing',0);
 
     if(newCount>0){
-      // استخدم الـcache المحلي للصور السحابية — لا حاجة لقراءة إضافية من GitHub
+      // اقرأ قاموس الصور الموجود في السحابة ثم أضف الجديدة
       let gistIdNow=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
       let existingMap={};
-      // استخدم الذاكرة المؤقتة إذا كانت لنفس الـgist
-      if(_cachedCloudPhotos && _cachedCloudPhotosGistId===gistIdNow){
-        existingMap=_cachedCloudPhotos;
-        console.debug('[CloudSave] Using cached cloud photos map (saved 1 API call)');
+      if(gistIdNow){
+        try{
+          let encP=await _gistReadFile(gistIdNow,CLOUD_PHOTOS_FILE);
+          if(encP)existingMap=JSON.parse(await cloudDecrypt(encP.trim()));
+        }catch(e){}
       }
       // دمج: الجديدة تُضاف/تُحدَّث، القديمة تبقى
       let mergedMap=Object.assign({},existingMap,newPhotosMap);
@@ -6955,13 +6914,8 @@ async function cloudSave(){
       localStorage.setItem(CLOUD_GIST_KEY,gistId);
       CLOUD_CONFIG.GIST_ID=gistId;
     }
-    // حفظ الـ hashes وتحديث الـcache بعد نجاح الرفع
+    // حفظ الـ hashes بعد نجاح الرفع
     _saveSyncedHashes(allHashesNow);
-    // تحديث الذاكرة المؤقتة بالصور الكاملة المرفوعة (للسحوبات القادمة)
-    if(typeof mergedMap!=='undefined'){
-      _cachedCloudPhotos = mergedMap;
-      _cachedCloudPhotosGistId = gistId;
-    }
     let doneMsg=newCount>0
       ?`☁️ تم الحفظ ✓ · ${newCount} صورة جديدة · ${totalCount} إجمالاً`
       :`☁️ تم الحفظ السحابي ✓${totalCount>0?' · '+totalCount+' صورة':''}`;
@@ -6969,118 +6923,60 @@ async function cloudSave(){
     _updateCloudBtn('ok');
   }catch(e){
     console.warn('[CloudSave]',e);
-    let msg = e.message||'خطأ غير معروف';
-    if(msg.includes('503')||msg.includes('502')||msg.includes('504')){
-      msg='GitHub غير متاح مؤقتاً — سيُعاد المحاولة تلقائياً';
-      // أعِد المحاولة بعد 30 ثانية
-      setTimeout(()=>{ if(!_cloudSyncing)cloudSave(); }, 30000);
-    } else if(msg.includes('401')||msg.includes('403')){
-      msg='خطأ مصادقة GitHub — تحقق من الـToken في إعدادات السحابة';
-    } else if(msg.includes('429')){
-      msg='تجاوزت حد طلبات GitHub — سيُعاد المحاولة خلال دقيقة';
-      setTimeout(()=>{ if(!_cloudSyncing)cloudSave(); }, 70000);
-    }
-    _showCloudToast('❌ '+msg,'error',5000);
+    _showCloudToast('❌ فشل الحفظ السحابي: '+e.message,'error',4000);
     _updateCloudBtn('error');
   }finally{_cloudSyncing=false;}
 }
 
 // ── تحميل من السحابة ──
-// forceCloudPhotos=true → استخدم صور السحابة دائماً (للاستعادة الكاملة أو لجهاز جديد)
-// forceCloudPhotos=false (الافتراضي) → قارن الـhash؛ السحابة تفوز إذا اختلف الحجم
-async function cloudLoad(forceCloudPhotos){
+async function cloudLoad(){
   if(!_isCloudConfigured())return false;
   let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
   if(!gistId)return false;
   if(!localStorage.getItem(CLOUD_GIST_KEY))try{localStorage.setItem(CLOUD_GIST_KEY,gistId);}catch(e){}
   try{
     _showCloudToast('🔄 جارٍ التحميل من السحابة...','syncing',0);
-    // ── طلب واحد يجلب كل الملفات (بيانات + صور) ──
-    // _gistFetchAll تُخزّن النتيجة مع ETag لتجنب إعادة الجلب عند عدم التغيير
-    let files = await _gistFetchAll(gistId);
-
-    // ── ١. ملف البيانات الرئيسية ──
-    let enc = files[CLOUD_CONFIG.GIST_FILE];
-    if(!enc) throw new Error('ملف البيانات غير موجود في Gist');
-    let d = JSON.parse(await cloudDecrypt(enc.trim()));
-    if(!d.people||!Array.isArray(d.people)) throw new Error('بيانات غير صالحة');
-
-    // ── ٢. ملف الصور (في نفس الطلب) ──
+    // ── ١. البيانات الرئيسية ──
+    let enc=await _gistRead(gistId);
+    let d=JSON.parse(await cloudDecrypt(enc.trim()));
+    if(!d.people||!Array.isArray(d.people))throw new Error('بيانات غير صالحة');
+    // ── ٢. الصور من السحابة — أضف لكل شخص صورته إن لم تكن موجودة محلياً ──
     try{
-      let encP = files[CLOUD_PHOTOS_FILE];
+      let encP=await _gistReadFile(gistId,CLOUD_PHOTOS_FILE);
       if(encP){
-        let cloudPhotos = JSON.parse(await cloudDecrypt(encP.trim()));
-        let newHashes = _getSyncedHashes();
-        let photoCount = 0;
+        let cloudPhotos=JSON.parse(await cloudDecrypt(encP.trim()));
+        let newHashes=_getSyncedHashes();
+        let photoCount=0;
         d.people.forEach(p=>{
-          let cPhoto = cloudPhotos[p.id]||cloudPhotos[String(p.id)];
+          let cPhoto=cloudPhotos[p.id]||cloudPhotos[String(p.id)];
           if(!cPhoto)return;
-          let localP = people.find(lp=>lp.id===p.id);
-          if(forceCloudPhotos||!localP||!localP.photo){
-            p.photo=cPhoto;
-          } else if(localP.photo.length!==cPhoto.length){
-            // الصورة في السحابة مختلفة (محدَّثة من جهاز آخر) → السحابة تفوز
-            p.photo=cPhoto;
-          } else {
-            p.photo=localP.photo; // نفس الصورة: استخدم المحلية
-          }
+          let localP=people.find(lp=>lp.id===p.id);
+          // خذ الصورة من السحابة إذا لم تكن موجودة محلياً — المحلية الموجودة تبقى
+          p.photo = (localP&&localP.photo) ? localP.photo : cPhoto;
           newHashes[p.id]=p.photo.length;
           photoCount++;
         });
         if(photoCount>0)_saveSyncedHashes(newHashes);
-        // حفظ نسخة الصور السحابية في الذاكرة (لاستخدامها في cloudSave دون قراءة إضافية)
-        _cachedCloudPhotos = cloudPhotos;
-        _cachedCloudPhotosGistId = gistId;
       }
-    }catch(pe){ console.warn('[CloudLoad-photos]',pe.message); }
+    }catch(pe){console.warn('[CloudLoad-photos]',pe.message);}
     return d;
   }catch(e){
     console.warn('[CloudLoad]',e);
-    let msg = e.message||'خطأ غير معروف';
-    // رسائل خطأ مفيدة بدلاً من "GitHub API: 503"
-    if(msg.includes('503')||msg.includes('502')||msg.includes('504')){
-      msg='GitHub غير متاح مؤقتاً — يُرجى المحاولة بعد قليل';
-    } else if(msg.includes('401')||msg.includes('403')){
-      msg='خطأ في المصادقة — تحقق من GitHub Token';
-    } else if(msg.includes('429')){
-      msg='تجاوزت حد طلبات GitHub — انتظر دقيقة ثم أعد المحاولة';
-    } else if(msg.includes('404')){
-      msg='لم يُعثر على Gist — تحقق من إعدادات السحابة';
-    }
-    _showCloudToast('❌ فشل التحميل: '+msg,'error',5000);
+    _showCloudToast('❌ فشل التحميل: '+e.message,'error',4000);
     return false;
   }
 }
 
-// ذاكرة مؤقتة لصور السحابة — تُجنب إعادة القراءة عند الحفظ
-let _cachedCloudPhotos = null;
-let _cachedCloudPhotosGistId = null;
-
-// ── مزامنة يدوية (ثنائية الاتجاه: سحب ثم رفع) ──
+// ── مزامنة يدوية ──
 async function manualCloudSync(){
   if(!_isCloudConfigured()){openCloudSetup();return;}
-  if(_isNewDevice()){await cloudSave();return;}
   let photoCount=people.filter(p=>p.photo).length;
   if(photoCount>0){
     let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
     let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)} MB`:`${sizeKB} KB`;
+    // رسالة تأكيد سريعة فقط إذا كان الحجم كبيراً (أكثر من 3MB)
     if(sizeKB>3000&&!confirm(`⚠️ الصور ستُرفع مع البيانات\n${photoCount} صورة — الحجم الإجمالي تقريباً ${sizeLabel}\n\nهل تريد المتابعة؟`))return;
   }
-  // ── أولاً: اسحب آخر التغييرات من السحابة لتجنب الكتابة فوق تغييرات جهاز آخر ──
-  _showCloudToast('🔄 مزامنة ثنائية الاتجاه...','syncing',0);
-  try{
-    let d=await cloudLoad(false);
-    if(d){
-      let{added,updated}=_cloudSmartMerge(d,{mode:'cloud'});
-      if(added>0||updated>0){
-        migrateExternalSpouses();_invalidateAll();
-        await _persistPhotosToIDB();
-        saveData();renderAll();
-        _lastPullAt=Date.now();
-      }
-    }
-  }catch(pullErr){console.warn('[ManualSync pull]',pullErr.message);}
-  // ── ثانياً: ارفع البيانات المحدَّثة ──
   await cloudSave();
 }
 
@@ -7136,16 +7032,7 @@ function _cloudSmartMerge(cloudData, mergeOptions){
       if(k==='id' || _familyIsIgnoredField(k))return;
       if(k==='photo'){
         if(mode==='cloud'){
-          if(src.photo){
-            if(!out.photo){
-              // الجهاز لا يملك صورة → خذ من السحابة
-              out.photo=src.photo;
-            } else if(out.photo.length!==src.photo.length){
-              // الصورة في السحابة مختلفة (محدَّثة من جهاز آخر) → السحابة تفوز
-              out.photo=src.photo;
-            }
-            // نفس الحجم → نفس الصورة → احتفظ بالمحلية
-          }
+          if(!out.photo && src.photo)out.photo=src.photo;
         }
         return;
       }
@@ -7157,13 +7044,10 @@ function _cloudSmartMerge(cloudData, mergeOptions){
       if(v!==undefined)out[k]=_familyCloneValue(v);
     });
     if(mode==='family'){
-      // نسخة العائلة: المحلية تفوز دائماً
       if(local && local.photo!==undefined)out.photo=local.photo;
       else if(out.photo===undefined)delete out.photo;
     } else {
-      // نسخة المالك: السحابة تفوز إذا اختلف الحجم (تم تحديثها من جهاز آخر)
-      // الأولوية محددة مسبقاً في if(k==='photo') أعلاه — لا تُعِد الكتابة من local هنا
-      if(local && local.photo && (!out.photo || out.photo.length===local.photo.length))out.photo=local.photo;
+      if(local && local.photo)out.photo=local.photo;
       else if(src.photo)out.photo=src.photo;
     }
     return out;
@@ -7385,29 +7269,28 @@ async function _findCloudGist(){
   if(!CLOUD_CONFIG.GITHUB_PAT)return null;
   try{
     _showCloudToast('🔍 جارٍ البحث عن نسخة سحابية...','syncing',0);
+    // نجلب صفحات حتى نجد أو ننتهي (max 5 صفحات × 30 = 150 gist)
     for(let page=1;page<=5;page++){
-      let res=await _ghFetch('https://api.github.com/gists?per_page=30&page='+page,{headers:_gistHeaders()},3);
+      let res=await fetch('https://api.github.com/gists?per_page=30&page='+page,{headers:_gistHeaders()});
       if(!res.ok)break;
       let list=await res.json();
       if(!list||!list.length)break;
       for(let g of list){
         let files=Object.keys(g.files||{});
         if(files.includes(CLOUD_CONFIG.GIST_FILE)){
+          // وجدنا الـ Gist
           localStorage.setItem(CLOUD_GIST_KEY,g.id);
           CLOUD_CONFIG.GIST_ID=g.id;
           _showCloudToast('✅ تم العثور على النسخة السحابية','success',2500);
           return g.id;
         }
       }
-      if(list.length<30)break;
+      if(list.length<30)break; // آخر صفحة
     }
     _showCloudToast('','info',1);
     return null;
   }catch(e){
-    let msg=e.message||'';
-    if(msg.includes('503')||msg.includes('502'))msg='GitHub غير متاح مؤقتاً';
-    else if(msg.includes('401')||msg.includes('403'))msg='خطأ مصادقة — تحقق من GitHub Token';
-    _showCloudToast('❌ فشل البحث: '+msg,'error',4000);
+    _showCloudToast('❌ فشل البحث: '+e.message,'error',3000);
     return null;
   }
 }
@@ -7454,8 +7337,7 @@ async function cloudRestorePrompt(){
 
 async function doCloudRestore(mode){
   closeModal();
-  // forceCloudPhotos=true في حالة الاستبدال الكامل: الجهاز الجديد لا يملك صوراً محلية
-  let d=await cloudLoad(mode==='replace');
+  let d=await cloudLoad();
   if(!d)return;
   try{
     if(mode==='replace'){
@@ -7573,7 +7455,6 @@ function applyCloudSetup(){
     },300);
   } else {
     _showCloudToast('✅ تم إعداد الحفظ السحابي — جارٍ أول رفع...','success',2000);
-    _startAutoSyncListeners();
     setTimeout(()=>cloudSave(),500);
   }
 }
@@ -7893,8 +7774,6 @@ async function initCloud(){
         _showCloudToast('☁️ الحفظ السحابي مفعّل ✓','success',2000);
       }
     }
-    // ── تفعيل المستمعين للمزامنة التلقائية مع الأجهزة الأخرى ──
-    _startAutoSyncListeners();
   } else {
     let banner=document.getElementById('cloudSetupBanner');
     let dismissed=false;try{dismissed=localStorage.getItem('ft_cloud_banner_dismissed')==='1';}catch(e){}
@@ -7907,69 +7786,6 @@ function triggerCloudSync(){
   if(!_isCloudConfigured())return;
   clearTimeout(_cloudSyncTimer);
   _cloudSyncTimer=setTimeout(()=>cloudSave(),3000); // بعد 3 ثواني من آخر تغيير
-}
-
-// ══════════════════════════════════════════════════════════
-//  مزامنة صامتة في الخلفية — تجلب تغييرات الأجهزة الأخرى
-// ══════════════════════════════════════════════════════════
-let _silentPullRunning=false;
-let _lastPullAt=0;
-const PULL_COOLDOWN_MS=60000; // لا تسحب أكثر من مرة كل 60 ثانية (يمنع تكرار visibilitychange+focus)
-
-async function _silentCloudPull(){
-  if(!_isCloudConfigured()||_cloudSyncing||_silentPullRunning||_isNewDevice())return;
-  let now=Date.now();
-  if(now-_lastPullAt<PULL_COOLDOWN_MS)return;
-  _silentPullRunning=true;
-  _lastPullAt=now;
-  try{
-    // تحميل من السحابة بدون إشعار مرئي
-    let d=await cloudLoad(false);
-    if(!d)return;
-    let{added,updated}=_cloudSmartMerge(d,{mode:'cloud'});
-    if(added>0||updated>0){
-      migrateExternalSpouses();_invalidateAll();
-      await _persistPhotosToIDB();
-      saveData();renderAll();updateMyPersonBtn();
-      _showCloudToast('🔄 مُزامَن: +'+(added||0)+' جديد، تحديث '+(updated||0)+' من جهاز آخر','info',3000);
-    }
-  }catch(e){
-    console.debug('[SilentPull]',e.message);
-  }finally{
-    _silentPullRunning=false;
-  }
-}
-
-// ── تشغيل المزامنة التلقائية بعد اكتمال initCloud ──
-let _autoSyncListenersStarted = false;
-function _startAutoSyncListeners(){
-  if(!_isCloudConfigured()||_autoSyncListenersStarted)return;
-  _autoSyncListenersStarted = true;
-
-  // ١. عند العودة للتبويب — visibilitychange و focus يطلقان معاً أحياناً
-  //    نستخدم cooldown لضمان طلب واحد فقط عند العودة
-  document.addEventListener('visibilitychange',function(){
-    if(!document.hidden) _silentCloudPull();
-  });
-  // focus: للـdesktop عند التبديل بين النوافذ (مع cooldown يمنع التكرار)
-  window.addEventListener('focus',function(){
-    // visibilitychange + focus يطلقان معاً — cooldown 30s يمنع الطلب المزدوج
-    _silentCloudPull();
-  });
-
-  // ٢. عند استعادة الاتصال بالإنترنت
-  window.addEventListener('online',function(){
-    console.debug('[AutoSync] Back online — pulling from cloud');
-    _lastPullAt = 0; // أعد ضبط cooldown عند استعادة الاتصال
-    _silentCloudPull();
-  });
-
-  // ٣. Polling دوري كل 3 دقائق (للأجهزة التي تبقى مفتوحة)
-  setInterval(function(){
-    if(!document.hidden)_silentCloudPull();
-  },180000);
-
-  console.debug('[AutoSync] Real-time sync listeners started');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -8106,7 +7922,6 @@ function saveData(){
 
   showSaveToast();
   triggerFamilyUpload(); // ← الرفع الصامت (نسخة العائلة — لا إشعار)
-  triggerCloudSync();    // ← مزامنة سحابية تلقائية للمالك (3 ثوانٍ debounce)
   _fsaTriggerSave();     // ← كتابة مباشرة في الملف (File System Access API)
   _swInvalidateHtmlCache();
 }
