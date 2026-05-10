@@ -6812,54 +6812,7 @@ function _updateCloudBtn(state){
 }
 
 // ── رفع إلى السحابة ──
-async function cloudSave(){
-  if(!_isCloudConfigured()||_cloudSyncing)return;
-  _cloudSyncing=true;
-  _updateCloudBtn('syncing');
-  let photoCount=people.filter(p=>p.photo).length;
-  let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
-  let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)}MB`:`${sizeKB}KB`;
-  _showCloudToast(`🔄 جارٍ التشفير والرفع${photoCount?' ('+photoCount+' صورة، '+sizeLabel+')':''}...`,'syncing',0);
-  try{
-    // ── ملف البيانات بدون صور (يبقى صغيراً < 1MB دائماً) ──
-    let dataNoPhotos=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null}));
-    dataNoPhotos.people.forEach(p=>{if(p.photo)delete p.photo;});
-    let encData=await cloudEncrypt(JSON.stringify(dataNoPhotos));
 
-    // ── ملف الصور المنفصل {id: base64} ──
-    let photosMap={};
-    people.forEach(p=>{if(p.photo)photosMap[p.id]=p.photo;});
-    let encPhotos=photoCount>0?await cloudEncrypt(JSON.stringify(photosMap)):null;
-
-    // ── رفع الملفين في طلب واحد ──
-    let filesObj={[CLOUD_CONFIG.GIST_FILE]:{content:encData}};
-    if(encPhotos)filesObj[CLOUD_PHOTOS_FILE]={content:encPhotos};
-
-    let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
-    if(gistId){
-      try{await _gistUpdate(gistId,filesObj);}
-      catch(e){
-        gistId=await _gistCreate(filesObj);
-        localStorage.setItem(CLOUD_GIST_KEY,gistId);
-        CLOUD_CONFIG.GIST_ID=gistId;
-      }
-    } else {
-      gistId=await _gistCreate(filesObj);
-      localStorage.setItem(CLOUD_GIST_KEY,gistId);
-      CLOUD_CONFIG.GIST_ID=gistId;
-    }
-    let doneMsg=`☁️ تم الحفظ السحابي ✓${photoCount?' · '+photoCount+' صورة':''}`;
-    _showCloudToast(doneMsg,'success',2500);
-    _updateCloudBtn('ok');
-  }catch(e){
-    console.warn('[CloudSave]',e);
-    _showCloudToast('❌ فشل الحفظ السحابي: '+e.message,'error',4000);
-    _updateCloudBtn('error');
-  }finally{_cloudSyncing=false;}
-}
-
-// ── مساعد: قاموس hash الصور المُرفوعة {id: length} ──
-const CLOUD_PHOTO_HASHES_KEY='ft_cloud_photo_hashes_v1';
 function _getSyncedHashes(){try{return JSON.parse(localStorage.getItem(CLOUD_PHOTO_HASHES_KEY)||'{}')}catch(e){return {};}}
 function _saveSyncedHashes(h){try{localStorage.setItem(CLOUD_PHOTO_HASHES_KEY,JSON.stringify(h));}catch(e){}}
 
@@ -7006,22 +6959,7 @@ async function cloudLoad(){
 }
 
 // ── مزامنة يدوية ──
-async function manualCloudSync(){
-  if(!_isCloudConfigured()){openCloudSetup();return;}
-  let photoCount=people.filter(p=>p.photo).length;
-  if(photoCount>0){
-    let sizeKB=Math.round(people.reduce((s,p)=>s+(p.photo?p.photo.length*0.75/1024:0),0));
-    let sizeLabel=sizeKB>1024?`${(sizeKB/1024).toFixed(1)} MB`:`${sizeKB} KB`;
-    // رسالة تأكيد سريعة فقط إذا كان الحجم كبيراً (أكثر من 3MB)
-    if(sizeKB>3000&&!confirm(`⚠️ الصور ستُرفع مع البيانات\n${photoCount} صورة — الحجم الإجمالي تقريباً ${sizeLabel}\n\nهل تريد المتابعة؟`))return;
-  }
-  await cloudSave();
-}
-
-// ── استعادة من السحابة ──
-// ════════════════════════════════════════════════════════
-// الدمج الذكي
-// ════════════════════════════════════════════════════════
+async 
 function _cloudSmartMerge(cloudData, mergeOptions){
   let opts=mergeOptions||{};
   let mode=(opts.mode||'cloud').toLowerCase(); // cloud | family
