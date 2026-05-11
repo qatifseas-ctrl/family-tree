@@ -997,7 +997,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button class="btn" id="cloudSyncBtn" onclick="manualCloudSync()" title="لوحة المزامنة" style="display:none">☁️ مزامنة</button>
     <button class="btn" id="cloudUploadBtn" onclick="_doUpload()" style="display:none;background:#eff6ff;border-color:#3b82f6;color:#1d4ed8">⬆️ رفع</button>
     <button class="btn" id="cloudDownloadBtn" onclick="_doDownload(false)" style="display:none;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">⬇️ تنزيل</button>
-
+    <span id="cloudLastSyncTime" style="font-size:11px;color:var(--text2);display:none;align-self:center"></span>
     <button class="btn" id="cloudRestoreBtn" onclick="cloudRestorePrompt()" style="display:none">🔄 استعادة</button>
     <label class="btn" style="cursor:pointer;" title="استيراد من ملف HTML محفوظ أو JSON">📥 استيراد<input type="file" id="importFileInput" accept=".json,.html,.htm" onchange="handleImportFile(event)" style="display:none"></label>
   </div>
@@ -1213,20 +1213,11 @@ const CLOUD_CONFIG = {
 
   // اسم الملف المشفّر في Gist (لا تغيّره بعد أول مزامنة)
   GIST_FILE: 'ft_encrypted.dat',
-
-  // ── إعدادات Supabase لرفع الصور ──
-  SUPABASE_URL: '',        // ← مثل: https://xxxx.supabase.co
-  SUPABASE_ANON_KEY: '',   // ← anon/public key من لوحة Supabase
-  SUPABASE_BUCKET: 'family-photos', // ← اسم الـ bucket (أنشئه في Supabase Storage)
 };
-// ملف الصور في Supabase Storage
+// ملف الصور المنفصل في نفس الـ Gist
 const CLOUD_PHOTOS_FILE = 'ft_photos.dat';
 // Gist ID يُحفظ تلقائياً في localStorage بعد أول رفع
 const CLOUD_GIST_KEY = 'ft_cloud_gist_id_v1';
-// مفاتيح localStorage لإعدادات Supabase
-const SUPABASE_URL_KEY    = 'ft_supabase_url_v1';
-const SUPABASE_ANONKEY_KEY= 'ft_supabase_anonkey_v1';
-const SUPABASE_BUCKET_KEY = 'ft_supabase_bucket_v1';
 // ── مفتاح تمييز الجهاز المُهيَّأ (يُضبط مرة واحدة بعد أول تحميل أو حفظ حقيقي) ──
 const DEVICE_INIT_KEY = 'ft_device_init_v1';
 function _isNewDevice(){
@@ -6911,17 +6902,23 @@ async function cloudSave(){
 
   _showCloudToast(`🔄 جارٍ الرفع${photoCount?` (${photoCount} صورة، ${sizeLabel})`:''}...`,'syncing',0);
   try{
-    // ── ١. ملف البيانات بدون صور → Gist ──
+    // ── ١. ملف البيانات بدون صور ──
     let dataNoPhotos=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null}));
     dataNoPhotos.people.forEach(p=>{delete p.photo;});
     let encData=await cloudEncrypt(JSON.stringify(dataNoPhotos));
 
-    // ── ٢. رفع البيانات إلى Gist ──
+    // ── ٢. ملف الصور المشفّر ──
+    let encPhotos=photoCount>0?await cloudEncrypt(JSON.stringify(photosMap)):null;
+
+    // ── ٣. رفع في طلب واحد ──
     let filesObj={[CLOUD_CONFIG.GIST_FILE]:{content:encData}};
+    if(encPhotos)filesObj[CLOUD_PHOTOS_FILE]={content:encPhotos};
+
     let gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
     if(gistId){
       try{ await _gistUpdate(gistId,filesObj); }
       catch(e){
+        // Gist محذوف أو خطأ → أنشئ جديداً
         console.warn('[IMG-SYNC] Update failed, creating new gist:',e.message);
         gistId=await _gistCreate(filesObj);
         localStorage.setItem(CLOUD_GIST_KEY,gistId);
@@ -6933,24 +6930,16 @@ async function cloudSave(){
       CLOUD_CONFIG.GIST_ID=gistId;
     }
 
-    // ── ٣. رفع الصور إلى Supabase (إن وُجدت وإن كان Supabase مُعدَّداً) ──
-    if(photoCount>0){
-      if(_isSupabaseConfigured()){
-        await _supabaseUploadPhotos(photosMap);
-        _syncLog('info','صور رُفعت إلى Supabase: '+photoCount);
-      } else {
-        _syncLog('warn','Supabase غير مُعدَّد — الصور لم تُرفع للسحابة');
-        console.warn('[IMG-SYNC] Supabase not configured — photos skipped');
-      }
-    }
-
-    // ── ٤. تحقق من وصول البيانات لـ Gist ──
+    // ── ٤. تحقق: هل الملفات وصلت فعلاً؟ ──
     try{
       let verifyFiles=await _gistFetchAllFiles(gistId);
       let dataOk=!!verifyFiles[CLOUD_CONFIG.GIST_FILE];
+      let photoOk=!encPhotos||!!verifyFiles[CLOUD_PHOTOS_FILE];
       if(!dataOk){ throw new Error('التحقق فشل: ملف البيانات غير موجود بعد الرفع'); }
-      console.debug('[IMG-SYNC] Verification OK — data:'+dataOk);
+      if(!photoOk){ throw new Error('التحقق فشل: ملف الصور غير موجود بعد الرفع'); }
+      console.debug('[IMG-SYNC] Verification OK — data:'+dataOk+' photos:'+photoOk);
     }catch(ve){
+      // فشل التحقق — تحذير لكن لا نعتبره فشلاً كاملاً
       console.warn('[IMG-SYNC] Post-upload verify warning:',ve.message);
     }
 
@@ -6973,7 +6962,6 @@ async function cloudSave(){
     _updateCloudBtn('error');
   }finally{_cloudSyncing=false;}
 }
-}
 
 // ── مساعد: قاموس hash الصور المُرفوعة {id: length} ──
 const CLOUD_PHOTO_HASHES_KEY='ft_cloud_photo_hashes_v1';
@@ -6992,20 +6980,39 @@ async function cloudLoad(forcePhotos){
     let gistFiles=await _gistFetchAllFiles(gistId);
     let imgLog={loaded:0,updated:0,kept:0,missing:0};
 
-    // ── ١. ملف البيانات الرئيسية من Gist ──
+    // ── ١. ملف البيانات الرئيسية ──
     let enc=gistFiles[CLOUD_CONFIG.GIST_FILE];
     if(!enc)throw new Error('ملف البيانات غير موجود في السحابة');
     let d=JSON.parse(await cloudDecrypt(enc.trim()));
     if(!d.people||!Array.isArray(d.people))throw new Error('بيانات غير صالحة');
 
-    // ── ٢. الصور من Supabase Storage ──
+    // ── ٢. ملف الصور — يدعم chunks الجديدة والملف القديم ──
     try{
+      let encP=gistFiles[CLOUD_PHOTOS_FILE];
       let cloudPhotos=null;
-      if(_isSupabaseConfigured()){
-        cloudPhotos=await _supabaseDownloadPhotos();
-        if(cloudPhotos)console.debug('[IMG] Loaded '+Object.keys(cloudPhotos).length+' photos from Supabase');
-      } else {
-        console.debug('[IMG] Supabase not configured — skipping photo load');
+
+      if(encP&&encP.startsWith('CHUNKED_V2')){
+        // نظام chunks الجديد: ft_photos.dat يحتوي 'CHUNKED_V2_chunks=N'
+        let m=encP.match(/CHUNKED_V2_chunks=([0-9]+)/);
+        let n=m?parseInt(m[1]):0;
+        if(n>0){
+          cloudPhotos={};
+          for(let i=0;i<n;i++){
+            let chunkKey='ft_photos_'+i+'.dat';
+            let chunkEnc=gistFiles[chunkKey];
+            if(chunkEnc&&chunkEnc.length>10&&!chunkEnc.startsWith('RESET_')){
+              try{
+                let chunkData=JSON.parse(await cloudDecrypt(chunkEnc.trim()));
+                Object.assign(cloudPhotos,chunkData);
+              }catch(ce){console.warn('[IMG] chunk '+i+' decode failed:',ce.message);}
+            }
+          }
+          console.debug('[IMG] Loaded '+Object.keys(cloudPhotos).length+' photos from '+n+' chunks');
+        }
+      } else if(encP&&encP.length>10&&!encP.startsWith('RESET_')){
+        // ملف قديم غير مقسّم (للتوافق مع رفعات سابقة)
+        try{cloudPhotos=JSON.parse(await cloudDecrypt(encP.trim()));}
+        catch(e){console.warn('[IMG] legacy photo decode:',e.message);}
       }
 
       if(cloudPhotos&&typeof cloudPhotos==='object'&&Object.keys(cloudPhotos).length>0){
@@ -7018,6 +7025,7 @@ async function cloudLoad(forcePhotos){
           if(forcePhotos||!localPhoto){
             p.photo=cPhoto; imgLog.loaded++;
           } else if(localPhoto.length!==cPhoto.length){
+            // حجم مختلف = صورة محدَّثة من جهاز آخر → السحابة تفوز
             p.photo=cPhoto; imgLog.updated++;
           } else {
             p.photo=localPhoto; imgLog.kept++;
@@ -7027,12 +7035,12 @@ async function cloudLoad(forcePhotos){
         _saveSyncedHashes(newHashes);
         let total=imgLog.loaded+imgLog.updated;
         console.debug('[IMG] Photos — loaded:'+imgLog.loaded+' updated:'+imgLog.updated+' kept:'+imgLog.kept);
-        if(total>0)_showCloudToast('☁️ '+total+' صورة محمَّلة من Supabase','info',2500);
+        if(total>0)_showCloudToast('☁️ '+total+' صورة محمَّلة من السحابة','info',2500);
       } else {
-        console.debug('[IMG] No photos found in Supabase');
+        console.debug('[IMG] No photos found in cloud');
       }
     }catch(pe){
-      console.warn('[IMG-SYNC] Supabase photo load failed:',pe.message);
+      console.warn('[IMG-SYNC] Photo load failed:',pe.message);
     }
     return d;
   }catch(e){
@@ -7435,9 +7443,6 @@ function openCloudSetup(){
   let currentPAT=CLOUD_CONFIG.GITHUB_PAT||'';
   let currentKey=CLOUD_CONFIG.KEY_HEX||'';
   let gistId=localStorage.getItem(CLOUD_GIST_KEY)||'';
-  let currentSbUrl=CLOUD_CONFIG.SUPABASE_URL||localStorage.getItem(SUPABASE_URL_KEY)||'';
-  let currentSbKey=CLOUD_CONFIG.SUPABASE_ANON_KEY||localStorage.getItem(SUPABASE_ANONKEY_KEY)||'';
-  let currentSbBucket=CLOUD_CONFIG.SUPABASE_BUCKET||localStorage.getItem(SUPABASE_BUCKET_KEY)||'family-photos';
   // Generate a random key for the user if none exists
   let generatedKey='';
   if(!currentKey){
@@ -7471,26 +7476,6 @@ function openCloudSetup(){
     </div>
     ${gistId?`<div class="form-row"><label>🔗 معرّف Gist الحالي (للقراءة فقط)</label><input type="text" value="${gistId}" readonly style="font-size:11px;font-family:monospace;background:var(--bg-secondary)"><button class="btn" style="font-size:11px;margin-top:4px;color:#ef4444" onclick="if(confirm('هل تريد حذف الربط بـ Gist الحالي؟ لن يُحذف الـ Gist من GitHub.'))localStorage.removeItem('${CLOUD_GIST_KEY.replace("'","\'")}');closeModal();openCloudSetup()">✕ إلغاء الربط</button></div>`
     :`<div class="form-row"><label>🔗 معرّف Gist (اختياري — اتركه فارغاً للبحث التلقائي)</label><input id="cs_gist" type="text" style="font-family:monospace;font-size:11px" placeholder="يُملأ تلقائياً — أو الصق الـ ID يدوياً"></div>`}
-    <div style="padding:10px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1e3a5f;margin-bottom:12px">
-      <strong style="color:#1d4ed8">🗄️ Supabase Storage — لرفع الصور</strong><br>
-      <span style="font-size:11px;color:#374151">البيانات → GitHub Gist · الصور → Supabase Storage<br>أنشئ Bucket في Supabase → Storage → New Bucket (اسمه الافتراضي: <code>family-photos</code>)</span>
-    </div>
-    <div class="form-row">
-      <label>🌐 Supabase Project URL</label>
-      <input id="cs_sb_url" type="text" value="${currentSbUrl}" style="font-family:monospace;font-size:11px" placeholder="https://xxxxxxxxxxxx.supabase.co">
-      <div style="margin-top:4px"><a href="https://supabase.com/dashboard" target="_blank" style="font-size:11px;color:#3b82f6">← لوحة Supabase (Settings → API)</a></div>
-    </div>
-    <div class="form-row">
-      <label>🔐 Supabase Anon Key (public)</label>
-      <div style="display:flex;gap:6px">
-        <input id="cs_sb_key" type="password" value="${currentSbKey}" style="font-family:monospace;font-size:11px;flex:1" placeholder="eyJhbGciOiJIUzI1NiIs...">
-        <button class="btn" onclick="document.getElementById('cs_sb_key').type=document.getElementById('cs_sb_key').type==='password'?'text':'password'" style="font-size:11px">👁</button>
-      </div>
-    </div>
-    <div class="form-row">
-      <label>🪣 اسم الـ Bucket</label>
-      <input id="cs_sb_bucket" type="text" value="${currentSbBucket||'family-photos'}" style="font-family:monospace;font-size:11px" placeholder="family-photos">
-    </div>
     <div style="padding:10px 12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:12px;color:#065f46;margin-bottom:8px">
       <strong>✅ الإعدادات تُحفظ تلقائياً</strong> في هذا المتصفح على هذا الجهاز.<br>
       لنقلها لجهاز آخر: بعد الإعداد اضغط <strong>💾 حفظ نسخة</strong> — ستُضمَّن الإعدادات في ملف HTML.
@@ -7518,13 +7503,6 @@ function applyCloudSetup(){
   CLOUD_CONFIG.GITHUB_PAT=pat;
   // حفظ في localStorage للاستمرارية بين الجلسات
   try{localStorage.setItem('ft_cloud_key_v1',key);localStorage.setItem('ft_cloud_pat_v1',pat);}catch(e){}
-  // إعدادات Supabase (اختيارية — للصور)
-  let sbUrl=(document.getElementById('cs_sb_url')?.value||'').trim().replace(/\/$/,'');
-  let sbKey=(document.getElementById('cs_sb_key')?.value||'').trim();
-  let sbBucket=(document.getElementById('cs_sb_bucket')?.value||'').trim()||'family-photos';
-  if(sbUrl){CLOUD_CONFIG.SUPABASE_URL=sbUrl;try{localStorage.setItem(SUPABASE_URL_KEY,sbUrl);}catch(e){}}
-  if(sbKey){CLOUD_CONFIG.SUPABASE_ANON_KEY=sbKey;try{localStorage.setItem(SUPABASE_ANONKEY_KEY,sbKey);}catch(e){}}
-  CLOUD_CONFIG.SUPABASE_BUCKET=sbBucket;try{localStorage.setItem(SUPABASE_BUCKET_KEY,sbBucket);}catch(e){}
   // GIST_ID اليدوي (حقل الجهاز الجديد)
   let manualGist=(document.getElementById('cs_gist')?.value||'').trim();
   if(manualGist){localStorage.setItem(CLOUD_GIST_KEY,manualGist);CLOUD_CONFIG.GIST_ID=manualGist;}
@@ -7567,8 +7545,10 @@ function _showCloudButtons(show){
   let b5=document.getElementById('familyUpdatesBtn');
   var bUp=document.getElementById('cloudUploadBtn');
   var bDn=document.getElementById('cloudDownloadBtn');
+  var bTime=document.getElementById('cloudLastSyncTime');
   if(bUp)bUp.style.display=show?'':'none';
   if(bDn)bDn.style.display=show?'':'none';
+  if(bTime){bTime.style.display=show?'inline':'none';if(show)_updateLastSyncUI(_getLastSync());}
   if(b1)b1.style.display=show?'':'none';
   if(b2)b2.style.display=show?'':'none';
   if(b3)b3.style.display=show?'':'none';
@@ -7806,16 +7786,6 @@ async function initCloud(){
       if(sk&&sk.length===64)CLOUD_CONFIG.KEY_HEX=sk;
       if(sp&&sp.trim())CLOUD_CONFIG.GITHUB_PAT=sp.trim();
     }catch(e){}
-  }
-  // تحميل إعدادات Supabase من localStorage
-  if(!CLOUD_CONFIG.SUPABASE_URL){
-    try{let v=localStorage.getItem(SUPABASE_URL_KEY);if(v&&v.trim())CLOUD_CONFIG.SUPABASE_URL=v.trim();}catch(e){}
-  }
-  if(!CLOUD_CONFIG.SUPABASE_ANON_KEY){
-    try{let v=localStorage.getItem(SUPABASE_ANONKEY_KEY);if(v&&v.trim())CLOUD_CONFIG.SUPABASE_ANON_KEY=v.trim();}catch(e){}
-  }
-  if(!CLOUD_CONFIG.SUPABASE_BUCKET){
-    try{let v=localStorage.getItem(SUPABASE_BUCKET_KEY);CLOUD_CONFIG.SUPABASE_BUCKET=v&&v.trim()?v.trim():'family-photos';}catch(e){CLOUD_CONFIG.SUPABASE_BUCKET='family-photos';}
   }
   // تحميل GIST_ID من localStorage إذا لم يكن مُضمَّناً في الكود
   if(!CLOUD_CONFIG.GIST_ID){
@@ -8087,16 +8057,6 @@ function _buildSaveHTML(){
   if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
     mainSrc=mainSrc.replace(/KEY_HEX:\s*'[^']*'/,"KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"'")
                    .replace(/GITHUB_PAT:\s*'[^']*'/,"GITHUB_PAT: '"+CLOUD_CONFIG.GITHUB_PAT+"'");
-  }
-  // تضمين إعدادات Supabase
-  if(CLOUD_CONFIG.SUPABASE_URL){
-    mainSrc=mainSrc.replace(/SUPABASE_URL:\s*'[^']*'/,"SUPABASE_URL: '"+CLOUD_CONFIG.SUPABASE_URL+"'");
-  }
-  if(CLOUD_CONFIG.SUPABASE_ANON_KEY){
-    mainSrc=mainSrc.replace(/SUPABASE_ANON_KEY:\s*'[^']*'/,"SUPABASE_ANON_KEY: '"+CLOUD_CONFIG.SUPABASE_ANON_KEY+"'");
-  }
-  if(CLOUD_CONFIG.SUPABASE_BUCKET){
-    mainSrc=mainSrc.replace(/SUPABASE_BUCKET:\s*'[^']*'/,"SUPABASE_BUCKET: '"+CLOUD_CONFIG.SUPABASE_BUCKET+"'");
   }
   // تضمين إعدادات رفع العائلة إذا كانت نسخة عائلة
   if(IS_FAMILY_COPY&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT){
@@ -9021,66 +8981,6 @@ async function _readPhotoChunks(gistId,n){
 }
 
 // ══════════════════════════════════════════════════════════
-//  Supabase Storage — رفع وتنزيل الصور
-// ══════════════════════════════════════════════════════════
-function _isSupabaseConfigured(){
-  return !!(CLOUD_CONFIG.SUPABASE_URL&&CLOUD_CONFIG.SUPABASE_URL.trim()&&
-            CLOUD_CONFIG.SUPABASE_ANON_KEY&&CLOUD_CONFIG.SUPABASE_ANON_KEY.trim()&&
-            CLOUD_CONFIG.SUPABASE_BUCKET&&CLOUD_CONFIG.SUPABASE_BUCKET.trim());
-}
-async function _sbFetch(path,opts){
-  let base=CLOUD_CONFIG.SUPABASE_URL.replace(/\/$/,'');
-  let url=base+'/storage/v1/object/'+CLOUD_CONFIG.SUPABASE_BUCKET+'/'+path;
-  let headers=Object.assign({'Authorization':'Bearer '+CLOUD_CONFIG.SUPABASE_ANON_KEY},opts.headers||{});
-  return fetch(url,Object.assign({},opts,{headers}));
-}
-async function _supabaseUpload(path,content){
-  let res=await _sbFetch(path,{method:'POST',headers:{'Content-Type':'text/plain','x-upsert':'true'},body:content});
-  if(!res.ok){let t=await res.text().catch(()=>'');throw new Error('Supabase '+res.status+': '+t.slice(0,80));}
-}
-async function _supabaseDownload(path){
-  try{
-    let res=await _sbFetch(path,{method:'GET'});
-    if(!res.ok)return null;
-    return await res.text();
-  }catch(e){return null;}
-}
-async function _supabaseUploadPhotos(photosMap){
-  if(!_isSupabaseConfigured())throw new Error('Supabase غير مُعدَّد — أضف URL و Anon Key في الإعدادات');
-  let chunks=await _buildPhotoChunks(photosMap);
-  for(let i=0;i<chunks.length;i++){
-    await _supabaseUpload('ft_photos_'+i+'.dat',chunks[i]);
-    _syncLog('info','رُفع chunk صور '+i+'/'+chunks.length);
-  }
-  // احذف chunks قديمة زائدة إن وُجدت
-  for(let i=chunks.length;i<chunks.length+5;i++){
-    try{await _sbFetch('ft_photos_'+i+'.dat',{method:'DELETE'});}catch(e){}
-  }
-  await _supabaseUpload(CLOUD_PHOTOS_FILE,'CHUNKED_V2_chunks='+chunks.length);
-}
-async function _supabaseDownloadPhotos(){
-  if(!_isSupabaseConfigured())return null;
-  let index=await _supabaseDownload(CLOUD_PHOTOS_FILE);
-  if(!index)return null;
-  if(index.startsWith('CHUNKED_V2')){
-    let m=index.match(/CHUNKED_V2_chunks=(\d+)/);
-    if(!m)return null;
-    let n=parseInt(m[1]),merged={};
-    for(let i=0;i<n;i++){
-      let enc=await _supabaseDownload('ft_photos_'+i+'.dat');
-      if(enc&&enc.length>10&&!enc.startsWith('RESET_')){
-        try{Object.assign(merged,JSON.parse(await cloudDecrypt(enc.trim())));}catch(e){console.warn('[SB] chunk '+i+' decode:',e.message);}
-      }
-    }
-    return Object.keys(merged).length?merged:null;
-  }
-  if(index.length>10&&!index.startsWith('RESET_')){
-    try{return JSON.parse(await cloudDecrypt(index.trim()));}catch(e){}
-  }
-  return null;
-}
-
-// ══════════════════════════════════════════════════════════
 //  Sync Log + Last Sync Time
 // ══════════════════════════════════════════════════════════
 var _SYNC_LOG_KEY='ft_sync_log_v1',_LAST_SYNC_KEY='ft_last_sync_v1';
@@ -9093,7 +8993,7 @@ function _clearSyncLog(){try{localStorage.removeItem(_SYNC_LOG_KEY);}catch(e){}}
 function _getLastSync(){return localStorage.getItem(_LAST_SYNC_KEY)||'';}
 function _setLastSync(){var ts=new Date().toISOString();try{localStorage.setItem(_LAST_SYNC_KEY,ts);}catch(e){}_updateLastSyncUI(ts);}
 function _updateLastSyncUI(ts){
-  var el=document.getElementById('cloudLastSyncTimePnl');if(!el)return;
+  var el=document.getElementById('cloudLastSyncTime');if(!el)return;
   if(!ts){el.textContent='';return;}
   var d=new Date(ts),now=new Date(),diffMin=Math.floor((now-d)/60000);
   var label=diffMin<1?'الآن':diffMin<60?diffMin+' دقيقة':Math.floor(diffMin/60)+' ساعة';
@@ -9124,20 +9024,16 @@ async function _doUpload(){
     dataNoPhotos.people.forEach(p=>delete p.photo);
     var encData=await cloudEncrypt(JSON.stringify(dataNoPhotos));
     var photosMap={};validPhotos.forEach(p=>{photosMap[p.id]=p.photo;});
-    // ── البيانات → Gist ──
     var filesObj={[CLOUD_CONFIG.GIST_FILE]:{content:encData}};
+    if(Object.keys(photosMap).length>0){
+      var chunks=await _buildPhotoChunks(photosMap);
+      chunks.forEach((enc,i)=>{filesObj['ft_photos_'+i+'.dat']={content:enc};});
+      filesObj[CLOUD_PHOTOS_FILE]={content:'CHUNKED_V2_chunks='+chunks.length};
+      _syncLog('info','chunks: '+chunks.length);
+    }
     var gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
     if(gistId){try{await _gistUpdate(gistId,filesObj);}catch(e){gistId=await _gistCreate(filesObj);localStorage.setItem(CLOUD_GIST_KEY,gistId);CLOUD_CONFIG.GIST_ID=gistId;}}
     else{gistId=await _gistCreate(filesObj);localStorage.setItem(CLOUD_GIST_KEY,gistId);CLOUD_CONFIG.GIST_ID=gistId;}
-    // ── الصور → Supabase ──
-    if(Object.keys(photosMap).length>0){
-      if(_isSupabaseConfigured()){
-        await _supabaseUploadPhotos(photosMap);
-        _syncLog('info','صور رُفعت إلى Supabase: '+Object.keys(photosMap).length);
-      } else {
-        _syncLog('warn','Supabase غير مُعدَّد — الصور لم تُرفع (أضف إعدادات Supabase)');
-      }
-    }
     // تحقق بعد الرفع
     try{
       await new Promise(r=>setTimeout(r,1500));
@@ -9177,9 +9073,13 @@ async function _doDownload(forceReplace){
     if(!d.people||!Array.isArray(d.people))throw new Error('بيانات غير صالحة');
     // قراءة الصور (chunks أو قديم)
     try{
+      var encP=await _gistReadFile(gistId,CLOUD_PHOTOS_FILE);
       var cloudPhotos=null;
-      if(_isSupabaseConfigured()){
-        try{cloudPhotos=await _supabaseDownloadPhotos();}catch(pe){_syncLog('warn','خطأ في الصور من Supabase: '+pe.message);}
+      if(encP&&encP.startsWith('CHUNKED_V2')){
+        var m=encP.match(/CHUNKED_V2_chunks=(\d+)/);
+        if(m)cloudPhotos=await _readPhotoChunks(gistId,parseInt(m[1]));
+      }else if(encP&&encP.length>10&&!encP.startsWith('RESET_')){
+        try{cloudPhotos=JSON.parse(await cloudDecrypt(encP.trim()));}catch(e){}
       }
       if(cloudPhotos){
         var newHashes=_getSyncedHashes();
@@ -9193,7 +9093,7 @@ async function _doDownload(forceReplace){
           newHashes[p.id]=p.photo.length;
         });
         _saveSyncedHashes(newHashes);
-        _syncLog('info','صور محمَّلة من Supabase: '+d.people.filter(p=>p.photo).length);
+        _syncLog('info','صور محمَّلة: '+d.people.filter(p=>p.photo).length);
       }
     }catch(pe){_syncLog('warn','خطأ في الصور: '+pe.message);}
     if(forceReplace){
@@ -9232,9 +9132,6 @@ function openCloudSyncPanel(){
   var sizeLabel=sizeKB>1024?(sizeKB/1024).toFixed(1)+' MB':sizeKB+' KB';
   var lastSync=_getLastSync();
   var lastLabel=lastSync?new Date(lastSync).toLocaleString('ar-SA',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'لم تتم مزامنة بعد';
-  var sbStatus=_isSupabaseConfigured()
-    ?'<span style="color:#059669">✓ Supabase مُفعَّل — الصور تُرفع إلى Storage</span>'
-    :'<span style="color:#b45309">⚠️ Supabase غير مُعدَّد — الصور لن تُزامَن</span>';
   var gistShare=gistId?
     '<div style="padding:10px 12px;background:#d1fae5;border:1px solid #6ee7b7;border-radius:10px;margin-bottom:12px">'+
     '<div style="font-size:12px;font-weight:600;color:#065f46;margin-bottom:6px">🔗 معرّف السحابة — شاركه مع أجهزتك الأخرى</div>'+
@@ -9251,8 +9148,7 @@ function openCloudSyncPanel(){
     gistShare+
     '<div style="padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;margin-bottom:12px;font-size:12px">'+
     '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text2)">آخر مزامنة</span><span style="font-weight:600">'+lastLabel+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text2)">البيانات المحلية</span><span>'+people.length+' فرد · '+validPhotos.length+' صورة · '+sizeLabel+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">الصور السحابية</span><span style="font-size:11px">'+sbStatus+'</span></div></div>'+
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">البيانات المحلية</span><span>'+people.length+' فرد · '+validPhotos.length+' صورة · '+sizeLabel+'</span></div></div>'+
     warnHtml+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'+
     '<button class="btn primary" onclick="closeModal();_doUpload()" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:20px">⬆️</span><span style="font-weight:600">رفع</span><span style="font-size:10px;opacity:.7">'+people.length+' فرد · '+validPhotos.length+' صورة</span></button>'+
@@ -9267,7 +9163,7 @@ function openCloudSyncPanel(){
     '</div></div>';
   document.getElementById('modalContainer').innerHTML=html;
   var el=document.getElementById('cloudLastSyncTimePnl');
-  if(el&&lastSync){var d2=new Date(lastSync),now=new Date(),dm=Math.floor((now-d2)/60000);el.textContent='☁️ '+(dm<1?'الآن':dm<60?dm+' دقيقة':Math.floor(dm/60)+' ساعة')+' مضت';}
+  if(el&&lastSync){var d2=new Date(lastSync),now=new Date(),dm=Math.floor((now-d2)/60000);el.textContent='☁️ '+( dm<1?'الآن':dm<60?dm+' دقيقة':Math.floor(dm/60)+' ساعة')+' مضت';}
 }
 
 
@@ -9295,7 +9191,7 @@ function openCloudResetPanel(){
     '⚠️ سيُستبدَل محتوى الـ Gist بعلامة reset. بياناتك المحلية لن تُمَس.</div>'+
     '<div style="margin-bottom:12px">'+
     '<label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer"><input type="checkbox" id="rst_data" checked><span style="font-size:13px">📄 ملف البيانات</span></label>'+
-    '<label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer"><input type="checkbox" id="rst_photos" checked><span style="font-size:13px">🖼 صور Supabase Storage</span></label>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer"><input type="checkbox" id="rst_photos" checked><span style="font-size:13px">🖼 ملفات الصور (chunks)</span></label>'+
     '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="rst_local"><span style="font-size:13px">🗄 مسح سجل المزامنة المحلي</span></label>'+
     '</div>'+
     '<div class="modal-footer"><button class="btn" onclick="closeModal();openCloudSyncPanel()">إلغاء</button><button class="btn" style="background:#dc2626;color:#fff;border-color:#dc2626" onclick="_execReset()">تنفيذ</button></div>'+
@@ -9311,27 +9207,22 @@ async function _execReset(){
   closeModal();
   _showCloudToast('🗑 جارٍ إعادة الضبط...','syncing',0);
   try{
-    if(gistId&&delData){
+    if(gistId&&(delData||delPhotos)){
       var vRes=await fetch('https://api.github.com/gists/'+gistId,{headers:_gistHeaders()});
       var existingFiles={};
       if(vRes.ok){var vj=await vRes.json();existingFiles=vj.files||{};}
       var MARKER='RESET_'+new Date().toISOString();
       var filesObj={};
       if(delData&&existingFiles[CLOUD_CONFIG.GIST_FILE])filesObj[CLOUD_CONFIG.GIST_FILE]={content:MARKER};
+      if(delPhotos){
+        // احذف كل chunk files
+        Object.keys(existingFiles).forEach(fn=>{
+          if((fn===CLOUD_PHOTOS_FILE||fn.startsWith('ft_photos_'))&&existingFiles[fn])
+            filesObj[fn]={content:MARKER};
+        });
+      }
       if(Object.keys(filesObj).length>0)await _gistUpdate(gistId,filesObj);
       _syncLog('ok','أُعيد ضبط الـ Gist',Object.keys(filesObj).join(', '));
-    }
-    // احذف الصور من Supabase إن طُلب ذلك
-    if(delPhotos&&_isSupabaseConfigured()){
-      try{
-        var MARKER2='RESET_'+new Date().toISOString();
-        await _supabaseUpload(CLOUD_PHOTOS_FILE,MARKER2);
-        for(var ci=0;ci<20;ci++){
-          var r=await _sbFetch('ft_photos_'+ci+'.dat',{method:'DELETE'});
-          if(r.status===404||r.status===400)break;
-        }
-        _syncLog('ok','أُعيدت ضبط صور Supabase');
-      }catch(se){_syncLog('warn','خطأ في ضبط Supabase: '+se.message);}
     }
     if(delLocal){try{localStorage.removeItem(_SYNC_LOG_KEY);localStorage.removeItem(_LAST_SYNC_KEY);localStorage.removeItem(CLOUD_PHOTO_HASHES_KEY);}catch(e){}};
     _showCloudToast('✅ تمت إعادة الضبط — ارفع نسخة نظيفة الآن','success',4000);
@@ -9384,5 +9275,679 @@ function _copyGistId(){
 
 document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMergeHistoryButtons,0);});
 </script>
+
+<script>
+(function () {
+  'use strict';
+
+  const FT_SB_KEYS = {
+    url: 'ft_supabase_url_v1',
+    anonKey: 'ft_supabase_anon_v1',
+    bucket: 'ft_supabase_bucket_v1',
+    syncId: 'ft_supabase_sync_id_v1',
+    keyHex: 'ft_supabase_key_v1',
+  };
+
+  const FT_DEFAULT_BUCKET = 'family-tree';
+  const FT_DEFAULT_SYNC_ID = 'family-sync';
+
+  function _ftReadSettings() {
+    const read = (k) => {
+      try { return (localStorage.getItem(k) || '').trim(); } catch (e) { return ''; }
+    };
+    return {
+      url: read(FT_SB_KEYS.url),
+      anonKey: read(FT_SB_KEYS.anonKey),
+      bucket: read(FT_SB_KEYS.bucket) || FT_DEFAULT_BUCKET,
+      syncId: read(FT_SB_KEYS.syncId) || FT_DEFAULT_SYNC_ID,
+      keyHex: read(FT_SB_KEYS.keyHex) || (window.CLOUD_CONFIG?.KEY_HEX || ''),
+    };
+  }
+
+  function _ftSaveSettings(next) {
+    const settings = { ..._ftReadSettings(), ...(next || {}) };
+    if (settings.url) try { localStorage.setItem(FT_SB_KEYS.url, settings.url); } catch (e) {}
+    if (settings.anonKey) try { localStorage.setItem(FT_SB_KEYS.anonKey, settings.anonKey); } catch (e) {}
+    if (settings.bucket) try { localStorage.setItem(FT_SB_KEYS.bucket, settings.bucket); } catch (e) {}
+    if (settings.syncId) try { localStorage.setItem(FT_SB_KEYS.syncId, settings.syncId); } catch (e) {}
+    if (settings.keyHex) try { localStorage.setItem(FT_SB_KEYS.keyHex, settings.keyHex); } catch (e) {}
+    if (window.CLOUD_CONFIG) {
+      try { window.CLOUD_CONFIG.KEY_HEX = settings.keyHex || window.CLOUD_CONFIG.KEY_HEX || ''; } catch (e) {}
+      try { window.CLOUD_CONFIG.GIST_ID = settings.syncId || window.CLOUD_CONFIG.GIST_ID || ''; } catch (e) {}
+      try { window.CLOUD_CONFIG.GITHUB_PAT = ''; } catch (e) {}
+    }
+    return settings;
+  }
+
+  function _ftEnsureHexKey(hex) {
+    if (!hex || typeof hex !== 'string') return '';
+    const clean = hex.trim();
+    return /^[0-9a-fA-F]{64}$/.test(clean) ? clean.toLowerCase() : '';
+  }
+
+  function _ftAutoGenerateKey() {
+    return [...crypto.getRandomValues(new Uint8Array(32))]
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  function _ftAutoGenerateSyncId() {
+    return 'ft_' + [...crypto.getRandomValues(new Uint8Array(12))]
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  function _ftNormalizeUrl(url) {
+    const raw = (url || '').trim().replace(/\/+$/, '');
+    return raw;
+  }
+
+  function _ftStoragePath(fileName) {
+    const s = _ftReadSettings();
+    return `${s.syncId}/${fileName}`;
+  }
+
+  function _ftNormalizeSupabaseError(err) {
+    if (!err) return 'خطأ غير معروف';
+    if (typeof err === 'string') return err;
+    return err.message || err.error_description || err.statusText || 'خطأ غير معروف';
+  }
+
+  async function _ftLoadSupabaseModule() {
+    if (!window.__ftSupabaseModulePromise) {
+      window.__ftSupabaseModulePromise = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    }
+    return window.__ftSupabaseModulePromise;
+  }
+
+  async function _ftGetSupabaseClient() {
+    const s = _ftReadSettings();
+    const url = _ftNormalizeUrl(s.url);
+    const anonKey = (s.anonKey || '').trim();
+    if (!url || !anonKey) {
+      throw new Error('إعدادات Supabase غير مكتملة');
+    }
+    if (!window.__ftSupabaseClient || window.__ftSupabaseClient.__ftUrl !== url || window.__ftSupabaseClient.__ftAnonKey !== anonKey) {
+      const { createClient } = await _ftLoadSupabaseModule();
+      window.__ftSupabaseClient = createClient(url, anonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+      });
+      window.__ftSupabaseClient.__ftUrl = url;
+      window.__ftSupabaseClient.__ftAnonKey = anonKey;
+    }
+
+    const client = window.__ftSupabaseClient;
+    const { data: sessionData, error: sessionErr } = await client.auth.getSession();
+    if (sessionErr) {
+      throw new Error('تعذّر قراءة جلسة Supabase: ' + _ftNormalizeSupabaseError(sessionErr));
+    }
+    if (!sessionData?.session) {
+      const { data, error } = await client.auth.signInAnonymously();
+      if (error) {
+        throw new Error(
+          'تعذّر تسجيل الدخول المجهول في Supabase: ' +
+            _ftNormalizeSupabaseError(error) +
+            ' — فعّل Anonymous Sign-Ins من لوحة Supabase'
+        );
+      }
+      if (!data?.session) {
+        const { data: retrySession } = await client.auth.getSession();
+        if (!retrySession?.session) {
+          throw new Error('فشل إنشاء جلسة Supabase');
+        }
+      }
+    }
+    return client;
+  }
+
+  function _ftSettingsReady() {
+    const s = _ftReadSettings();
+    return !!(_ftNormalizeUrl(s.url) && s.anonKey && s.bucket && s.syncId && _ftEnsureHexKey(s.keyHex));
+  }
+
+  window._isCloudConfigured = function () {
+    return _ftSettingsReady();
+  };
+
+  window.cloudEncrypt = async function (plainText) {
+    const s = _ftReadSettings();
+    const keyHex = _ftEnsureHexKey(s.keyHex);
+    if (!keyHex) throw new Error('مفتاح التشفير غير صالح');
+    const key = await crypto.subtle.importKey(
+      'raw',
+      _hexToBytes(keyHex),
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plainText);
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+    const combined = new Uint8Array(12 + cipher.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(cipher), 12);
+    return _bytesToBase64(combined);
+  };
+
+  window.cloudDecrypt = async function (b64) {
+    const s = _ftReadSettings();
+    const keyHex = _ftEnsureHexKey(s.keyHex);
+    if (!keyHex) throw new Error('مفتاح التشفير غير صالح');
+    const key = await crypto.subtle.importKey(
+      'raw',
+      _hexToBytes(keyHex),
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+    const combined = _base64ToBytes((b64 || '').trim());
+    const iv = combined.slice(0, 12);
+    const cipher = combined.slice(12);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+    return new TextDecoder().decode(plain);
+  };
+
+  async function _ftUploadText(fileName, plainText) {
+    const client = await _ftGetSupabaseClient();
+    const { bucket } = _ftReadSettings();
+    const path = _ftStoragePath(fileName);
+    const body = new Blob([plainText], { type: 'application/octet-stream' });
+    const { error } = await client.storage.from(bucket).upload(path, body, {
+      upsert: true,
+      contentType: 'application/octet-stream',
+      cacheControl: '3600',
+    });
+    if (error) throw error;
+  }
+
+  async function _ftDownloadText(fileName) {
+    const client = await _ftGetSupabaseClient();
+    const { bucket } = _ftReadSettings();
+    const path = _ftStoragePath(fileName);
+    const { data, error } = await client.storage.from(bucket).download(path);
+    if (error) throw error;
+    if (!data) throw new Error('الملف غير موجود: ' + fileName);
+    return await data.text();
+  }
+
+  async function _ftDeletePath(fileName) {
+    const client = await _ftGetSupabaseClient();
+    const { bucket } = _ftReadSettings();
+    const path = _ftStoragePath(fileName);
+    const { error } = await client.storage.from(bucket).remove([path]);
+    if (error) throw error;
+  }
+
+  function _ftBuildPhotosMap() {
+    const photosMap = {};
+    (people || []).forEach((p) => {
+      if (p && _isValidPhoto(p.photo)) photosMap[p.id] = p.photo;
+    });
+    return photosMap;
+  }
+
+  function _ftBuildBaseData() {
+    const data = JSON.parse(JSON.stringify({
+      people,
+      relPairs,
+      nextId,
+      myPersonId: myPersonId || null,
+    }));
+    if (data.people && Array.isArray(data.people)) {
+      data.people.forEach((p) => { if (p && p.photo !== undefined) delete p.photo; });
+    }
+    return data;
+  }
+
+  function _ftApplyLoadedPhotos(loadedData, cloudPhotos, forcePhotos) {
+    const photoMap = cloudPhotos && typeof cloudPhotos === 'object' ? cloudPhotos : {};
+    const photoHashes = _getSyncedHashes();
+    loadedData.people.forEach((p) => {
+      const cPhoto = photoMap[p.id] || photoMap[String(p.id)];
+      if (!cPhoto || typeof cPhoto !== 'string' || cPhoto.length < 100) return;
+      const localP = (people || []).find((lp) => lp.id === p.id);
+      const localPhoto = localP ? localP.photo : null;
+      if (forcePhotos || !localPhoto) {
+        p.photo = cPhoto;
+      } else if (localPhoto.length !== cPhoto.length) {
+        p.photo = cPhoto;
+      } else {
+        p.photo = localPhoto;
+      }
+      photoHashes[p.id] = p.photo.length;
+    });
+    _saveSyncedHashes(photoHashes);
+  }
+
+  async function _ftSupabaseSave() {
+    if (!_ftSettingsReady()) {
+      openCloudSetup();
+      return;
+    }
+    if (_cloudSyncing) {
+      _showCloudToast('⏳ عملية مزامنة جارية بالفعل...','info',2000);
+      return;
+    }
+    _cloudSyncing = true;
+    _updateCloudBtn('syncing');
+
+    const validPhotos = (people || []).filter((p) => _isValidPhoto(p.photo));
+    const invalidCount = (people || []).filter((p) => p.photo && !_isValidPhoto(p.photo)).length;
+    if (invalidCount > 0) _syncLog('warn', 'صور غير صالحة تم تجاهلها', String(invalidCount));
+
+    try {
+      const dataNoPhotos = _ftBuildBaseData();
+      const photosMap = _ftBuildPhotosMap();
+      const encData = await cloudEncrypt(JSON.stringify(dataNoPhotos));
+      const encPhotos = Object.keys(photosMap).length ? await cloudEncrypt(JSON.stringify(photosMap)) : '';
+      const meta = {
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        people: people.length,
+        photos: Object.keys(photosMap).length,
+      };
+
+      _showCloudToast('🔄 جارٍ الحفظ على Supabase...','syncing',0);
+      await _ftUploadText('data.enc', encData);
+      if (encPhotos) {
+        await _ftUploadText('photos.enc', encPhotos);
+      } else {
+        try { await _ftDeletePath('photos.enc'); } catch (e) {}
+      }
+      await _ftUploadText('meta.json', JSON.stringify(meta));
+
+      const newHashes = _getSyncedHashes();
+      Object.keys(photosMap).forEach((id) => { newHashes[id] = photosMap[id].length; });
+      _saveSyncedHashes(newHashes);
+      _setLastSync();
+      _syncLog('ok', 'تم الحفظ على Supabase', `${people.length} فرد، ${Object.keys(photosMap).length} صورة`);
+      _showCloudToast(`☁️ تم الحفظ ✓ · ${people.length} فرد · ${Object.keys(photosMap).length} صورة`, 'success', 3500);
+      _updateCloudBtn('ok');
+    } catch (e) {
+      const msg = _ftNormalizeSupabaseError(e);
+      _syncLog('error', 'فشل الحفظ على Supabase', msg);
+      _showCloudToast('❌ فشل الحفظ: ' + msg, 'error', 5000);
+      _updateCloudBtn('error');
+    } finally {
+      _cloudSyncing = false;
+      _updateCloudBtn('ok');
+    }
+  }
+
+  async function _ftSupabaseLoad(forceReplace) {
+    if (!_ftSettingsReady()) {
+      openCloudSetup();
+      return false;
+    }
+    if (_cloudSyncing) {
+      _showCloudToast('⏳ عملية مزامنة جارية...','info',2000);
+      return false;
+    }
+    _cloudSyncing = true;
+    _updateCloudBtn('syncing');
+    _showCloudToast('🔄 جارٍ التحميل من Supabase...','syncing',0);
+
+    try {
+      const encData = await _ftDownloadText('data.enc');
+      const d = JSON.parse(await cloudDecrypt(encData.trim()));
+      if (!d.people || !Array.isArray(d.people)) throw new Error('بيانات غير صالحة');
+
+      let cloudPhotos = null;
+      try {
+        const encPhotos = await _ftDownloadText('photos.enc');
+        if (encPhotos && encPhotos.trim()) {
+          cloudPhotos = JSON.parse(await cloudDecrypt(encPhotos.trim()));
+        }
+      } catch (pe) {
+        _syncLog('warn', 'فشل تحميل الصور من Supabase', pe.message || String(pe));
+      }
+
+      if (cloudPhotos) {
+        _ftApplyLoadedPhotos(d, cloudPhotos, !!forceReplace);
+        _syncLog('info', 'الصور محمّلة من Supabase', String(Object.keys(cloudPhotos).length));
+      }
+
+      if (forceReplace) {
+        people = d.people;
+        nextId = d.nextId || 1;
+        relPairs = d.relPairs || [];
+        if (d.myPersonId) {
+          myPersonId = parseInt(d.myPersonId, 10);
+          saveMyPerson();
+        }
+        expanded = {};
+        people.forEach((p) => { expanded[p.id] = false; });
+        migrateExternalSpouses();
+        if (people.length) expanded[people[0].id] = true;
+        const newH2 = {};
+        people.forEach((p) => { if (p.photo) newH2[p.id] = p.photo.length; });
+        _saveSyncedHashes(newH2);
+        _markDeviceInit();
+        saveData();
+        _persistPhotosToIDB().catch(() => {});
+        renderAll();
+        updateMyPersonBtn();
+        _setLastSync();
+        _syncLog('ok', 'استبدال كامل من Supabase', `${d.people.length} فرد`);
+        _showCloudToast(`✅ استبدال كامل — ${d.people.length} فرد`, 'success', 4000);
+      } else {
+        const { added, updated } = _cloudSmartMerge(d, { mode: 'cloud' });
+        migrateExternalSpouses();
+        _invalidateAll();
+        _markDeviceInit();
+        saveData();
+        _persistPhotosToIDB().catch(() => {});
+        renderAll();
+        updateMyPersonBtn();
+        _setLastSync();
+        _syncLog('ok', 'اكتمل الدمج من Supabase', `+${added} جديد، تحديث ${updated}`);
+        _showCloudToast(`✅ دُمج: +${added} جديد · ${updated} تحديث`, 'success', 3500);
+      }
+      return d;
+    } catch (e) {
+      const msg = _ftNormalizeSupabaseError(e);
+      _syncLog('error', 'فشل التحميل من Supabase', msg);
+      _showCloudToast('❌ فشل التحميل: ' + msg, 'error', 5000);
+      return false;
+    } finally {
+      _cloudSyncing = false;
+      _updateCloudBtn('ok');
+    }
+  }
+
+  window.cloudSave = async function () { return _ftSupabaseSave(); };
+  window.cloudLoad = async function (forcePhotos) { return _ftSupabaseLoad(forcePhotos); };
+
+  window._doUpload = async function () { return _ftSupabaseSave(); };
+  window._doDownload = async function (forceReplace) { return _ftSupabaseLoad(forceReplace); };
+
+  window.manualCloudSync = async function () {
+    if (!_ftSettingsReady()) { openCloudSetup(); return; }
+    openCloudSyncPanel();
+  };
+
+  window.cloudRestorePrompt = async function () {
+    if (!_ftSettingsReady()) { openCloudSetup(); return; }
+    if (confirm('سيستبدل المحتوى المحلي بالنسخة الموجودة على Supabase. هل تريد المتابعة؟')) {
+      await _ftSupabaseLoad(true);
+    }
+  };
+
+  window._copyGistId = function () {
+    const s = _ftReadSettings();
+    const text = s.syncId || '';
+    if (!text) return;
+    const btn = document.getElementById('copyGistBtn');
+    navigator.clipboard.writeText(text).then(function () {
+      if (btn) btn.textContent = '✅';
+      setTimeout(function () { if (btn) btn.textContent = '📋'; }, 1800);
+    }).catch(function () {
+      prompt('انسخ المعرّف:', text);
+    });
+  };
+
+  window.openCloudSetup = function () {
+    const s = _ftReadSettings();
+    const currentKey = _ftEnsureHexKey(s.keyHex);
+    const keyValue = currentKey || _ftAutoGenerateKey();
+    const syncId = s.syncId || _ftAutoGenerateSyncId();
+    const html = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="max-width:560px">
+        <h3>☁️ إعداد Supabase المشفّر</h3>
+        <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.7">
+          <strong style="color:var(--text)">كيف يعمل؟</strong><br>
+          يتم تشفير البيانات والصور محلياً بـ AES-GCM قبل الرفع إلى Supabase Storage.<br>
+          لا يخرج نص غير مشفر من المتصفح، ومفتاح التشفير يبقى عندك فقط.
+        </div>
+
+        <div class="form-row">
+          <label>رابط Supabase Project URL</label>
+          <input id="cs_sb_url" type="text" value="${s.url || ''}" style="font-family:monospace;font-size:11px" placeholder="https://xxxx.supabase.co">
+        </div>
+
+        <div class="form-row">
+          <label>Supabase anon / publishable key</label>
+          <div style="display:flex;gap:6px">
+            <input id="cs_sb_anon" type="password" value="${s.anonKey || ''}" style="font-family:monospace;font-size:11px;flex:1" placeholder="sb_publishable_... أو anon key">
+            <button class="btn" onclick="const i=document.getElementById('cs_sb_anon');i.type=i.type==='password'?'text':'password'" style="font-size:11px">👁</button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>اسم Bucket</label>
+          <input id="cs_sb_bucket" type="text" value="${s.bucket || FT_DEFAULT_BUCKET}" style="font-family:monospace;font-size:11px" placeholder="family-tree">
+        </div>
+
+        <div class="form-row">
+          <label>معرّف المزامنة المشترك بين أجهزة المالك</label>
+          <div style="display:flex;gap:6px">
+            <input id="cs_sb_sync" type="text" value="${syncId}" style="font-family:monospace;font-size:11px;flex:1" placeholder="ft_...">
+            <button class="btn" onclick="document.getElementById('cs_sb_sync').value='${_ftAutoGenerateSyncId()}'" style="font-size:11px" title="توليد معرّف جديد">🎲</button>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">هذا ليس سراً بذاته، لكنه جزء من عنوان التخزين، ويُفضّل أن يبقى عند المالك فقط.</div>
+        </div>
+
+        <div class="form-row">
+          <label>مفتاح التشفير AES-256 (64 حرف hex)</label>
+          <div style="display:flex;gap:6px">
+            <input id="cs_sb_key" type="password" value="${keyValue}" style="font-family:monospace;font-size:11px;flex:1" placeholder="64 حرف hex">
+            <button class="btn" onclick="const i=document.getElementById('cs_sb_key');i.type=i.type==='password'?'text':'password'" style="font-size:11px">👁</button>
+            <button class="btn" onclick="document.getElementById('cs_sb_key').value='${_ftAutoGenerateKey()}'" style="font-size:11px" title="توليد مفتاح جديد">🎲</button>
+          </div>
+          <div style="font-size:11px;color:#ef4444;margin-top:4px">احتفظ بالمفتاح في مكان آمن، لأن فقدانه يعني فقدان القدرة على فك النسخ القديمة.</div>
+        </div>
+
+        <div style="padding:10px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1d4ed8;margin-bottom:10px;line-height:1.6">
+          <strong>خطوات Supabase المطلوبة خارج التطبيق:</strong><br>
+          1) أنشئ Bucket بنفس الاسم أعلاه.<br>
+          2) فعّل Anonymous Sign-Ins.<br>
+          3) أضف Policy تسمح للمستخدمين authenticated بالرفع والقراءة داخل bucketك.<br>
+          4) استخدم نفس URL وanon key وBucket وSync ID وKey على الأجهزة الأخرى.
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn" onclick="closeModal()">إلغاء</button>
+          <button class="btn primary" onclick="applyCloudSetup()">✓ تطبيق وحفظ</button>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('modalContainer').innerHTML = html;
+  };
+
+  window.applyCloudSetup = async function () {
+    const url = _ftNormalizeUrl((document.getElementById('cs_sb_url')?.value || '').trim());
+    const anonKey = (document.getElementById('cs_sb_anon')?.value || '').trim();
+    const bucket = (document.getElementById('cs_sb_bucket')?.value || '').trim() || FT_DEFAULT_BUCKET;
+    const syncId = (document.getElementById('cs_sb_sync')?.value || '').trim() || _ftAutoGenerateSyncId();
+    let keyHex = (document.getElementById('cs_sb_key')?.value || '').trim();
+    keyHex = _ftEnsureHexKey(keyHex);
+
+    if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
+      alert('أدخل رابط Supabase صالح مثل https://xxxx.supabase.co');
+      return;
+    }
+    if (!anonKey) {
+      alert('أدخل Supabase anon / publishable key');
+      return;
+    }
+    if (!keyHex) {
+      alert('مفتاح التشفير يجب أن يكون 64 حرف hex صالح');
+      return;
+    }
+    _ftSaveSettings({ url, anonKey, bucket, syncId, keyHex });
+    _cloudEnabled = true;
+    _showCloudButtons(true);
+    const banner = document.getElementById('cloudSetupBanner');
+    if (banner) banner.style.display = 'none';
+    closeModal();
+    _showCloudToast('✅ تم حفظ إعدادات Supabase بنجاح', 'success', 2500);
+    try {
+      await _ftGetSupabaseClient();
+      _syncLog('ok', 'اتصال Supabase ناجح', bucket + ' / ' + syncId);
+    } catch (e) {
+      const msg = _ftNormalizeSupabaseError(e);
+      _syncLog('warn', 'تعذّر اختبار الجلسة', msg);
+      _showCloudToast('⚠️ تم الحفظ لكن الاختبار لم ينجح: ' + msg, 'error', 5000);
+    }
+  };
+
+  window.openCloudSyncPanel = function () {
+    if (!_ftSettingsReady()) { openCloudSetup(); return; }
+    const s = _ftReadSettings();
+    const validPhotos = (people || []).filter((p) => _isValidPhoto(p.photo));
+    const invalidCount = (people || []).filter((p) => p.photo && !_isValidPhoto(p.photo)).length;
+    const sizeKB = Math.round(validPhotos.reduce((sum, p) => sum + p.photo.length * 0.75 / 1024, 0));
+    const sizeLabel = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
+    const lastSync = _getLastSync();
+    const lastLabel = lastSync ? new Date(lastSync).toLocaleString('ar-SA', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' }) : 'لم تتم مزامنة بعد';
+    const shortSync = s.syncId ? (s.syncId.length > 24 ? s.syncId.slice(0, 10) + '…' + s.syncId.slice(-8) : s.syncId) : '—';
+
+    const warnHtml =
+      (invalidCount > 0 ? `<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:11px;color:#9a3412;margin-bottom:8px">⚠️ ${invalidCount} صورة بمسار محلي (blob) — لن تُرفع</div>` : '') +
+      (sizeKB > 8000 ? `<div style="padding:7px 10px;background:#fef9c3;border:1px solid #eab308;border-radius:7px;font-size:11px;color:#713f12;margin-bottom:8px">⚠️ حجم كبير (${sizeLabel}) — قد يستغرق الرفع وقتاً</div>` : '');
+
+    const html = `
+      <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal" style="max-width:520px">
+          <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:12px">☁️ المزامنة السحابية <span id="cloudLastSyncTimePnl" style="font-size:11px;font-weight:400;color:var(--text2);margin-right:auto"></span></h3>
+          <div style="padding:10px 12px;background:#ecfeff;border:1px solid #67e8f9;border-radius:10px;margin-bottom:12px">
+            <div style="font-size:12px;font-weight:600;color:#155e75;margin-bottom:6px">🔗 معرّف المزامنة</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <code style="flex:1;font-size:10px;background:#fff;padding:5px 8px;border-radius:6px;border:1px solid #a5f3fc;word-break:break-all;color:#155e75">${shortSync}</code>
+              <button class="btn" id="copyGistBtn" onclick="_copyGistId()" style="font-size:11px;flex-shrink:0">📋</button>
+            </div>
+            <div style="font-size:10px;color:#155e75;margin-top:4px">استخدم نفس القيم على جهاز المالك الآخر</div>
+          </div>
+
+          <div style="padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;margin-bottom:12px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text2)">آخر مزامنة</span><span style="font-weight:600">${lastLabel}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">البيانات المحلية</span><span>${people.length} فرد · ${validPhotos.length} صورة · ${sizeLabel}</span></div>
+          </div>
+
+          ${warnHtml}
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <button class="btn primary" onclick="closeModal();_doUpload()" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:20px">⬆️</span><span style="font-weight:600">رفع</span><span style="font-size:10px;opacity:.7">${people.length} فرد · ${validPhotos.length} صورة</span></button>
+            <button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">تنزيل ودمج</span><span style="font-size:10px;opacity:.7">يحدّث الصور</span></button>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:#fff7ed;border-color:#fb923c;color:#c2410c">🔄 استبدال كامل</button>
+            <button class="btn" onclick="openSyncDebugPanel()" style="flex:1;font-size:12px">🔍 سجل</button>
+            <button class="btn" onclick="openCloudResetPanel()" style="flex:1;font-size:12px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">🗑 ضبط</button>
+          </div>
+
+          <div class="modal-footer" style="margin-top:8px"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn" onclick="closeModal();openCloudSetup()" style="font-size:11px">⚙️ الإعدادات</button></div>
+        </div>
+      </div>`;
+    document.getElementById('modalContainer').innerHTML = html;
+    const el = document.getElementById('cloudLastSyncTimePnl');
+    if (el && lastSync) {
+      const d2 = new Date(lastSync), now = new Date(), dm = Math.floor((now - d2) / 60000);
+      el.textContent = '☁️ ' + (dm < 1 ? 'الآن' : dm < 60 ? dm + ' دقيقة' : Math.floor(dm / 60) + ' ساعة') + ' مضت';
+    }
+  };
+
+  window.openCloudResetPanel = function () {
+    const s = _ftReadSettings();
+    const html = `
+      <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal" style="max-width:420px">
+          <h3>🗑 ضبط إعدادات Supabase</h3>
+          <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:12px">
+            سيؤدي هذا إلى حذف إعدادات Supabase المحفوظة محلياً فقط.
+            لن تُحذف الملفات من Supabase.
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:12px">
+            URL: <code>${s.url ? s.url.slice(0, 40) + (s.url.length > 40 ? '…' : '') : '—'}</code><br>
+            Bucket: <code>${s.bucket || FT_DEFAULT_BUCKET}</code><br>
+            Sync ID: <code>${s.syncId || FT_DEFAULT_SYNC_ID}</code>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" onclick="closeModal();openCloudSyncPanel()">إلغاء</button>
+            <button class="btn" style="background:#dc2626;color:#fff;border-color:#dc2626" onclick="_ftResetSupabaseSettings()">تنفيذ</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('modalContainer').innerHTML = html;
+  };
+
+  window._ftResetSupabaseSettings = function () {
+    const keys = Object.values(FT_SB_KEYS);
+    keys.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+    try { if (window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX = ''; } catch (e) {}
+    _cloudEnabled = false;
+    _showCloudButtons(false);
+    closeModal();
+    _showCloudToast('✅ تم مسح إعدادات Supabase المحلية', 'success', 2500);
+  };
+
+  window.openSyncDebugPanel = function () {
+    const logs = _getSyncLog();
+    const s = _ftReadSettings();
+    const hashes = _getSyncedHashes();
+    const unsynced = (people || []).filter((p) => p.photo && hashes[p.id] !== p.photo.length).length;
+    const invalid = (people || []).filter((p) => p.photo && !_isValidPhoto(p.photo)).length;
+    const logHtml = logs.length ? logs.map((l) => {
+      const icon = l.level === 'ok' ? '✅' : l.level === 'error' ? '❌' : l.level === 'warn' ? '⚠️' : 'ℹ️';
+      const t = new Date(l.ts).toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      return '<div style="display:flex;gap:6px;padding:4px 0;border-bottom:1px solid var(--card-border);font-size:11px"><span style="color:var(--text2);white-space:nowrap">'+t+'</span><span>'+icon+' '+l.msg+(l.detail?' — <span style="color:var(--text2)">'+l.detail+'</span>':'')+'</span></div>';
+    }).join('') : '<div style="color:var(--text2);text-align:center;padding:20px;font-size:12px">لا يوجد سجل</div>';
+
+    const html = `
+      <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal" style="max-width:560px;width:min(560px,96vw)">
+          <h3>🔍 تشخيص المزامنة والصور</h3>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+            ${[
+              ['👥', (people || []).length, 'الأفراد', ''],
+              ['📷', (people || []).filter((p) => _isValidPhoto(p.photo)).length, 'صور صالحة', ''],
+              ['📤', unsynced, 'غير مزامنة', unsynced > 0 ? '#dc2626' : '#15803d'],
+              ['⚠️', invalid, 'صور blob', invalid > 0 ? '#92400e' : '#15803d'],
+              ['🕐', _getLastSync() ? new Date(_getLastSync()).toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' }) : '—', 'آخر مزامنة', '']
+            ].map(([ic, v, lbl, col]) => '<div style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:7px;padding:7px;text-align:center"><div style="font-size:10px;color:var(--text2)">'+lbl+'</div><div style="font-size:15px;font-weight:700;color:'+(col||'var(--text)')+'">'+v+'</div></div>').join('')}
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Supabase: <code style="font-family:monospace">${s.bucket || FT_DEFAULT_BUCKET} / ${s.syncId || FT_DEFAULT_SYNC_ID}</code></div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:5px">سجل العمليات</div>
+          <div style="max-height:38vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:6px 10px">${logHtml}</div>
+          <div class="modal-footer" style="margin-top:10px"><button class="btn" onclick="_clearSyncLog();openSyncDebugPanel()" style="font-size:11px">🗑 مسح</button><button class="btn" onclick="closeModal();openCloudSyncPanel()">رجوع</button></div>
+        </div>
+      </div>`;
+    document.getElementById('modalContainer').innerHTML = html;
+  };
+
+  window._showCloudButtons = function (show) {
+    const b1 = document.getElementById('cloudSyncBtn');
+    const b2 = document.getElementById('cloudRestoreBtn');
+    const b3 = document.getElementById('exportFamilyBtn');
+    const b4 = document.getElementById('familyUploadSetupBtn');
+    const b5 = document.getElementById('familyUpdatesBtn');
+    const bUp = document.getElementById('cloudUploadBtn');
+    const bDn = document.getElementById('cloudDownloadBtn');
+    const bTime = document.getElementById('cloudLastSyncTime');
+    if (bUp) bUp.style.display = show ? '' : 'none';
+    if (bDn) bDn.style.display = show ? '' : 'none';
+    if (bTime) { bTime.style.display = show ? 'inline' : 'none'; if (show) _updateLastSyncUI(_getLastSync()); }
+    if (b1) b1.style.display = show ? '' : 'none';
+    if (b2) b2.style.display = show ? '' : 'none';
+    if (b3) b3.style.display = show ? '' : 'none';
+    if (b4) b4.style.display = show ? '' : 'none';
+    if (b5) b5.style.display = show ? '' : 'none';
+  };
+
+  const initSettings = _ftReadSettings();
+  if (initSettings.url && initSettings.anonKey && initSettings.bucket && initSettings.syncId && _ftEnsureHexKey(initSettings.keyHex)) {
+    _cloudEnabled = true;
+    _showCloudButtons(true);
+    try { if (window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX = initSettings.keyHex; } catch (e) {}
+  }
+})();
+</script>
+
 </body>
 </html>
