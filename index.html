@@ -9365,7 +9365,7 @@ function openSyncDebugPanel(){
     '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">Gist: '+(gistId?'<a href="https://gist.github.com/'+gistId+'" target="_blank" style="color:#3b82f6;font-family:monospace">'+gistId.slice(0,20)+'...</a>':'غير مُعيَّن')+'</div>'+
     '<div style="font-size:12px;font-weight:600;margin-bottom:5px">سجل العمليات</div>'+
     '<div style="max-height:38vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:6px 10px">'+logHtml+'</div>'+
-    '<div class="modal-footer" style="margin-top:10px"><button class="btn" onclick="_clearSyncLog();openSyncDebugPanel()" style="font-size:11px">🗑 مسح</button><button class="btn" onclick="closeModal();openCloudSyncPanel()">رجوع</button></div>'+
+    '<div class="modal-footer" style="margin-top:10px;position:relative;z-index:1"><button class="btn" onclick="_clearSyncLog();openSyncDebugPanel()" style="font-size:11px">🗑 مسح</button><button class="btn" onclick="closeModal();openCloudSyncPanel()">رجوع</button></div>'+
     '</div></div>';
   document.getElementById('modalContainer').innerHTML=html;
 }
@@ -9712,7 +9712,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       const pid = escapeHtml(String(c.personId));
       const choiceKey = String(c.personId);
       return `
-        <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:12px;background:var(--card-bg);margin-bottom:10px">
+        <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:12px;background:var(--card-bg);margin-bottom:10px;position:relative;z-index:1;pointer-events:auto">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <div>
               <div style="font-size:13px;font-weight:700;color:var(--text)">${title}</div>
@@ -9724,14 +9724,14 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
             <label style="display:block;border:1px solid var(--card-border);border-radius:10px;padding:8px;background:var(--bg-secondary);cursor:pointer">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:12px;font-weight:700;color:var(--text)">المحلية</span>
-                <input type="radio" name="${rowName}" value="local" checked onchange="_ftSetConflictChoice(${JSON.stringify(choiceKey)}, 'local')">
+                <input type="radio" name="${rowName}" value="local" checked onchange="window._ftSetConflictChoice(${JSON.stringify(choiceKey)}, 'local')">
               </div>
               <div style="font-size:11px;color:var(--text2);margin-bottom:6px">معاينة الصورة المحلية</div><img loading="lazy" src="${c.localPhoto||''}" alt="local" onerror="this.outerHTML='<div style=\'padding:20px;text-align:center;font-size:12px;color:var(--text2);border:1px dashed var(--card-border);border-radius:8px\'>تعذر عرض الصورة المحلية</div>'" style="display:block;width:100%;min-height:120px;max-height:220px;object-fit:contain;border-radius:8px;border:1px solid var(--card-border);background:#fff">
             </label>
             <label style="display:block;border:1px solid var(--card-border);border-radius:10px;padding:8px;background:var(--bg-secondary);cursor:pointer">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:12px;font-weight:700;color:var(--text)">السحابية</span>
-                <input type="radio" name="${rowName}" value="cloud" onchange="_ftSetConflictChoice(${JSON.stringify(choiceKey)}, 'cloud')">
+                <input type="radio" name="${rowName}" value="cloud" onchange="window._ftSetConflictChoice(${JSON.stringify(choiceKey)}, 'cloud')">
               </div>
               <div style="font-size:11px;color:var(--text2);margin-bottom:6px">معاينة الصورة السحابية</div><img loading="lazy" src="${c.cloudPhoto||''}" alt="cloud" onerror="this.outerHTML='<div style=\'padding:20px;text-align:center;font-size:12px;color:var(--text2);border:1px dashed var(--card-border);border-radius:8px\'>تعذر عرض الصورة السحابية</div>'" style="display:block;width:100%;min-height:120px;max-height:220px;object-fit:contain;border-radius:8px;border:1px solid var(--card-border);background:#fff">
             </label>
@@ -9746,18 +9746,18 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
     document.getElementById('modalContainer').innerHTML = `
       <div class="modal-overlay" onclick="if(event.target===this){window._ftSmartSyncState=null;closeModal();}">
-        <div class="modal" style="max-width:920px;width:min(920px,96vw)">
+        <div class="modal" style="max-width:920px;width:min(920px,96vw);position:relative;z-index:2;pointer-events:auto">
           <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">🟦 تعارضات الصور <span style="font-size:12px;font-weight:400;color:var(--text2)">${total} حالة</span></h3>
           <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:10px;padding:10px 12px">
             الصور غير المتعارضة ستُدمج تلقائياً. تمت إضافة معاينة مباشرة لكل صورة محلية وسحابية قبل الدمج. اختر لكل تعارض: المحلية أو السحابية، ثم اضغط دمج.
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-            <button class="btn" onclick="_ftSetAllConflictChoices('local')" style="font-size:12px">اعتماد المحلية للجميع</button>
-            <button class="btn" onclick="_ftSetAllConflictChoices('cloud')" style="font-size:12px">اعتماد السحابية للجميع</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:1">
+            <button class="btn" onclick="window._ftSetAllConflictChoices('local')" style="font-size:12px">اعتماد المحلية للجميع</button>
+            <button class="btn" onclick="window._ftSetAllConflictChoices('cloud')" style="font-size:12px">اعتماد السحابية للجميع</button>
           </div>
-          <div style="max-height:58vh;overflow-y:auto;padding-left:2px">${rows || '<div class="no-results">لا توجد تعارضات</div>'}</div>
-          <div class="modal-footer" style="margin-top:10px">
-            <button class="btn primary" onclick="_ftApplySmartSyncResolution()">✔ دمج المختار</button>
+          <div style="max-height:58vh;overflow-y:auto;padding-left:2px;position:relative;z-index:1">${rows || '<div class="no-results">لا توجد تعارضات</div>'}</div>
+          <div class="modal-footer" style="margin-top:10px;position:relative;z-index:1">
+            <button class="btn primary" onclick="window._ftApplySmartSyncResolution()">✔ دمج المختار</button>
             <button class="btn" onclick="window._ftSmartSyncState=null;closeModal()">إلغاء</button>
           </div>
         </div>
@@ -9826,6 +9826,12 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     closeModal();
     await _ftFinalizeSmartSync(state.preview.data, state.preview.cloudPhotos || {}, choices, state.preview);
   }
+
+  window._ftSetConflictChoice = _ftSetConflictChoice;
+  window._ftSetAllConflictChoices = _ftSetAllConflictChoices;
+  window._ftOpenPhotoConflictModal = _ftOpenPhotoConflictModal;
+  window._ftApplySmartSyncResolution = _ftApplySmartSyncResolution;
+  window._ftSmartSyncFromSupabase = _ftSmartSyncFromSupabase;
 
   async function _ftSmartSyncFromSupabase(dataObj, cloudPhotos) {
     const preview = await _ftComputePhotoConflicts((dataObj && dataObj.people) || [], cloudPhotos || {});
@@ -10245,7 +10251,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
           <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Supabase: <code style="font-family:monospace">${s.bucket || FT_DEFAULT_BUCKET} / ${s.syncId || FT_DEFAULT_SYNC_ID}</code></div>
           <div style="font-size:12px;font-weight:600;margin-bottom:5px">سجل العمليات</div>
           <div style="max-height:38vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:6px 10px">${logHtml}</div>
-          <div class="modal-footer" style="margin-top:10px"><button class="btn" onclick="_clearSyncLog();openSyncDebugPanel()" style="font-size:11px">🗑 مسح</button><button class="btn" onclick="closeModal();openCloudSyncPanel()">رجوع</button></div>
+          <div class="modal-footer" style="margin-top:10px;position:relative;z-index:1"><button class="btn" onclick="_clearSyncLog();openSyncDebugPanel()" style="font-size:11px">🗑 مسح</button><button class="btn" onclick="closeModal();openCloudSyncPanel()">رجوع</button></div>
         </div>
       </div>`;
     document.getElementById('modalContainer').innerHTML = html;
