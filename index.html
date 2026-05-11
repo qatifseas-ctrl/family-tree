@@ -1827,12 +1827,15 @@ function openMobSearchSheet(results, q){
   sheet._originalResults=results.slice(); // حفظ النسخة الأصلية
   const prevGroupOpen = _mssActiveGroup || 'all';
   _mssActiveGroup = groups[prevGroupOpen] ? prevGroupOpen : 'all';
-  _mssGroupResults=results;
-  _mssCurrentResults=results;
+  const activeItems = _mssActiveGroup==='all'
+    ? results
+    : (groups[_mssActiveGroup] || results);
+  _mssGroupResults=activeItems.slice();
+  _mssCurrentResults=activeItems.slice();
   _mssOriginalResults=results.slice();
 
   let badge=document.getElementById('mss-count-badge');
-  if(badge)badge.textContent=results.length+' نتيجة';
+  if(badge)badge.textContent=activeItems.length+' نتيجة';
 
   let groupsEl=document.getElementById('mss-groups');
   if(groupsEl){
@@ -1846,7 +1849,7 @@ function openMobSearchSheet(results, q){
     }
   }
 
-  _mssRenderItems(results,q);
+  _mssRenderItems(activeItems,q);
   overlay.classList.add('open');
   requestAnimationFrame(()=>{
     sheet.classList.add('open');
@@ -2856,7 +2859,8 @@ function openShortcutHelpModal(){
           <div><code>/</code> — فتح البحث السريع من أي مكان غير حقل إدخال</div>
           <div><code>Esc</code> — إغلاق البحث أو النافذة الحالية</div>
           <div><code>Home</code> — الانتقال إلى أعلى الصفحة</div>
-          <div><code>?</code> — عرض هذه النافذة</div>
+          <div><code>?</code> أو <code>؟</code> — عرض هذه النافذة</div>
+          <div style="color:var(--text2);font-size:12px">تعمل الاختصارات أيضًا مع لوحة المفاتيح العربية لأننا نستخدم المفاتيح الفيزيائية نفسها.</div>
         </div>
         <div class="modal-footer" style="margin-top:12px">
           <button class="btn" onclick="closeModal()">إغلاق</button>
@@ -2869,23 +2873,25 @@ function openShortcutHelpModal(){
 document.addEventListener('keydown',function(e){
   const modalOpen = !!document.getElementById('modalContainer').innerHTML;
   const typing = _isTypingField(e.target);
+  const noMods = !e.ctrlKey && !e.metaKey && !e.altKey;
 
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){
+  // اختصارات تعتمد على المفتاح الفيزيائي حتى تعمل على لوحات عربية/إنجليزية
+  if((e.ctrlKey||e.metaKey) && e.code==='KeyK'){
     e.preventDefault();
     openSearchPanel();
     return;
   }
-  if(!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key==='/'){
+  if(!typing && noMods && e.code==='Slash' && !e.shiftKey){
     e.preventDefault();
     openSearchPanel();
     return;
   }
-  if(!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key==='?'){
+  if(!typing && noMods && ((e.code==='Slash' && e.shiftKey) || e.key==='?' || e.key==='؟')){
     e.preventDefault();
     openShortcutHelpModal();
     return;
   }
-  if(!typing && e.key==='Home'){
+  if(!typing && e.code==='Home'){
     e.preventDefault();
     window.scrollTo({top:0,behavior:'smooth'});
     return;
