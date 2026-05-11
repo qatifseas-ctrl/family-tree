@@ -7021,10 +7021,31 @@ async function cloudSave(){
   }finally{_cloudSyncing=false;}
 }
 
-// ── مساعد: قاموس hash الصور المُرفوعة {id: length} ──
-const CLOUD_PHOTO_HASHES_KEY='ft_cloud_photo_hashes_v1';
-function _getSyncedHashes(){try{return JSON.parse(localStorage.getItem(CLOUD_PHOTO_HASHES_KEY)||'{}')}catch(e){return {};}}
-function _saveSyncedHashes(h){try{localStorage.setItem(CLOUD_PHOTO_HASHES_KEY,JSON.stringify(h));}catch(e){}}
+// ── مساعد: قاموس hash الصور المُرفوعة ──
+const CLOUD_PHOTO_HASHES_KEY='ft_cloud_photo_hashes_v2';
+
+function _getSyncedHashes(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(CLOUD_PHOTO_HASHES_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed;
+  }catch(e){
+    return {};
+  }
+}
+
+function _saveSyncedHashes(h){
+  try{
+    localStorage.setItem(CLOUD_PHOTO_HASHES_KEY, JSON.stringify(h || {}));
+  }catch(e){}
+}
+
+function _ftStoredPhotoSize(entry){
+  if (entry && typeof entry === 'object') {
+    return Number(entry.size || entry.length || 0) || 0;
+  }
+  return Number(entry || 0) || 0;
+}
 
 
 async function cloudLoad(forcePhotos){
@@ -7444,7 +7465,7 @@ async function cloudRestorePrompt(){
     'Gist هذا الجهاز: <code style="font-size:10px">'+(gistId||'غير مُعيَّن')+'</code></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
     '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#d1fae5;border-color:#10b981;color:#065f46">'+
-    '<span style="font-size:18px">🔀</span><span style="font-weight:600">دمج</span><span style="font-size:10px;opacity:.8">يضيف الجديد ويحدّث الصور</span></button>'+
+    '<span style="font-size:18px">🔀</span><span style="font-weight:600">دمج</span><span style="font-size:10px;opacity:.8">يضيف الجديد ويفحص التعارضات</span></button>'+
     '<button class="btn" onclick="closeModal();_doDownload(true)" style="padding:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">'+
     '<span style="font-size:18px">🔄</span><span style="font-weight:600">استبدال كامل</span><span style="font-size:10px;opacity:.8">يمسح المحلي تماماً</span></button>'+
     '</div>'+
@@ -9241,7 +9262,7 @@ function openCloudSyncPanel(){
     warnHtml+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'+
     '<button class="btn primary" onclick="closeModal();_doUpload()" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:20px">⬆️</span><span style="font-weight:600">رفع</span><span style="font-size:10px;opacity:.7">'+people.length+' فرد · '+validPhotos.length+' صورة</span></button>'+
-    '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">تنزيل ودمج</span><span style="font-size:10px;opacity:.7">يحدّث الصور</span></button>'+
+    '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">مزامنة ذكية</span><span style="font-size:10px;opacity:.7">يفحص التعارضات</span></button>'+
     '</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
     '<button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:#fff7ed;border-color:#fb923c;color:#c2410c">🔄 استبدال كامل</button>'+
@@ -9592,9 +9613,236 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     return data;
   }
 
+  async function _ftPhotoFingerprint(photo) {
+    if (!_isValidPhoto(photo)) return '';
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(photo));
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function _ftBuildPhotoMetaMapFromMap(photosMap) {
+    const out = {};
+    const entries = Object.entries(photosMap || {});
+    for (const [id, photo] of entries) {
+      if (!_isValidPhoto(photo)) continue;
+      out[id] = {
+        hash: await _ftPhotoFingerprint(photo),
+        size: photo.length,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return out;
+  }
+
+  async function _ftBuildPhotoMetaMapFromPeople(list) {
+    const out = {};
+    for (const p of (list || [])) {
+      if (p && _isValidPhoto(p.photo)) {
+        out[p.id] = {
+          hash: await _ftPhotoFingerprint(p.photo),
+          size: p.photo.length,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    }
+    return out;
+  }
+
+  function _ftMatchLocalPersonForPhoto(remotePerson) {
+    const arr = Array.isArray(people) ? people : [];
+    if (!remotePerson || !arr.length) return null;
+    const byId = arr.find((lp) => lp && lp.id === remotePerson.id);
+    if (byId) return byId;
+    return arr.find((lp) => {
+      if (!lp) return false;
+      if (normalizeAr(lp.name) !== normalizeAr(remotePerson.name)) return false;
+      if (remotePerson.gender && lp.gender && remotePerson.gender !== lp.gender) return false;
+      return true;
+    }) || null;
+  }
+
+  async function _ftComputePhotoConflicts(incomingPeople, cloudPhotos) {
+    const conflicts = [];
+    const cloudList = Array.isArray(incomingPeople) ? incomingPeople : [];
+    for (const cp of cloudList) {
+      const cPhoto = _isValidPhoto(cloudPhotos && cloudPhotos[cp.id] ? cloudPhotos[cp.id] : cp.photo)
+        ? (cloudPhotos && cloudPhotos[cp.id] ? cloudPhotos[cp.id] : cp.photo)
+        : '';
+      if (!_isValidPhoto(cPhoto)) continue;
+      const local = _ftMatchLocalPersonForPhoto(cp);
+      if (!local || !_isValidPhoto(local.photo)) continue;
+      const [localHash, cloudHash] = await Promise.all([
+        _ftPhotoFingerprint(local.photo),
+        _ftPhotoFingerprint(cPhoto),
+      ]);
+      if (localHash !== cloudHash) {
+        conflicts.push({
+          personId: cp.id,
+          name: _familyDisplayName ? _familyDisplayName(local) : (local.name || cp.name || '—'),
+          localPhoto: local.photo,
+          cloudPhoto: cPhoto,
+          localHash,
+          cloudHash,
+        });
+      }
+    }
+    return { conflicts, total: cloudList.length };
+  }
+
+  function _ftSetConflictChoice(personId, choice) {
+    if (!window._ftSmartSyncState) return;
+    window._ftSmartSyncState.choices[String(personId)] = choice;
+  }
+
+  function _ftSetAllConflictChoices(choice) {
+    const state = window._ftSmartSyncState;
+    if (!state || !state.preview || !Array.isArray(state.preview.conflicts)) return;
+    state.preview.conflicts.forEach((c) => {
+      state.choices[String(c.personId)] = choice;
+      const input = document.querySelector(`input[name="ft_conflict_${c.personId}"][value="${choice}"]`);
+      if (input) input.checked = true;
+    });
+  }
+
+  async function _ftOpenPhotoConflictModal(preview) {
+    const items = preview.conflicts || [];
+    const total = items.length;
+    const rows = items.map((c) => {
+      const rowName = `ft_conflict_${c.personId}`;
+      const title = escapeHtml(c.name || '—');
+      const pid = escapeHtml(String(c.personId));
+      const choiceKey = String(c.personId);
+      return `
+        <div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:12px;background:var(--card-bg);margin-bottom:10px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text)">${title}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">#${pid}</div>
+            </div>
+            <div style="font-size:11px;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;border-radius:999px;padding:2px 8px">تعارض صورة</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label style="display:block;border:1px solid var(--card-border);border-radius:10px;padding:8px;background:var(--bg-secondary);cursor:pointer">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:12px;font-weight:700;color:var(--text)">المحلية</span>
+                <input type="radio" name="${rowName}" value="local" checked onchange="_ftSetConflictChoice(${JSON.stringify(choiceKey)}, 'local')">
+              </div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:6px">معاينة الصورة المحلية</div><img loading="lazy" src="${c.localPhoto||''}" alt="local" onerror="this.outerHTML='<div style=\'padding:20px;text-align:center;font-size:12px;color:var(--text2);border:1px dashed var(--card-border);border-radius:8px\'>تعذر عرض الصورة المحلية</div>'" style="display:block;width:100%;min-height:120px;max-height:220px;object-fit:contain;border-radius:8px;border:1px solid var(--card-border);background:#fff">
+            </label>
+            <label style="display:block;border:1px solid var(--card-border);border-radius:10px;padding:8px;background:var(--bg-secondary);cursor:pointer">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:12px;font-weight:700;color:var(--text)">السحابية</span>
+                <input type="radio" name="${rowName}" value="cloud" onchange="_ftSetConflictChoice(${JSON.stringify(choiceKey)}, 'cloud')">
+              </div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:6px">معاينة الصورة السحابية</div><img loading="lazy" src="${c.cloudPhoto||''}" alt="cloud" onerror="this.outerHTML='<div style=\'padding:20px;text-align:center;font-size:12px;color:var(--text2);border:1px dashed var(--card-border);border-radius:8px\'>تعذر عرض الصورة السحابية</div>'" style="display:block;width:100%;min-height:120px;max-height:220px;object-fit:contain;border-radius:8px;border:1px solid var(--card-border);background:#fff">
+            </label>
+          </div>
+        </div>`;
+    }).join('');
+
+    window._ftSmartSyncState = {
+      preview,
+      choices: {},
+    };
+
+    document.getElementById('modalContainer').innerHTML = `
+      <div class="modal-overlay" onclick="if(event.target===this){window._ftSmartSyncState=null;closeModal();}">
+        <div class="modal" style="max-width:920px;width:min(920px,96vw)">
+          <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">🟦 تعارضات الصور <span style="font-size:12px;font-weight:400;color:var(--text2)">${total} حالة</span></h3>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:10px;padding:10px 12px">
+            الصور غير المتعارضة ستُدمج تلقائياً. تمت إضافة معاينة مباشرة لكل صورة محلية وسحابية قبل الدمج. اختر لكل تعارض: المحلية أو السحابية، ثم اضغط دمج.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn" onclick="_ftSetAllConflictChoices('local')" style="font-size:12px">اعتماد المحلية للجميع</button>
+            <button class="btn" onclick="_ftSetAllConflictChoices('cloud')" style="font-size:12px">اعتماد السحابية للجميع</button>
+          </div>
+          <div style="max-height:58vh;overflow-y:auto;padding-left:2px">${rows || '<div class="no-results">لا توجد تعارضات</div>'}</div>
+          <div class="modal-footer" style="margin-top:10px">
+            <button class="btn primary" onclick="_ftApplySmartSyncResolution()">✔ دمج المختار</button>
+            <button class="btn" onclick="window._ftSmartSyncState=null;closeModal()">إلغاء</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function _ftFinalizeSmartSync(dataObj, cloudPhotos, conflictChoices, previewMeta) {
+    const backup = _cloneMergeState();
+    const result = _cloudSmartMerge(dataObj || { people: [], relPairs: [], nextId: 1 }, { mode: 'cloud' });
+    let appliedCloud = 0;
+    const choiceMap = conflictChoices || {};
+    const incomingPeople = Array.isArray(dataObj && dataObj.people) ? dataObj.people : [];
+
+    incomingPeople.forEach((cp) => {
+      const cPhoto = _isValidPhoto(cloudPhotos && cloudPhotos[cp.id] ? cloudPhotos[cp.id] : cp.photo)
+        ? (cloudPhotos && cloudPhotos[cp.id] ? cloudPhotos[cp.id] : cp.photo)
+        : '';
+      if (!_isValidPhoto(cPhoto)) return;
+      const choice = choiceMap[String(cp.id)] || choiceMap[cp.id] || 'local';
+      if (choice !== 'cloud') return;
+
+      const target = (people || []).find((p) => p.id === cp.id) || _ftMatchLocalPersonForPhoto(cp);
+      if (target) {
+        target.photo = cPhoto;
+        appliedCloud++;
+      }
+    });
+
+    try { migrateExternalSpouses(); } catch (e) {}
+    try { _invalidateAll(); } catch (e) {}
+    try { _markDeviceInit(); } catch (e) {}
+    try { saveData(); } catch (e) {}
+    try { _persistPhotosToIDB().catch(() => {}); } catch (e) {}
+    try { renderAll(); } catch (e) {}
+    try { updateMyPersonBtn(); } catch (e) {}
+
+    const photoMeta = await _ftBuildPhotoMetaMapFromPeople(people);
+    _saveSyncedHashes(photoMeta);
+
+    _recordMergeHistory({
+      source: 'supabase-smart-sync',
+      kind: 'single',
+      added: result.added || 0,
+      updated: result.updated || 0,
+      note: 'مزامنة ذكية من Supabase',
+      mergeMode: 'cloud',
+      photoConflicts: (previewMeta && previewMeta.conflicts) || 0,
+      cloudPhotoOverrides: appliedCloud,
+    }, backup);
+
+    try { _setLastSync(); } catch (e) {}
+    _syncLog('ok', 'مزامنة ذكية من Supabase', `+${result.added || 0} جديد، تحديث ${result.updated || 0}، ${appliedCloud} صور محسومة`);
+    _showCloudToast(`✅ دُمج ذكيًا: +${result.added || 0} جديد · ${result.updated || 0} تحديث · ${appliedCloud} صور محسومة`, 'success', 4000);
+    return { added: result.added || 0, updated: result.updated || 0, appliedCloud };
+  }
+
+  async function _ftApplySmartSyncResolution() {
+    const state = window._ftSmartSyncState;
+    if (!state || !state.preview) return;
+    const choices = {};
+    (state.preview.conflicts || []).forEach((c) => {
+      const selected = document.querySelector(`input[name="ft_conflict_${c.personId}"]:checked`);
+      choices[String(c.personId)] = selected ? selected.value : 'local';
+    });
+    window._ftSmartSyncState = null;
+    closeModal();
+    await _ftFinalizeSmartSync(state.preview.data, state.preview.cloudPhotos || {}, choices, state.preview);
+  }
+
+  async function _ftSmartSyncFromSupabase(dataObj, cloudPhotos) {
+    const preview = await _ftComputePhotoConflicts((dataObj && dataObj.people) || [], cloudPhotos || {});
+    if (preview.conflicts.length) {
+      preview.data = dataObj;
+      preview.cloudPhotos = cloudPhotos || {};
+      preview.cloudOnly = (preview.total || 0) - preview.conflicts.length;
+      await _ftOpenPhotoConflictModal(preview);
+      _syncLog('warn', 'توجد تعارضات صور', String(preview.conflicts.length));
+      _showCloudToast(`🟦 ${preview.conflicts.length} تعارض صورة يحتاج مراجعة`, 'info', 4000);
+      return { pending: true, conflicts: preview.conflicts.length };
+    }
+    return await _ftFinalizeSmartSync(dataObj, cloudPhotos || {}, {}, preview);
+  }
+
   function _ftApplyLoadedPhotos(loadedData, cloudPhotos, forcePhotos) {
     const photoMap = cloudPhotos && typeof cloudPhotos === 'object' ? cloudPhotos : {};
-    const photoHashes = _getSyncedHashes();
     loadedData.people.forEach((p) => {
       const cPhoto = photoMap[p.id] || photoMap[String(p.id)];
       if (!cPhoto || typeof cPhoto !== 'string' || cPhoto.length < 100) return;
@@ -9607,12 +9855,11 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       } else {
         p.photo = localPhoto;
       }
-      photoHashes[p.id] = p.photo.length;
     });
-    _saveSyncedHashes(photoHashes);
   }
 
   async function _ftSupabaseSave() {
+
     if (!_ftSettingsReady()) {
       openCloudSetup();
       return;
@@ -9649,8 +9896,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       }
       await _ftUploadText('meta.json', JSON.stringify(meta));
 
-      const newHashes = _getSyncedHashes();
-      Object.keys(photosMap).forEach((id) => { newHashes[id] = photosMap[id].length; });
+      const newHashes = await _ftBuildPhotoMetaMapFromMap(photosMap);
       _saveSyncedHashes(newHashes);
       _setLastSync();
       _syncLog('ok', 'تم الحفظ على Supabase', `${people.length} فرد، ${Object.keys(photosMap).length} صورة`);
@@ -9695,11 +9941,6 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         _syncLog('warn', 'فشل تحميل الصور من Supabase', pe.message || String(pe));
       }
 
-      if (cloudPhotos) {
-        _ftApplyLoadedPhotos(d, cloudPhotos, !!forceReplace);
-        _syncLog('info', 'الصور محمّلة من Supabase', String(Object.keys(cloudPhotos).length));
-      }
-
       if (forceReplace) {
         people = d.people;
         nextId = d.nextId || 1;
@@ -9712,8 +9953,13 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         people.forEach((p) => { expanded[p.id] = false; });
         migrateExternalSpouses();
         if (people.length) expanded[people[0].id] = true;
-        const newH2 = {};
-        people.forEach((p) => { if (p.photo) newH2[p.id] = p.photo.length; });
+        if (cloudPhotos) {
+          Object.keys(cloudPhotos).forEach((id) => {
+            const target = (people || []).find((p) => String(p.id) === String(id));
+            if (target && _isValidPhoto(cloudPhotos[id])) target.photo = cloudPhotos[id];
+          });
+        }
+        const newH2 = await _ftBuildPhotoMetaMapFromPeople(people);
         _saveSyncedHashes(newH2);
         _markDeviceInit();
         saveData();
@@ -9723,18 +9969,12 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         _setLastSync();
         _syncLog('ok', 'استبدال كامل من Supabase', `${d.people.length} فرد`);
         _showCloudToast(`✅ استبدال كامل — ${d.people.length} فرد`, 'success', 4000);
-      } else {
-        const { added, updated } = _cloudSmartMerge(d, { mode: 'cloud' });
-        migrateExternalSpouses();
-        _invalidateAll();
-        _markDeviceInit();
-        saveData();
-        _persistPhotosToIDB().catch(() => {});
-        renderAll();
-        updateMyPersonBtn();
-        _setLastSync();
-        _syncLog('ok', 'اكتمل الدمج من Supabase', `+${added} جديد، تحديث ${updated}`);
-        _showCloudToast(`✅ دُمج: +${added} جديد · ${updated} تحديث`, 'success', 3500);
+        return d;
+      }
+
+      const smartResult = await _ftSmartSyncFromSupabase(d, cloudPhotos || {});
+      if (smartResult && smartResult.pending) {
+        return d;
       }
       return d;
     } catch (e) {
@@ -9749,6 +9989,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   }
 
   window.cloudSave = async function () { return _ftSupabaseSave(); };
+
   window.cloudLoad = async function (forcePhotos) { return _ftSupabaseLoad(forcePhotos); };
 
   window._doUpload = async function () { return _ftSupabaseSave(); };
@@ -9922,7 +10163,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
             <button class="btn primary" onclick="closeModal();_doUpload()" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:20px">⬆️</span><span style="font-weight:600">رفع</span><span style="font-size:10px;opacity:.7">${people.length} فرد · ${validPhotos.length} صورة</span></button>
-            <button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">تنزيل ودمج</span><span style="font-size:10px;opacity:.7">يحدّث الصور</span></button>
+            <button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">مزامنة ذكية</span><span style="font-size:10px;opacity:.7">يفحص التعارضات</span></button>
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -9980,7 +10221,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     const logs = _getSyncLog();
     const s = _ftReadSettings();
     const hashes = _getSyncedHashes();
-    const unsynced = (people || []).filter((p) => p.photo && hashes[p.id] !== p.photo.length).length;
+    const unsynced = (people || []).filter((p) => p.photo && _ftStoredPhotoSize(hashes[p.id]) !== p.photo.length).length;
     const invalid = (people || []).filter((p) => p.photo && !_isValidPhoto(p.photo)).length;
     const logHtml = logs.length ? logs.map((l) => {
       const icon = l.level === 'ok' ? '✅' : l.level === 'error' ? '❌' : l.level === 'warn' ? '⚠️' : 'ℹ️';
