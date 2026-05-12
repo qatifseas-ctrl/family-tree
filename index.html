@@ -3004,92 +3004,48 @@ function renderStats(){
       </div>
     </div>`).join('');
 }
-function exportData(){
+
+async function _ftDownloadHtmlExport(includeFamilyMeta, filenamePrefix, toastLabel){
+  const toast=document.createElement('div');
+  toast.id='export-progress-toast';
+  toast.textContent=toastLabel||'⏳ جارٍ تجهيز الملف...';
+  Object.assign(toast.style,{
+    position:'fixed',bottom:'80px',right:'50%',transform:'translateX(50%)',
+    background:'var(--card-bg,#fff)',border:'1px solid var(--card-border,#e5e7eb)',
+    borderRadius:'12px',padding:'12px 20px',fontSize:'14px',fontWeight:'600',
+    color:'var(--text,#111)',boxShadow:'0 4px 20px rgba(0,0,0,.15)',
+    zIndex:'99999',whiteSpace:'nowrap',maxWidth:'calc(100vw - 24px)'
+  });
+  document.body.appendChild(toast);
+  await new Promise(function(r){ setTimeout(r, 40); });
+  try{
+    const html=await _ftBuildFamilyHtml(!!includeFamilyMeta);
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const stamp=_ftDateStamp();
+    a.href=url;
+    a.download=(filenamePrefix||'family_tree')+'_'+stamp+'.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },2000);
+    showSaveToast();
+  }catch(err){
+    throw err;
+  }finally{
+    const t=document.getElementById('export-progress-toast');
+    if(t) t.remove();
+  }
+}
+
+async function exportData(){
   closeModal();
-  setTimeout(function(){
-    try{
-      // ── 1. Build data payload ──
-      var payload=JSON.stringify(_ftBuildExportSnapshot(false));
-      var bytes=new TextEncoder().encode(payload);
-      var bin='';bytes.forEach(function(b){bin+=String.fromCharCode(b);});
-      var b64=btoa(bin);
-      var dataTag='<scr'+'ipt id="__family_tree_data__" data-ft-export="1" type="application/json">'+b64+'<\/sc'+'ript>';
-
-      // ── 2. Build <html> tag with original attributes ──
-      var htmlAttrs='';
-      Array.from(document.documentElement.attributes).forEach(function(a){
-        htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
-      });
-
-      // ── 3. Get clean #app (pre-render, from _HTML_TEMPLATE via DOMParser) ──
-      var cleanAppHTML='';
-      try{
-        var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-        var tApp=tDoc.getElementById('app');
-        if(tApp)cleanAppHTML=tApp.outerHTML;
-      }catch(ex){}
-      if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
-
-      // ── 4. Get exact main script source (last script element = main app) ──
-      var mainSrc=document.scripts[document.scripts.length-1].textContent;
-
-      // ── تضمين CLOUD_CONFIG في الملف المحفوظ ──
-      if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
-        let gistIdToEmbed=CLOUD_CONFIG.GIST_ID||localStorage.getItem(CLOUD_GIST_KEY)||'';
-        // استبدال الكتلة كاملةً بدلاً من حقل بحقل لتفادي الخلط مع FAMILY_UPLOAD_CONFIG
-        mainSrc=mainSrc.replace(
-          /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
-          "const CLOUD_CONFIG = {\n" +
-          "  KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"',\n" +
-          "  GITHUB_PAT: '"+CLOUD_CONFIG.GITHUB_PAT+"',\n" +
-          "  GIST_ID: '"+gistIdToEmbed+"',  // ← يُملأ تلقائياً\n" +
-          "  GIST_FILE: '"+(CLOUD_CONFIG.GIST_FILE||'ft_encrypted.dat')+"',\n" +
-          "}"
-        );
-      }
-
-      // ── تضمين FAMILY_UPLOAD_CONFIG في نسخة المالك أيضاً ──
-      {
-        let fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
-        let fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
-        let fuKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||'';
-        if(fuPat||fuGid){
-          mainSrc=mainSrc.replace(
-            /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
-            "const FAMILY_UPLOAD_CONFIG = {\n" +
-            "  GITHUB_PAT: '"+fuPat+"',\n" +
-            "  GIST_ID: '"+fuGid+"',\n" +
-            "  KEY_HEX: '"+fuKey+"',\n" +
-            "}"
-          );
-        }
-      }
-
-      // ── 5. Assemble complete, valid HTML ──
-      var src='<!DOCTYPE html>\n'+
-        '<html'+htmlAttrs+'>\n'+
-        document.head.outerHTML+'\n'+
-        '<body>\n'+
-        cleanAppHTML+'\n'+
-        '<div id="modalContainer"></div>\n'+
-        dataTag+'\n'+
-        '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-        '</body>\n</html>';
-
-      // ── 6. Download ──
-      var d=new Date();
-      var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      var blob=new Blob([src],{type:'text/html;charset=utf-8'});
-      var url=URL.createObjectURL(blob);
-      var lnk=document.createElement('a');
-      lnk.href=url;lnk.download='family_tree_'+stamp+'.html';
-      document.body.appendChild(lnk);lnk.click();
-      setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},1500);
-      showSaveToast();
-    }catch(err){
-      alert('خطأ في الحفظ: '+err.message);
-    }
-  },100);
+  try{
+    await _ftDownloadHtmlExport(false, 'family_tree_owner', '⏳ جارٍ تجهيز نسخة المالك HTML...');
+  }catch(err){
+    alert('خطأ في الحفظ: '+err.message);
+    console.error('[exportData]',err);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3514,7 +3470,12 @@ function _ftApplySettingsSnapshot(settings){
 function _ftApplyExportDataExtras(d){
   if(!d||typeof d!=='object')return;
   _ftApplySettingsSnapshot(d.settings);
-  if(d._familyMeta) _ftApplyExportDataExtras(d);
+  if(d._familyMeta&&typeof d._familyMeta==='object'){
+    try{
+      if(d._familyMeta.deviceId) localStorage.setItem('ft_family_device_id', String(d._familyMeta.deviceId));
+    }catch(e){}
+    _ftApplySettingsSnapshot({family:d._familyMeta});
+  }
 }
 
 function _ftDecodeExportSnapshot(raw){
@@ -7804,16 +7765,7 @@ async function exportFamilyCopy(){
 window.exportFamilyHtmlCopy = async function(){
   closeModal();
   try{
-    const html=await _ftBuildFamilyHtml(true);
-    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    const stamp=_ftDateStamp();
-    a.href=url;
-    a.download='family_tree_family_'+stamp+'.html';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){a.remove();URL.revokeObjectURL(url);},1500);
+    await _ftDownloadHtmlExport(true, 'family_tree_family', '⏳ جارٍ تجهيز نسخة العائلة HTML...');
     alert('✅ تم تصدير ملف HTML للعائلة');
   }catch(err){
     alert('خطأ في التصدير: '+err.message);
