@@ -3004,49 +3004,31 @@ function renderStats(){
       </div>
     </div>`).join('');
 }
-
-async function _ftDownloadHtmlExport(includeFamilyMeta, filenamePrefix, toastLabel){
-  const toast=document.createElement('div');
-  toast.id='export-progress-toast';
-  toast.textContent=toastLabel||'⏳ جارٍ تجهيز الملف...';
-  Object.assign(toast.style,{
-    position:'fixed',bottom:'80px',right:'50%',transform:'translateX(50%)',
-    background:'var(--card-bg,#fff)',border:'1px solid var(--card-border,#e5e7eb)',
-    borderRadius:'12px',padding:'12px 20px',fontSize:'14px',fontWeight:'600',
-    color:'var(--text,#111)',boxShadow:'0 4px 20px rgba(0,0,0,.15)',
-    zIndex:'99999',whiteSpace:'nowrap',maxWidth:'calc(100vw - 24px)'
-  });
-  document.body.appendChild(toast);
-  await new Promise(function(r){ setTimeout(r, 40); });
+function exportData(){
   try{
-    const html=await _ftBuildFamilyHtml(!!includeFamilyMeta);
-    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    const stamp=_ftDateStamp();
+    var clone=document.documentElement.cloneNode(true);
+    clone.querySelectorAll("script[src]").forEach(function(){});
+    var data={people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null};
+    var settings={CLOUD_CONFIG:CLOUD_CONFIG,FAMILY_UPLOAD_CONFIG:FAMILY_UPLOAD_CONFIG};
+    var boot=clone.querySelector('#__family_tree_data__');
+    if(boot) boot.remove();
+    var s=document.createElement('script');
+    s.id='__family_tree_data__';
+    s.type='application/json';
+    s.textContent=JSON.stringify({data:data,settings:settings});
+    clone.body.appendChild(s);
+    var html='<!DOCTYPE html>
+'+clone.outerHTML;
+    var blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
     a.href=url;
-    a.download=(filenamePrefix||'family_tree')+'_'+stamp+'.html';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },2000);
-    showSaveToast();
-  }catch(err){
-    throw err;
-  }finally{
-    const t=document.getElementById('export-progress-toast');
-    if(t) t.remove();
-  }
+    a.download='family_tree_export.html';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+  }catch(err){alert('خطأ في التصدير: '+err.message);console.error(err);}
 }
 
-async function exportData(){
-  closeModal();
-  try{
-    await _ftDownloadHtmlExport(false, 'family_tree_owner', '⏳ جارٍ تجهيز نسخة المالك HTML...');
-  }catch(err){
-    alert('خطأ في الحفظ: '+err.message);
-    console.error('[exportData]',err);
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
@@ -3250,7 +3232,7 @@ function doImport(mode){
       migrateExternalSpouses();
       _invalidateAll();
       if(people.length)expanded[people[0].id]=true;
-      _ftApplyExportDataExtras(d);
+      _applyFamilyMetaIfNeeded(d);
       saveData();renderAll();updateMyPersonBtn();
       setTimeout(()=>alert(`✔ تم الاستيراد بنجاح! (${people.length} فرد)`),200);
     } else {
@@ -3317,7 +3299,7 @@ function doImport(mode){
       people=people.concat(trulyNew);
       trulyNew.forEach(p=>{expanded[p.id]=false;});
       _invalidateAll();
-      _ftApplyExportDataExtras(d);
+      _applyFamilyMetaIfNeeded(d);
       saveData();renderAll();updateMyPersonBtn();
       let msg=`✔ تم الدمج بنجاح!\n➕ أضيف ${trulyNew.length} فرد جديد`;
       if(skipped>0)msg+=`\n⏭️ تجاهل ${skipped} فرد مكرر موجود مسبقاً`;
@@ -3350,138 +3332,6 @@ function _applyFamilyMetaIfNeeded(data){
     try{localStorage.setItem('ft_fupload_key', meta.keyHex);}catch(e){}
   }
   console.log('[Import] Family meta applied — deviceId:', meta.deviceId||'—', 'gistId:', meta.gistId||'—');
-}
-
-function _ftCloneJSON(value){
-  try{return JSON.parse(JSON.stringify(value));}
-  catch(e){return value;}
-}
-
-function _ftB64EncodeUtf8(textValue){
-  var bytes=new TextEncoder().encode(String(textValue||''));
-  var bin='';
-  bytes.forEach(function(b){bin+=String.fromCharCode(b);});
-  return btoa(bin);
-}
-
-function _ftB64DecodeUtf8(raw){
-  var bin=atob(String(raw||'').replace(/\s/g,''));
-  var bytes=new Uint8Array(bin.length);
-  for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
-}
-
-function _ftCurrentSettingsSnapshot(){
-  var supabaseSettings={};
-  try{
-    if(typeof _ftReadSettings==='function') supabaseSettings=_ftReadSettings()||{};
-  }catch(e){}
-  return {
-    supabase:supabaseSettings,
-    cloud:{
-      KEY_HEX:(CLOUD_CONFIG&&CLOUD_CONFIG.KEY_HEX)||'',
-      GITHUB_PAT:(CLOUD_CONFIG&&CLOUD_CONFIG.GITHUB_PAT)||'',
-      GIST_ID:(CLOUD_CONFIG&&CLOUD_CONFIG.GIST_ID)||'',
-      GIST_FILE:(CLOUD_CONFIG&&CLOUD_CONFIG.GIST_FILE)||'ft_encrypted.dat'
-    },
-    family:{
-      GITHUB_PAT:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT)||'',
-      GIST_ID:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GIST_ID)||'',
-      KEY_HEX:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.KEY_HEX)||''
-    },
-    ui:{
-      mobileMode:!!_mobileMode
-    }
-  };
-}
-
-function _ftBuildExportSnapshot(includeFamilyMeta){
-  var data={
-    people:_ftCloneJSON(people||[]),
-    relPairs:_ftCloneJSON(relPairs||[]),
-    nextId:nextId,
-    myPersonId:myPersonId||null,
-    settings:_ftCurrentSettingsSnapshot()
-  };
-  if(includeFamilyMeta){
-    data._familyMeta={
-      deviceId:localStorage.getItem('ft_family_device_id')||FAMILY_DEVICE_ID||'',
-      pat:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT)||localStorage.getItem('ft_fupload_pat')||'',
-      gistId:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GIST_ID)||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'',
-      keyHex:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.KEY_HEX)||localStorage.getItem('ft_fupload_key')||''
-    };
-  }
-  return data;
-}
-
-function _ftApplySettingsSnapshot(settings){
-  if(!settings||typeof settings!=='object')return;
-  try{
-    if(settings.supabase&&typeof settings.supabase==='object'){
-      var sb=settings.supabase;
-      if(sb.url) try{localStorage.setItem(FT_SB_KEYS.url,sb.url);}catch(e){}
-      if(sb.anonKey) try{localStorage.setItem(FT_SB_KEYS.anonKey,sb.anonKey);}catch(e){}
-      if(sb.bucket) try{localStorage.setItem(FT_SB_KEYS.bucket,sb.bucket);}catch(e){}
-      if(sb.syncId) try{localStorage.setItem(FT_SB_KEYS.syncId,sb.syncId);}catch(e){}
-      if(sb.keyHex) try{localStorage.setItem(FT_SB_KEYS.keyHex,sb.keyHex);}catch(e){}
-      if(window.CLOUD_CONFIG){
-        if(sb.keyHex) window.CLOUD_CONFIG.KEY_HEX=sb.keyHex;
-        if(sb.syncId) window.CLOUD_CONFIG.GIST_ID=sb.syncId;
-      }
-    }
-    if(settings.cloud&&typeof settings.cloud==='object'){
-      var c=settings.cloud;
-      if(c.KEY_HEX){
-        try{localStorage.setItem('ft_cloud_key_v1',c.KEY_HEX);}catch(e){}
-        if(window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX=c.KEY_HEX;
-      }
-      if(c.GITHUB_PAT){
-        try{localStorage.setItem('ft_cloud_pat_v1',c.GITHUB_PAT);}catch(e){}
-        if(window.CLOUD_CONFIG) window.CLOUD_CONFIG.GITHUB_PAT=c.GITHUB_PAT;
-      }
-      if(c.GIST_ID){
-        try{localStorage.setItem(CLOUD_GIST_KEY,c.GIST_ID);}catch(e){}
-        if(window.CLOUD_CONFIG) window.CLOUD_CONFIG.GIST_ID=c.GIST_ID;
-      }
-    }
-    if(settings.family&&typeof settings.family==='object'){
-      var f=settings.family;
-      if(f.GITHUB_PAT){
-        FAMILY_UPLOAD_CONFIG.GITHUB_PAT=f.GITHUB_PAT;
-        try{localStorage.setItem('ft_fupload_pat',f.GITHUB_PAT);}catch(e){}
-      }
-      if(f.GIST_ID){
-        FAMILY_UPLOAD_CONFIG.GIST_ID=f.GIST_ID;
-        try{localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,f.GIST_ID);}catch(e){}
-        try{localStorage.setItem('ft_fupload_gid',f.GIST_ID);}catch(e){}
-      }
-      if(f.KEY_HEX){
-        FAMILY_UPLOAD_CONFIG.KEY_HEX=f.KEY_HEX;
-        try{localStorage.setItem('ft_fupload_key',f.KEY_HEX);}catch(e){}
-      }
-    }
-    if(settings.ui&&typeof settings.ui==='object'&&typeof settings.ui.mobileMode!=='undefined'){
-      try{localStorage.setItem(MOB_KEY,settings.ui.mobileMode?'1':'0');}catch(e){}
-      _mobileMode=!!settings.ui.mobileMode;
-    }
-  }catch(e){}
-}
-
-function _ftApplyExportDataExtras(d){
-  if(!d||typeof d!=='object')return;
-  _ftApplySettingsSnapshot(d.settings);
-  if(d._familyMeta&&typeof d._familyMeta==='object'){
-    try{
-      if(d._familyMeta.deviceId) localStorage.setItem('ft_family_device_id', String(d._familyMeta.deviceId));
-    }catch(e){}
-    _ftApplySettingsSnapshot({family:d._familyMeta});
-  }
-}
-
-function _ftDecodeExportSnapshot(raw){
-  if(!raw)return null;
-  try{return JSON.parse(_ftB64DecodeUtf8(raw));}
-  catch(e){return null;}
 }
 
 let _renderTreeRAF=null;
@@ -7731,50 +7581,14 @@ function _showCloudButtons(show){
 async function exportFamilyCopy(){
   closeModal();
 
+  // ── تحقق من وجود JSZip ──
   if(typeof JSZip==='undefined'){
     alert('⚠️ مكتبة JSZip غير محملة بعد.\nتأكد من اتصالك بالإنترنت وأعد المحاولة.');
     return;
   }
 
-  const html = `
-  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="max-width:520px">
-      <h3>📦 تصدير نسخة العائلة</h3>
-      <div style="font-size:12px;color:var(--text2);background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.8">
-        اختر الصيغة المناسبة:
-        <br>• <strong>حزمة PWA ZIP</strong> لنسخة جاهزة للتثبيت والنشر.
-        <br>• <strong>ملف HTML للعائلة</strong> لنسخة واحدة تعمل مباشرة في المتصفح وتتضمن الإعدادات والصور.
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <button class="btn" onclick="closeModal();window.exportFamilyZipCopy&&window.exportFamilyZipCopy()" style="padding:12px 10px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">
-          <div style="font-size:18px">📦</div>
-          <div style="font-weight:700;margin-top:4px">حزمة PWA ZIP</div>
-          <div style="font-size:10px;opacity:.8;margin-top:2px">مجلد كامل مع manifest وsw</div>
-        </button>
-        <button class="btn" onclick="closeModal();window.exportFamilyHtmlCopy&&window.exportFamilyHtmlCopy()" style="padding:12px 10px;background:#dbeafe;border-color:#60a5fa;color:#1d4ed8">
-          <div style="font-size:18px">🌐</div>
-          <div style="font-weight:700;margin-top:4px">ملف HTML للعائلة</div>
-          <div style="font-size:10px;opacity:.8;margin-top:2px">يحتوي البيانات والإعدادات</div>
-        </button>
-      </div>
-    </div>
-  </div>`;
-  document.getElementById('modalContainer').innerHTML=html;
-}
-
-window.exportFamilyHtmlCopy = async function(){
-  closeModal();
-  try{
-    await _ftDownloadHtmlExport(true, 'family_tree_family', '⏳ جارٍ تجهيز نسخة العائلة HTML...');
-    alert('✅ تم تصدير ملف HTML للعائلة');
-  }catch(err){
-    alert('خطأ في التصدير: '+err.message);
-    console.error('[exportFamilyHtmlCopy]',err);
-  }
-};
-
-window.exportFamilyZipCopy = async function(){
-  const _toast=document.createElement('div');
+  // ── مؤشر تحميل ──
+  var _toast=document.createElement('div');
   _toast.id='export-progress-toast';
   _toast.innerHTML='⏳ جارٍ تجهيز حزمة الـ PWA...';
   Object.assign(_toast.style,{
@@ -7785,98 +7599,84 @@ window.exportFamilyZipCopy = async function(){
     zIndex:'99999',whiteSpace:'nowrap'
   });
   document.body.appendChild(_toast);
-  const removeToast=function(){var t=document.getElementById('export-progress-toast');if(t)t.remove();};
-  try{
-    const zip=await _ftBuildFamilyZip();
-    removeToast();
-    const stamp=_ftDateStamp();
-    const zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-    const url=URL.createObjectURL(zipBlob);
-    const lnk=document.createElement('a');
-    lnk.href=url;lnk.download='family-tree-pwa-'+stamp+'.zip';
-    document.body.appendChild(lnk);lnk.click();
-    setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},2000);
-    alert('✅ تم تصدير حزمة الـ PWA');
-  }catch(err){
-    removeToast();
-    alert('خطأ في التصدير: '+err.message);
-    console.error('[exportFamilyZipCopy]',err);
-  }
-};
+  var _removeToast=function(){var t=document.getElementById('export-progress-toast');if(t)t.remove();};
 
-async function _ftBuildFamilyHtml(includeFamilyMeta){
-  const exportData=_ftBuildExportSnapshot(!!includeFamilyMeta);
-  const payload=_ftB64EncodeUtf8(JSON.stringify(exportData));
-  const dataTag='<scr'+'ipt id="__family_tree_data__" data-ft-export="1" data-ft-kind="'+(includeFamilyMeta?'family':'snapshot')+'" type="application/json">'+payload+'<\/sc'+'ript>';
-  const htmlAttrText=Array.from(document.documentElement.attributes).reduce(function(acc,a){
-    return acc+' '+a.name+'="'+String(a.value).replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
-  },'');
-  let cleanAppHTML='';
   try{
-    const tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-    const tApp=tDoc.getElementById('app');
-    if(tApp)cleanAppHTML=tApp.outerHTML;
-  }catch(ex){}
-  if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+    // ════ 1. بناء الكود الرئيسي لنسخة العائلة ════
+    var htmlAttrs='';
+    Array.from(document.documentElement.attributes).forEach(function(a){
+      htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
+    });
 
-  let mainSrc=document.scripts[document.scripts.length-1].textContent;
-  if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
-    mainSrc=mainSrc.replace(/KEY_HEX:\s*'[^']*'/,"KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"'")
-                   .replace(/GITHUB_PAT:\s*'[^']*'/,"GITHUB_PAT: '"+CLOUD_CONFIG.GITHUB_PAT+"'");
-  }
-  if(IS_FAMILY_COPY&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT){
-    const fek=FAMILY_UPLOAD_CONFIG.KEY_HEX||CLOUD_CONFIG.KEY_HEX||'';
-    mainSrc=mainSrc
-      .replace(/(FAMILY_UPLOAD_CONFIG[\s\S]*?GITHUB_PAT\s*:\s*')[^']*(')/,'$1'+FAMILY_UPLOAD_CONFIG.GITHUB_PAT+'$2')
-      .replace(/(FAMILY_UPLOAD_CONFIG[\s\S]*?GIST_ID\s*:\s*')[^']*(')/,'$1'+(FAMILY_UPLOAD_CONFIG.GIST_ID||'')+'$2')
-      .replace(/(FAMILY_UPLOAD_CONFIG[\s\S]*?KEY_HEX\s*:\s*')[^']*(')/,'$1'+fek+'$2');
+    var cleanAppHTML='';
+    try{
+      var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
+      var tApp=tDoc.getElementById('app');
+      if(tApp)cleanAppHTML=tApp.outerHTML;
+    }catch(ex){}
+    if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+
+    // الكود المصدري — تعديل الثوابت
+    var mainSrc=document.scripts[document.scripts.length-1].textContent;
+
+    // 1a. حذف CLOUD_CONFIG كاملاً — لا مفاتيح المالك السحابية في نسخة العائلة
+    mainSrc=mainSrc.replace(
+      /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
+      "const CLOUD_CONFIG = {\n  KEY_HEX: '',\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  GIST_FILE: 'ft_encrypted.dat',\n}"
+    );
+
+    // 1b. FAMILY_UPLOAD_CONFIG فارغ في الـ HTML — المفاتيح تأتي فقط من ملف JSON عند الاستيراد
+    // (أكثر أماناً: الـ PWA لا يحمل أي مفاتيح — تُفعَّل فقط بعد استيراد JSON يحتوي _familyMeta)
+    mainSrc=mainSrc.replace(
+      /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
+      "const FAMILY_UPLOAD_CONFIG = {\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  KEY_HEX: '',\n}"
+    );
+
+    // 1c. تمييز النسخة كـ "نسخة عائلة"
     mainSrc=mainSrc.replace(/const IS_FAMILY_COPY\s*=\s*false/,'const IS_FAMILY_COPY = true');
-  }
-  return '<!DOCTYPE html>\n<html'+htmlAttrText+'>\n'+document.head.outerHTML+'\n<body>\n'+
-    cleanAppHTML+'\n<div id="modalContainer"></div>\n'+dataTag+'\n'+
-    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
-}
 
-function _ftDateStamp(){
-  const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
+    // 1d. Device ID فريد لكل نسخة مصدَّرة
+    var _newDid=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    mainSrc=mainSrc.replace(/const FAMILY_DEVICE_ID\s*=\s*'[^']*'/,"const FAMILY_DEVICE_ID = '"+_newDid+"'");
 
-async function _ftBuildFamilyZip(){
-  const zip=new JSZip();
-  const folder=zip.folder('family-tree-pwa');
+    // ── بناء head نظيف (بدون JSZip) ──
+    var headClone=document.head.cloneNode(true);
+    headClone.querySelectorAll('script').forEach(function(s){
+      if(s.src&&s.src.includes('jszip'))s.remove();
+    });
 
-  const familyHTML=await _ftBuildFamilyHtml(true);
-  folder.file('index.html',familyHTML);
+    // ✅ لا dataTag — الشجرة فارغة، المستخدم يستورد JSON بنفسه
+    var familyHTML=
+      '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+
+      headClone.outerHTML+'\n'+
+      '<body>\n'+
+      cleanAppHTML+'\n'+
+      '<div id="modalContainer"></div>\n'+
+      '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+      '</body>\n</html>';
 
-  const manifestContent=JSON.stringify({
-    name:'شجرة العائلة',
-    short_name:'العائلة',
-    description:'شجرة عائلية تفاعلية',
-    start_url:'./index.html',
-    scope:'./',
-    display:'standalone',
-    orientation:'any',
-    background_color:'#f3f4f6',
-    theme_color:'#3b82f6',
-    lang:'ar',
-    dir:'rtl',
-    icons:[
-      {src:'icons/icon-72x72.png',sizes:'72x72',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-96x96.png',sizes:'96x96',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-128x128.png',sizes:'128x128',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-144x144.png',sizes:'144x144',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-152x152.png',sizes:'152x152',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-192x192.png',sizes:'192x192',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-384x384.png',sizes:'384x384',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-512x512.png',sizes:'512x512',type:'image/png',purpose:'any maskable'},
-      {src:'icons/icon-maskable-192x192.png',sizes:'192x192',type:'image/png',purpose:'maskable'},
-      {src:'icons/icon-maskable-512x512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}
-    ]
-  },null,2);
-  folder.file('manifest.json',manifestContent);
+    // ════ 2. manifest.json ════
+    var manifestContent=JSON.stringify({
+      name:'شجرة العائلة',short_name:'العائلة',
+      description:'شجرة عائلية تفاعلية',
+      start_url:'./index.html',scope:'./',display:'standalone',orientation:'any',
+      background_color:'#f3f4f6',theme_color:'#3b82f6',lang:'ar',dir:'rtl',
+      icons:[
+        {src:'icons/icon-72x72.png',sizes:'72x72',type:'image/png',purpose:'any'},
+        {src:'icons/icon-96x96.png',sizes:'96x96',type:'image/png',purpose:'any'},
+        {src:'icons/icon-128x128.png',sizes:'128x128',type:'image/png',purpose:'any'},
+        {src:'icons/icon-144x144.png',sizes:'144x144',type:'image/png',purpose:'any'},
+        {src:'icons/icon-152x152.png',sizes:'152x152',type:'image/png',purpose:'any'},
+        {src:'icons/icon-192x192.png',sizes:'192x192',type:'image/png',purpose:'any'},
+        {src:'icons/icon-384x384.png',sizes:'384x384',type:'image/png',purpose:'any'},
+        {src:'icons/icon-512x512.png',sizes:'512x512',type:'image/png',purpose:'any'},
+        {src:'icons/icon-maskable-192x192.png',sizes:'192x192',type:'image/png',purpose:'maskable'},
+        {src:'icons/icon-maskable-512x512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}
+      ]
+    },null,2);
 
-  const swContent=`/* شجرة العائلة — Service Worker */
+    // ════ 3. sw.js — Network-First لـ index.html (يمنع تحميل HTML قديم من الكاش) ════
+    var swContent=`/* شجرة العائلة — Service Worker */
 const CACHE_NAME='family-tree-v1';
 const SHELL_CACHE='family-tree-shell-v1';
 const STATIC_ASSETS=['./manifest.json','./icons/icon-192x192.png','./icons/icon-512x512.png','./icons/apple-touch-icon.png'];
@@ -7892,7 +7692,7 @@ self.addEventListener('fetch',e=>{
 async function networkFirst(req){
   var cache=await caches.open(SHELL_CACHE);
   try{var r=await fetch(req);if(r&&r.status===200)cache.put(req,r.clone());return r;}
-  catch{var c=await cache.match(req);return c||new Response('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p></body></html>',{headers:{'Content-Type':'text/html;charset=utf-8'}});}
+  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p></body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
 }
 async function cacheFirst(req){
   var c=await caches.match(req);if(c)return c;
@@ -7900,89 +7700,99 @@ async function cacheFirst(req){
   catch{return new Response('',{status:503});}
 }
 self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting();});`;
-  folder.file('sw.js',swContent);
 
-  const guide=`# 🌳 شجرة العائلة — دليل رفع نسخة العائلة
+    // ════ 4. جلب الأيقونات ════
+    _toast.innerHTML='⏳ جارٍ تحميل الأيقونات...';
+    var iconFiles=[
+      'icons/apple-touch-icon.png','icons/icon-72x72.png','icons/icon-96x96.png',
+      'icons/icon-128x128.png','icons/icon-144x144.png','icons/icon-152x152.png',
+      'icons/icon-192x192.png','icons/icon-384x384.png','icons/icon-512x512.png',
+      'icons/icon-maskable-192x192.png','icons/icon-maskable-512x512.png'
+    ];
+    var iconData={};
+    await Promise.all(iconFiles.map(async function(path){
+      try{var resp=await fetch('./'+path);if(resp.ok)iconData[path]=await resp.arrayBuffer();}
+      catch(e){console.warn('Could not fetch icon:',path);}
+    }));
+
+    // ════ 5. دليل الاستضافة ════
+    var guide=`# 🌳 شجرة العائلة — دليل رفع نسخة العائلة
 
 ## هيكل الملفات
 \`\`\`
 family-tree-pwa/
-├── index.html
+├── index.html       ← التطبيق (بدون بيانات — يطلب استيراد JSON)
 ├── manifest.json
 ├── sw.js
-└── icons/
+└── icons/  (11 أيقونة PNG)
 \`\`\`
 
-## الاستخدام
-1. ارفع المجلد على GitHub Pages أو Netlify
-2. افتح \`index.html\`
-3. استورد أو استخدم النسخة المصدرة
+## رفع على GitHub Pages (مجاني — مُوصى به)
+1. github.com/new ← اسم المستودع: family-tree ← Public ← Create
+2. ارفع جميع الملفات (بما فيها مجلد icons/)
+3. Settings → Pages → Source: main / (root) → Save
+4. انتظر دقيقتين ← رابطك: https://USERNAME.github.io/family-tree/
 
-## ملاحظات
-- الأيقونات في هذه الحزمة منقولة بصيغة maskable لتناسب أندرويد
-- ملف \`index.html\` يحتوي البيانات والإعدادات والصور المضمّنة`;
-  folder.file('INSTALL.md',guide);
+## رفع على Netlify (أسرع — سحب وإفلات)
+1. netlify.com ← سجّل دخول
+2. اسحب مجلد family-tree-pwa وأفلته في لوحة التحكم
+3. رابطك جاهز فوراً: https://xxxx.netlify.app
 
-  async function _makeIconBlob(size){
-    const canvas=document.createElement('canvas');
-    canvas.width=size; canvas.height=size;
-    const ctx=canvas.getContext('2d');
-    ctx.clearRect(0,0,size,size);
-    const cx=size/2, cy=size/2;
-    const bgR=size*0.46;
-    ctx.beginPath();
-    ctx.arc(cx,cy,bgR,0,Math.PI*2);
-    ctx.fillStyle='#eff6ff';
-    ctx.fill();
-    ctx.lineWidth=Math.max(2, size*0.02);
-    ctx.strokeStyle='#3b82f6';
-    ctx.stroke();
-    ctx.fillStyle='#16a34a';
-    ctx.beginPath(); ctx.arc(cx,cy-size*0.10,size*0.14,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx-size*0.12,cy-size*0.02,size*0.11,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx+size*0.12,cy-size*0.02,size*0.11,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy-size*0.18,size*0.10,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#854d0e';
-    ctx.fillRect(cx-size*0.035, cy-size*0.02, size*0.07, size*0.18);
-    ctx.fillStyle='#7c2d12';
-    ctx.fillRect(cx-size*0.028, cy-size*0.01, size*0.056, size*0.16);
-    ctx.strokeStyle='#166534';
-    ctx.lineWidth=Math.max(2,size*0.012);
-    ctx.beginPath();
-    ctx.moveTo(cx-size*0.18, cy+size*0.12);
-    ctx.lineTo(cx+size*0.18, cy+size*0.12);
-    ctx.stroke();
-    ctx.fillStyle='#1d4ed8';
-    const dotR=size*0.03;
-    [[-0.17,0.18],[0,0.20],[0.17,0.18]].forEach(function(pt){
-      ctx.beginPath(); ctx.arc(cx+size*pt[0], cy+size*pt[1], dotR, 0, Math.PI*2); ctx.fill();
+## التثبيت كـ PWA
+- Android/Chrome: بانر التثبيت يظهر تلقائياً
+- iPhone/Safari: زر المشاركة ⬆️ ← "إضافة إلى الشاشة الرئيسية"
+- كمبيوتر: أيقونة ➕ في شريط العنوان
+
+## تدفق الاستخدام
+1. المالك يرسل الرابط + ملف JSON للبيانات
+2. فرد العائلة يفتح الرابط → يضغط "استيراد ملف JSON"
+3. البيانات تُحفظ محلياً — يعمل التطبيق بدون إنترنت
+`;
+
+    // ════ 6. تجميع ZIP ════
+    _toast.innerHTML='⏳ جارٍ ضغط الملفات...';
+    var zip=new JSZip();
+    var folder=zip.folder('family-tree-pwa');
+    folder.file('index.html',familyHTML);
+    folder.file('manifest.json',manifestContent);
+    folder.file('sw.js',swContent);
+    folder.file('INSTALL.md',guide);
+    var iconsFolder=folder.folder('icons');
+    Object.entries(iconData).forEach(function(entry){
+      iconsFolder.file(entry[0].replace('icons/',''),entry[1]);
     });
-    return await new Promise(function(resolve){
-      canvas.toBlob(function(blob){ resolve(blob); }, 'image/png');
-    });
+    var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+
+    // ════ 7. تنزيل ZIP ════
+    _removeToast();
+    var d=new Date();
+    var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var url=URL.createObjectURL(zipBlob);
+    var lnk=document.createElement('a');
+    lnk.href=url;lnk.download='family-tree-pwa-'+stamp+'.zip';
+    document.body.appendChild(lnk);lnk.click();
+    setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},2000);
+
+    showSaveToast();
+    setTimeout(function(){
+      alert(
+        '✅ تم تصدير حزمة الـ PWA\n\n'+
+        '📦 الملف: family-tree-pwa-'+stamp+'.zip\n\n'+
+        'خطوات التوزيع:\n'+
+        '1. ارفع المجلد على GitHub Pages أو Netlify\n'+
+        '2. أرسل الرابط + ملف JSON للبيانات لأفراد العائلة\n'+
+        '3. كل فرد يستورد الـ JSON من داخل التطبيق\n\n'+
+        '📄 راجع INSTALL.md داخل الحزمة للتفاصيل'
+      );
+    },300);
+
+  }catch(err){
+    _removeToast();
+    alert('خطأ في التصدير: '+err.message);
+    console.error('[exportFamilyCopy]',err);
   }
-
-  const iconSpecs=[
-    ['apple-touch-icon.png',192],
-    ['icon-72x72.png',72],
-    ['icon-96x96.png',96],
-    ['icon-128x128.png',128],
-    ['icon-144x144.png',144],
-    ['icon-152x152.png',152],
-    ['icon-192x192.png',192],
-    ['icon-384x384.png',384],
-    ['icon-512x512.png',512],
-    ['icon-maskable-192x192.png',192],
-    ['icon-maskable-512x512.png',512]
-  ];
-  const iconsFolder=folder.folder('icons');
-  await Promise.all(iconSpecs.map(async function(spec){
-    const blob=await _makeIconBlob(spec[1]);
-    if(blob) iconsFolder.file(spec[0], blob);
-  }));
-
-  return zip;
 }
+
 // ── تهيئة السحابة عند بدء التطبيق ──
 async function initCloud(){
   // تحميل الإعدادات من localStorage إذا لم تكن محدَّدة في الكود
@@ -8243,11 +8053,11 @@ let _fsaEnabled=false;
 
 // بناء HTML الكامل مع البيانات مضمّنة
 function _buildSaveHTML(){
-  var payload=JSON.stringify(_ftBuildExportSnapshot(false));
+  var payload=JSON.stringify({people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null});
   var bytes=new TextEncoder().encode(payload);
   var bin='';bytes.forEach(function(b){bin+=String.fromCharCode(b);});
   var b64=btoa(bin);
-  var dataTag='<scr'+'ipt id="__family_tree_data__" data-ft-export="1" type="application/json">'+b64+'<\/sc'+'ript>';
+  var dataTag='<scr'+'ipt id="__family_tree_data__" type="application/json">'+b64+'<\/sc'+'ript>';
   var htmlAttrs='';
   Array.from(document.documentElement.attributes).forEach(function(a){
     htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
@@ -8451,26 +8261,6 @@ deletePerson=function(id){
 
   var dataLoaded=false;
 
-  // 0. إذا كان هذا الملف نسخة تصدير مستقلة، ففضّل البيانات المضمّنة
-  try{
-    var exportTag=document.getElementById('__family_tree_data__');
-    var isSnapshotExport=!!(exportTag&&exportTag.getAttribute('data-ft-export')==='1');
-    if(isSnapshotExport&&exportTag&&exportTag.textContent){
-      var snapshotData=_ftDecodeExportSnapshot(exportTag.textContent.replace(/\s/g,''));
-      if(snapshotData&&snapshotData.people&&snapshotData.people.length){
-        people=snapshotData.people;nextId=snapshotData.nextId||1;relPairs=snapshotData.relPairs||[];
-        if(snapshotData.myPersonId){myPersonId=parseInt(snapshotData.myPersonId);saveMyPerson();}
-        people.forEach(function(p){expanded[p.id]=false;});
-        migrateExternalSpouses();
-        _ftApplyExportDataExtras(snapshotData);
-        _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
-        _lsSave({people:people,relPairs:relPairs,nextId:nextId});
-        dataLoaded=true;
-        console.log('[Init] Loaded snapshot export:',people.length,'persons');
-      }
-    }
-  }catch(e){console.warn('[Init] Snapshot export load failed',e);}
-
   // 1. محاولة IDB — أعلى أولوية (آخر تغيير حفظه المستخدم)
   try{
     var idbData=await _idbLoad();
@@ -8520,7 +8310,6 @@ deletePerson=function(id){
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
-            _ftApplyExportDataExtras(d);
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
             _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
             _lsSave({people:people,relPairs:relPairs,nextId:nextId});
