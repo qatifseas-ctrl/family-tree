@@ -2132,82 +2132,107 @@ function renderStats(){
       </div>
     </div>`).join('');
 }
+
+
+function _ftBuildExportPayload(includeFamilyMeta){
+  var payload={
+    people:JSON.parse(JSON.stringify(people||[])),
+    relPairs:JSON.parse(JSON.stringify(relPairs||[])),
+    nextId:nextId,
+    myPersonId:myPersonId||null,
+    settings:{
+      CLOUD_CONFIG:{
+        KEY_HEX:(CLOUD_CONFIG&&CLOUD_CONFIG.KEY_HEX)||'',
+        GITHUB_PAT:(CLOUD_CONFIG&&CLOUD_CONFIG.GITHUB_PAT)||'',
+        GIST_ID:(CLOUD_CONFIG&&CLOUD_CONFIG.GIST_ID)||'',
+        GIST_FILE:(CLOUD_CONFIG&&CLOUD_CONFIG.GIST_FILE)||'ft_encrypted.dat'
+      },
+      FAMILY_UPLOAD_CONFIG:{
+        GITHUB_PAT:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT)||'',
+        GIST_ID:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GIST_ID)||'',
+        KEY_HEX:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.KEY_HEX)||''
+      }
+    }
+  };
+  if(includeFamilyMeta){
+    payload._familyMeta={
+      deviceId:FAMILY_DEVICE_ID||localStorage.getItem('ft_family_device_id')||'',
+      pat:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT)||'',
+      gistId:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.GIST_ID)||'',
+      keyHex:(FAMILY_UPLOAD_CONFIG&&FAMILY_UPLOAD_CONFIG.KEY_HEX)||''
+    };
+  }
+  return payload;
+}
+
+function _ftEncodeExportPayload(payload){
+  var json=JSON.stringify(payload).replace(/</g,'\\u003c');
+  var bytes=new TextEncoder().encode(json);
+  var bin='';
+  bytes.forEach(function(b){bin+=String.fromCharCode(b);});
+  return btoa(bin);
+}
+
+function _ftBuildDataTag(payload){
+  return '<scr'+'ipt id="__family_tree_data__" type="application/json">'+_ftEncodeExportPayload(payload)+'<\/scr'+'ipt>';
+}
+
+function _ftApplyImportedSettings(data){
+  if(!data||!data.settings)return;
+  var sc=data.settings.CLOUD_CONFIG||data.settings.cloudConfig||null;
+  if(sc){
+    if(typeof sc.KEY_HEX==='string')CLOUD_CONFIG.KEY_HEX=sc.KEY_HEX;
+    if(typeof sc.GITHUB_PAT==='string')CLOUD_CONFIG.GITHUB_PAT=sc.GITHUB_PAT;
+    if(typeof sc.GIST_ID==='string')CLOUD_CONFIG.GIST_ID=sc.GIST_ID;
+    if(typeof sc.GIST_FILE==='string')CLOUD_CONFIG.GIST_FILE=sc.GIST_FILE;
+  }
+  var fc=data.settings.FAMILY_UPLOAD_CONFIG||data.settings.familyUploadConfig||null;
+  if(fc){
+    if(typeof fc.GITHUB_PAT==='string')FAMILY_UPLOAD_CONFIG.GITHUB_PAT=fc.GITHUB_PAT;
+    if(typeof fc.GIST_ID==='string')FAMILY_UPLOAD_CONFIG.GIST_ID=fc.GIST_ID;
+    if(typeof fc.KEY_HEX==='string')FAMILY_UPLOAD_CONFIG.KEY_HEX=fc.KEY_HEX;
+  }
+}
+
+function _ftBuildStandaloneExportHTML(opts){
+  opts=opts||{};
+  var payload=_ftBuildExportPayload(!!opts.familyMeta);
+  var dataTag=_ftBuildDataTag(payload);
+  var htmlAttrs='';
+  Array.from(document.documentElement.attributes).forEach(function(a){
+    htmlAttrs+=' '+a.name+'="'+String(a.value).replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
+  });
+  var cleanAppHTML='';
+  try{
+    var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
+    var tApp=tDoc.getElementById('app');
+    if(tApp)cleanAppHTML=tApp.outerHTML;
+  }catch(ex){}
+  if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+  var mainSrc=document.scripts[document.scripts.length-1].textContent;
+  if(opts.family){
+    mainSrc=mainSrc.replace(/const IS_FAMILY_COPY\s*=\s*false/,'const IS_FAMILY_COPY = true');
+  }
+  return '<!DOCTYPE html>\n'+
+    '<html'+htmlAttrs+'>\n'+
+    document.head.outerHTML+'\n'+
+    '<body>\n'+
+    cleanAppHTML+'\n'+
+    '<div id="modalContainer"></div>\n'+
+    dataTag+'\n'+
+    '<scr'+'ipt>\n'+mainSrc+'\n<\/scr'+'ipt>\n'+
+    '</body>\n</html>';
+}
+
+
 function exportData(){
   closeModal();
   setTimeout(function(){
     try{
-      // ── 1. Build data payload ──
-      var payload=JSON.stringify({people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null});
-      var bytes=new TextEncoder().encode(payload);
-      var bin='';bytes.forEach(function(b){bin+=String.fromCharCode(b);});
-      var b64=btoa(bin);
-      var dataTag='<scr'+'ipt id="__family_tree_data__" type="application/json">'+b64+'<\/sc'+'ript>';
-
-      // ── 2. Build <html> tag with original attributes ──
-      var htmlAttrs='';
-      Array.from(document.documentElement.attributes).forEach(function(a){
-        htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
-      });
-
-      // ── 3. Get clean #app (pre-render, from _HTML_TEMPLATE via DOMParser) ──
-      var cleanAppHTML='';
-      try{
-        var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-        var tApp=tDoc.getElementById('app');
-        if(tApp)cleanAppHTML=tApp.outerHTML;
-      }catch(ex){}
-      if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
-
-      // ── 4. Get exact main script source (last script element = main app) ──
-      var mainSrc=document.scripts[document.scripts.length-1].textContent;
-
-      // ── تضمين CLOUD_CONFIG في الملف المحفوظ ──
-      if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
-        let gistIdToEmbed=CLOUD_CONFIG.GIST_ID||localStorage.getItem(CLOUD_GIST_KEY)||'';
-        // استبدال الكتلة كاملةً بدلاً من حقل بحقل لتفادي الخلط مع FAMILY_UPLOAD_CONFIG
-        mainSrc=mainSrc.replace(
-          /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
-          "const CLOUD_CONFIG = {\n" +
-          "  KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"',\n" +
-          "  GITHUB_PAT: '"+CLOUD_CONFIG.GITHUB_PAT+"',\n" +
-          "  GIST_ID: '"+gistIdToEmbed+"',  // ← يُملأ تلقائياً\n" +
-          "  GIST_FILE: '"+(CLOUD_CONFIG.GIST_FILE||'ft_encrypted.dat')+"',\n" +
-          "}"
-        );
-      }
-
-      // ── تضمين FAMILY_UPLOAD_CONFIG في نسخة المالك أيضاً ──
-      {
-        let fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
-        let fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
-        let fuKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||'';
-        if(fuPat||fuGid){
-          mainSrc=mainSrc.replace(
-            /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
-            "const FAMILY_UPLOAD_CONFIG = {\n" +
-            "  GITHUB_PAT: '"+fuPat+"',\n" +
-            "  GIST_ID: '"+fuGid+"',\n" +
-            "  KEY_HEX: '"+fuKey+"',\n" +
-            "}"
-          );
-        }
-      }
-
-      // ── 5. Assemble complete, valid HTML ──
-      var src='<!DOCTYPE html>\n'+
-        '<html'+htmlAttrs+'>\n'+
-        document.head.outerHTML+'\n'+
-        '<body>\n'+
-        cleanAppHTML+'\n'+
-        '<div id="modalContainer"></div>\n'+
-        dataTag+'\n'+
-        '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-        '</body>\n</html>';
-
-      // ── 6. Download ──
+      var html=_ftBuildStandaloneExportHTML({family:false});
       var d=new Date();
       var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      var blob=new Blob([src],{type:'text/html;charset=utf-8'});
+      var blob=new Blob([html],{type:'text/html;charset=utf-8'});
       var url=URL.createObjectURL(blob);
       var lnk=document.createElement('a');
       lnk.href=url;lnk.download='family_tree_'+stamp+'.html';
@@ -2216,11 +2241,11 @@ function exportData(){
       showSaveToast();
     }catch(err){
       alert('خطأ في الحفظ: '+err.message);
+      console.error(err);
     }
   },100);
 }
 
-// ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
 // تصدير JSON — بدون صور / مع صور / للعائلة (مع Gist + Device ID)
 // ═══════════════════════════════════════════════════════════════
@@ -2422,6 +2447,8 @@ function doImport(mode){
       migrateExternalSpouses();
       _invalidateAll();
       if(people.length)expanded[people[0].id]=true;
+      _ftApplyImportedSettings(d);
+      _ftApplyImportedSettings(d);
       _applyFamilyMetaIfNeeded(d);
       saveData();renderAll();updateMyPersonBtn();
       setTimeout(()=>alert(`✔ تم الاستيراد بنجاح! (${people.length} فرد)`),200);
@@ -5095,6 +5122,53 @@ async function _doSilentFamilyUpload(){
   }finally{_familyUploading=false;}
 }
 
+
+
+function exportFamilyCopy(){
+  openFamilyExportChoiceModal();
+}
+
+function openFamilyExportChoiceModal(){
+  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:440px">
+    <h3>📤 نسخة العائلة</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.7">اختر نوع النسخة:</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div onclick="exportFamilyZipCopy()" style="cursor:pointer;padding:14px 16px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;">📦 حزمة PWA ZIP</div>
+        <div style="font-size:12px;color:var(--text2);">نسخة جاهزة للتثبيت على الأجهزة كـ PWA.</div>
+      </div>
+      <div onclick="exportFamilyHTMLCopy()" style="cursor:pointer;padding:14px 16px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;">💾 ملف HTML للعائلة</div>
+        <div style="font-size:12px;color:var(--text2);">يتضمن البيانات والصور والإعدادات وبيانات الرفع الخاصة بالعائلة.</div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal()">إلغاء</button></div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=html;
+}
+
+function exportFamilyHTMLCopy(){
+  closeModal();
+  setTimeout(function(){
+    try{
+      var html=_ftBuildStandaloneExportHTML({family:true,familyMeta:true});
+      var d=new Date();
+      var stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      var blob=new Blob([html],{type:'text/html;charset=utf-8'});
+      var url=URL.createObjectURL(blob);
+      var lnk=document.createElement('a');
+      lnk.href=url;lnk.download='family_tree_family_'+stamp+'.html';
+      document.body.appendChild(lnk);lnk.click();
+      setTimeout(function(){document.body.removeChild(lnk);URL.revokeObjectURL(url);},1500);
+      showSaveToast();
+    }catch(err){
+      alert('خطأ في حفظ نسخة العائلة HTML: '+err.message);
+      console.error(err);
+    }
+  },100);
+}
+
 // ══════════════════════════════════════════════════════════
 //  واجهة المالك — إعداد نسخة العائلة
 // ══════════════════════════════════════════════════════════
@@ -6768,7 +6842,7 @@ function _showCloudButtons(show){
 // ══════════════════════════════════════════════════════════════
 //  exportFamilyCopy — يُصدِّر ZIP كامل يعمل كـ PWA مباشرةً
 // ══════════════════════════════════════════════════════════════
-async function exportFamilyCopy(){
+async function exportFamilyZipCopy(){
   closeModal();
 
   // ── تحقق من وجود JSZip ──
@@ -7242,41 +7316,9 @@ let _fsaSaving=false;
 let _fsaEnabled=false;
 
 // بناء HTML الكامل مع البيانات مضمّنة
+
 function _buildSaveHTML(){
-  var payload=JSON.stringify({people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null});
-  var bytes=new TextEncoder().encode(payload);
-  var bin='';bytes.forEach(function(b){bin+=String.fromCharCode(b);});
-  var b64=btoa(bin);
-  var dataTag='<scr'+'ipt id="__family_tree_data__" type="application/json">'+b64+'<\/sc'+'ript>';
-  var htmlAttrs='';
-  Array.from(document.documentElement.attributes).forEach(function(a){
-    htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
-  });
-  var cleanAppHTML='';
-  try{
-    var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-    var tApp=tDoc.getElementById('app');
-    if(tApp)cleanAppHTML=tApp.outerHTML;
-  }catch(ex){}
-  if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
-  var mainSrc=document.scripts[document.scripts.length-1].textContent;
-  // تضمين إعدادات السحابة
-  if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
-    mainSrc=mainSrc.replace(/KEY_HEX:\s*'[^']*'/,"KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"'")
-                   .replace(/GITHUB_PAT:\s*'[^']*'/,"GITHUB_PAT: '"+CLOUD_CONFIG.GITHUB_PAT+"'");
-  }
-  // تضمين إعدادات رفع العائلة إذا كانت نسخة عائلة
-  if(IS_FAMILY_COPY&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT){
-    var fek=FAMILY_UPLOAD_CONFIG.KEY_HEX||CLOUD_CONFIG.KEY_HEX||'';
-    mainSrc=mainSrc
-      .replace(/(FAMILY_UPLOAD_CONFIG[\s\S]*?GITHUB_PAT\s*:\s*')[^']*(')/,'$1'+FAMILY_UPLOAD_CONFIG.GITHUB_PAT+'$2')
-      .replace(/(FAMILY_UPLOAD_CONFIG[\s\S]*?GIST_ID\s*:\s*')[^']*(')/,'$1'+(FAMILY_UPLOAD_CONFIG.GIST_ID||'')+'$2')
-      .replace(/(FAMILY_UPLOAD_CONFIG[\s\S]*?KEY_HEX\s*:\s*')[^']*(')/,'$1'+fek+'$2');
-    mainSrc=mainSrc.replace(/const IS_FAMILY_COPY\s*=\s*false/,'const IS_FAMILY_COPY = true');
-  }
-  return '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+document.head.outerHTML+'\n<body>\n'+
-    cleanAppHTML+'\n<div id="modalContainer"></div>\n'+dataTag+'\n'+
-    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
+  return _ftBuildStandaloneExportHTML({family:false});
 }
 
 async function _fsaWriteNow(){
@@ -7498,6 +7540,13 @@ deletePerson=function(id){
           if(d.people&&d.people.length){
             people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
+            if(d.photos&&typeof d.photos==='object'){
+              people.forEach(function(p){
+                if(!p.photo&&d.photos[p.id])p.photo=d.photos[p.id];
+              });
+            }
+            _ftApplyImportedSettings(d);
+            _applyFamilyMetaIfNeeded(d);
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
