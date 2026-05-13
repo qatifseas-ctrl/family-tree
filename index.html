@@ -1020,7 +1020,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   <div class="sheet-btns" id="mob-sheet-btns"></div>
 </div>
 
-<script id="__main_app_script__">
+<script>
 var _HTML_TEMPLATE=document.documentElement.outerHTML;
 
 /* ══════════════════════════════════════════════════════════
@@ -3031,7 +3031,7 @@ function exportData(){
       if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
 
       // ── 4. Get exact main script source (last script element = main app) ──
-      var mainSrc=document.getElementById('__main_app_script__').textContent;
+      var mainSrc=document.scripts[document.scripts.length-1].textContent;
 
       // ── تضمين CLOUD_CONFIG في الملف المحفوظ ──
       if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
@@ -3073,7 +3073,7 @@ function exportData(){
         cleanAppHTML+'\n'+
         '<div id="modalContainer"></div>\n'+
         dataTag+'\n'+
-        '<scr'+'ipt id="__main_app_script__">\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+        '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
         '</body>\n</html>';
 
       // ── 6. Download ──
@@ -7679,7 +7679,7 @@ async function exportFamilyCopy(){
     if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
 
     // الكود المصدري — تعديل الثوابت
-    var mainSrc=document.getElementById('__main_app_script__').textContent;
+    var mainSrc=document.scripts[document.scripts.length-1].textContent;
 
     // 1a. حذف CLOUD_CONFIG كاملاً — لا مفاتيح المالك السحابية في نسخة العائلة
     mainSrc=mainSrc.replace(
@@ -7714,7 +7714,7 @@ async function exportFamilyCopy(){
       '<body>\n'+
       cleanAppHTML+'\n'+
       '<div id="modalContainer"></div>\n'+
-      '<scr'+'ipt id="__main_app_script__">\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+      '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
       '</body>\n</html>';
 
     // ════ 2. manifest.json ════
@@ -7741,7 +7741,7 @@ async function exportFamilyCopy(){
     var swContent=`/* شجرة العائلة — Service Worker */
 const CACHE_NAME='family-tree-v1';
 const SHELL_CACHE='family-tree-shell-v1';
-const STATIC_ASSETS=['./manifest.json','./icons/icon-192x192.png','./icons/icon-512x512.png','./icons/apple-touch-icon.png'];
+const STATIC_ASSETS=['./manifest.json','./icons/icon-192x192.png','./icons/icon-512x512.png','./icons/icon-maskable-192x192.png','./icons/icon-maskable-512x512.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL_CACHE).then(c=>c.addAll(STATIC_ASSETS)).then(()=>self.skipWaiting()).catch(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME&&k!==SHELL_CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{
@@ -7763,19 +7763,60 @@ async function cacheFirst(req){
 }
 self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting();});`;
 
-    // ════ 4. جلب الأيقونات ════
-    _toast.innerHTML='⏳ جارٍ تحميل الأيقونات...';
-    var iconFiles=[
-      'icons/apple-touch-icon.png','icons/icon-72x72.png','icons/icon-96x96.png',
-      'icons/icon-128x128.png','icons/icon-144x144.png','icons/icon-152x152.png',
-      'icons/icon-192x192.png','icons/icon-384x384.png','icons/icon-512x512.png',
-      'icons/icon-maskable-192x192.png','icons/icon-maskable-512x512.png'
+    // ════ 4. توليد الأيقونات داخلياً ════
+    _toast.innerHTML='⏳ جارٍ توليد الأيقونات...';
+    function loadImage(src){
+      return new Promise(function(resolve,reject){
+        var img=new Image();
+        img.onload=function(){resolve(img);};
+        img.onerror=function(){reject(new Error('Failed to load '+src));};
+        img.src=src;
+      });
+    }
+    function canvasToArrayBuffer(canvas){
+      return new Promise(function(resolve){
+        canvas.toBlob(function(blob){
+          if(!blob){resolve(null);return;}
+          blob.arrayBuffer().then(resolve);
+        },'image/png');
+      });
+    }
+    function renderIcon(source,size,maskable){
+      var canvas=document.createElement('canvas');
+      canvas.width=size;canvas.height=size;
+      var ctx=canvas.getContext('2d');
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality='high';
+      if(maskable){
+        var pad=Math.round(size*0.08);
+        var target=size-pad*2;
+        ctx.drawImage(source,pad,pad,target,target);
+      }else{
+        ctx.drawImage(source,0,0,size,size);
+      }
+      return canvas;
+    }
+    var sourceIcon=await loadImage('./icons/icon-512x512.png');
+    var iconSpecs=[
+      {path:'icons/apple-touch-icon.png',size:180,purpose:'any'},
+      {path:'icons/icon-72x72.png',size:72,purpose:'any'},
+      {path:'icons/icon-96x96.png',size:96,purpose:'any'},
+      {path:'icons/icon-128x128.png',size:128,purpose:'any'},
+      {path:'icons/icon-144x144.png',size:144,purpose:'any'},
+      {path:'icons/icon-152x152.png',size:152,purpose:'any'},
+      {path:'icons/icon-192x192.png',size:192,purpose:'any'},
+      {path:'icons/icon-384x384.png',size:384,purpose:'any'},
+      {path:'icons/icon-512x512.png',size:512,purpose:'any'},
+      {path:'icons/icon-maskable-192x192.png',size:192,purpose:'maskable'},
+      {path:'icons/icon-maskable-512x512.png',size:512,purpose:'maskable'}
     ];
     var iconData={};
-    await Promise.all(iconFiles.map(async function(path){
-      try{var resp=await fetch('./'+path);if(resp.ok)iconData[path]=await resp.arrayBuffer();}
-      catch(e){console.warn('Could not fetch icon:',path);}
-    }));
+    for(var i=0;i<iconSpecs.length;i++){
+      var spec=iconSpecs[i];
+      var canvas=renderIcon(sourceIcon,spec.size,spec.purpose==='maskable');
+      var buffer=await canvasToArrayBuffer(canvas);
+      if(buffer)iconData[spec.path]=buffer;
+    }
 
     // ════ 5. دليل الاستضافة ════
     var guide=`# 🌳 شجرة العائلة — دليل رفع نسخة العائلة
@@ -7786,7 +7827,7 @@ family-tree-pwa/
 ├── index.html       ← التطبيق (بدون بيانات — يطلب استيراد JSON)
 ├── manifest.json
 ├── sw.js
-└── icons/  (11 أيقونة PNG)
+└── icons/  (11 أيقونة PNG تولَّد داخليًا)
 \`\`\`
 
 ## رفع على GitHub Pages (مجاني — مُوصى به)
@@ -8131,7 +8172,7 @@ function _buildSaveHTML(){
     if(tApp)cleanAppHTML=tApp.outerHTML;
   }catch(ex){}
   if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
-  var mainSrc=document.getElementById('__main_app_script__').textContent;
+  var mainSrc=document.scripts[document.scripts.length-1].textContent;
   // تضمين إعدادات السحابة
   if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
     mainSrc=mainSrc.replace(/KEY_HEX:\s*'[^']*'/,"KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"'")
@@ -8148,7 +8189,7 @@ function _buildSaveHTML(){
   }
   return '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+document.head.outerHTML+'\n<body>\n'+
     cleanAppHTML+'\n<div id="modalContainer"></div>\n'+dataTag+'\n'+
-    '<scr'+'ipt id="__main_app_script__">\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
+    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
 }
 
 async function _fsaWriteNow(){
