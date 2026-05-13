@@ -2159,7 +2159,7 @@ function exportData(){
       if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
 
       // ── 4. Get exact main script source (last script element = main app) ──
-      var mainSrc=document.scripts[document.scripts.length-1].textContent;
+      var mainSrc=document.getElementById('__main_app_script__').textContent;
 
       // ── تضمين CLOUD_CONFIG في الملف المحفوظ ──
       if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
@@ -2201,7 +2201,7 @@ function exportData(){
         cleanAppHTML+'\n'+
         '<div id="modalContainer"></div>\n'+
         dataTag+'\n'+
-        '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+        '<scr'+'ipt id="__main_app_script__">\n'+mainSrc+'\n<\/sc'+'ript>\n'+
         '</body>\n</html>';
 
       // ── 6. Download ──
@@ -6807,7 +6807,7 @@ async function exportFamilyCopy(){
     if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
 
     // الكود المصدري — تعديل الثوابت
-    var mainSrc=document.scripts[document.scripts.length-1].textContent;
+    var mainSrc=document.getElementById('__main_app_script__').textContent;
 
     // 1a. حذف CLOUD_CONFIG كاملاً — لا مفاتيح المالك السحابية في نسخة العائلة
     mainSrc=mainSrc.replace(
@@ -6842,7 +6842,7 @@ async function exportFamilyCopy(){
       '<body>\n'+
       cleanAppHTML+'\n'+
       '<div id="modalContainer"></div>\n'+
-      '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
+      '<scr'+'ipt id="__main_app_script__">\n'+mainSrc+'\n<\/sc'+'ript>\n'+
       '</body>\n</html>';
 
     // ════ 2. manifest.json ════
@@ -7259,7 +7259,7 @@ function _buildSaveHTML(){
     if(tApp)cleanAppHTML=tApp.outerHTML;
   }catch(ex){}
   if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
-  var mainSrc=document.scripts[document.scripts.length-1].textContent;
+  var mainSrc=document.getElementById('__main_app_script__').textContent;
   // تضمين إعدادات السحابة
   if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
     mainSrc=mainSrc.replace(/KEY_HEX:\s*'[^']*'/,"KEY_HEX: '"+CLOUD_CONFIG.KEY_HEX+"'")
@@ -7276,7 +7276,7 @@ function _buildSaveHTML(){
   }
   return '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+document.head.outerHTML+'\n<body>\n'+
     cleanAppHTML+'\n<div id="modalContainer"></div>\n'+dataTag+'\n'+
-    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
+    '<scr'+'ipt id="__main_app_script__">\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
 }
 
 async function _fsaWriteNow(){
