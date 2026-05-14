@@ -1067,7 +1067,7 @@ function _applyMobileMode(){
     btn.title='وضع الجوال: شجرة أخف وأسرع';
   }
   let tip=document.getElementById('mobileHtmlTip');
-  if(tip)tip.style.display=_mobileMode?'block':'none';
+  if(tip)tip.style.display='none';
 }
 
 // تبديل فتح/إغلاق فرع في وضع الجوال (بدون إغلاق الإخوة)
@@ -7751,26 +7751,52 @@ async function exportFamilyCopy(){
       '</body>\n</html>';
 
     // ════ 2. manifest.json ════
-    var manifestContent=JSON.stringify({
-      name:'شجرة العائلة',short_name:'العائلة',
-      description:'شجرة عائلية تفاعلية',
-      start_url:'./index.html',scope:'./',display:'standalone',orientation:'any',
-      background_color:'#f3f4f6',theme_color:'#3b82f6',lang:'ar',dir:'rtl',
-      icons:[
-        {src:'icons/icon-72x72.png',sizes:'72x72',type:'image/png',purpose:'any'},
-        {src:'icons/icon-96x96.png',sizes:'96x96',type:'image/png',purpose:'any'},
-        {src:'icons/icon-128x128.png',sizes:'128x128',type:'image/png',purpose:'any'},
-        {src:'icons/icon-144x144.png',sizes:'144x144',type:'image/png',purpose:'any'},
-        {src:'icons/icon-152x152.png',sizes:'152x152',type:'image/png',purpose:'any'},
-        {src:'icons/icon-192x192.png',sizes:'192x192',type:'image/png',purpose:'any'},
-        {src:'icons/icon-384x384.png',sizes:'384x384',type:'image/png',purpose:'any'},
-        {src:'icons/icon-512x512.png',sizes:'512x512',type:'image/png',purpose:'any'},
-        {src:'icons/icon-maskable-192x192.png',sizes:'192x192',type:'image/png',purpose:'maskable'},
-        {src:'icons/icon-maskable-512x512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}
-      ]
-    },null,2);
+    var sourceManifest=null;
+    try{
+      var mfResp=await fetch('./manifest.json',{cache:'no-store'});
+      if(mfResp&&mfResp.ok) sourceManifest=await mfResp.json();
+    }catch(ex){}
 
-    // ════ 3. sw.js — Network-First لـ index.html (يمنع تحميل HTML قديم من الكاش) ════
+    var manifestBase=(sourceManifest&&typeof sourceManifest==='object')?sourceManifest:{};
+    manifestBase.name='شجرة العائلة';
+    manifestBase.short_name='العائلة';
+    manifestBase.description='شجرة عائلية تفاعلية';
+    manifestBase.start_url='./index.html';
+    manifestBase.scope='./';
+    manifestBase.display='standalone';
+    manifestBase.orientation='any';
+    manifestBase.background_color='#f3f4f6';
+    manifestBase.theme_color='#3b82f6';
+    manifestBase.lang='ar';
+    manifestBase.dir='rtl';
+    manifestBase.categories=Array.isArray(manifestBase.categories)?manifestBase.categories:['lifestyle','utilities'];
+
+    // نُبقي أيقونات النسخة الحالية ونضمن وجود أيقونات أندرويد/المكشّفة
+    var iconList=Array.isArray(manifestBase.icons)?manifestBase.icons.slice():[];
+    var ensureIcon=function(src,sizes,purpose){
+      if(!iconList.some(function(i){ return i&&i.src===src&&i.sizes===sizes&&i.purpose===purpose; })){
+        iconList.push({src:src,sizes:sizes,type:'image/png',purpose:purpose});
+      }
+    };
+    ensureIcon('icons/icon-72x72.png','72x72','any');
+    ensureIcon('icons/icon-96x96.png','96x96','any');
+    ensureIcon('icons/icon-128x128.png','128x128','any');
+    ensureIcon('icons/icon-144x144.png','144x144','any');
+    ensureIcon('icons/icon-152x152.png','152x152','any');
+    ensureIcon('icons/icon-192x192.png','192x192','any');
+    ensureIcon('icons/icon-384x384.png','384x384','any');
+    ensureIcon('icons/icon-512x512.png','512x512','any');
+    ensureIcon('icons/icon-maskable-192x192.png','192x192','maskable');
+    ensureIcon('icons/icon-maskable-512x512.png','512x512','maskable');
+
+    // دعم أفضل لأيقونة أندرويد: نضيف نسخة purpose="any maskable" إن لم تكن موجودة
+    ensureIcon('icons/icon-192x192.png','192x192','any maskable');
+    ensureIcon('icons/icon-512x512.png','512x512','any maskable');
+
+    manifestBase.icons=iconList;
+    var manifestContent=JSON.stringify(manifestBase,null,2);
+
+// ════ 3. sw.js — Network-First لـ index.html (يمنع تحميل HTML قديم من الكاش) ════
     var swContent=`/* شجرة العائلة — Service Worker */
 const CACHE_NAME='family-tree-v1';
 const SHELL_CACHE='family-tree-shell-v1';
@@ -8225,7 +8251,7 @@ function _updateFsaBtn(state){
     if(bar)bar.style.display='none';
   }else if(state==='prompt'){
     if(bar){
-      bar.style.display='flex';
+      bar.style.display=document.body.classList.contains('mobile-mode')?'flex':'none';
       var hint=document.getElementById('fsaHint');
       if(hint)hint.textContent='لضمان حفظ بياناتك على الجوال، اربط التطبيق بملف الـ HTML الخاص بك';
     }
@@ -8318,8 +8344,8 @@ function _fsaShowFallbackBar(){
   // للمتصفحات التي لا تدعم FSA — نُظهر زر التحميل اليدوي
   var bar=document.getElementById('fsaBar');
   if(bar){
-    bar.style.display='flex';
-    var hint=document.getElementById('fsaHint');
+      bar.style.display=document.body.classList.contains('mobile-mode')?'flex':'none';
+      var hint=document.getElementById('fsaHint');
     if(hint)hint.textContent='متصفحك لا يدعم الحفظ التلقائي — اضغط "💾 حفظ نسخة" بعد كل تعديل';
     var btn=document.getElementById('fsaSaveBtn');
     if(btn){btn.innerHTML='💾 حفظ نسخة';btn.onclick=exportData;}
