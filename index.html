@@ -1288,6 +1288,32 @@ function _getFamilyGistFileName(){
   return 'ft_family_'+id+'.dat';
 }
 
+// ملف لَقطة جديدة لكل رفع عائلة حتى لا تُستبدل النسخ السابقة
+function _getFamilySnapshotFileName(){
+  var id=FAMILY_DEVICE_ID||localStorage.getItem('ft_family_device_id')||'';
+  if(!id){
+    id=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    try{localStorage.setItem('ft_family_device_id',id);}catch(e){}
+  }
+  let ts=new Date().toISOString().replace(/[-:]/g,'').replace(/\./g,'').replace('Z','Z');
+  let seq=0;
+  try{
+    seq=(Number(localStorage.getItem('ft_family_upload_seq')||'0')||0)+1;
+    localStorage.setItem('ft_family_upload_seq',String(seq));
+  }catch(e){
+    seq=1;
+  }
+  return 'ft_family_'+id+'_'+ts+'_'+String(seq).padStart(3,'0')+'.dat';
+}
+
+// استخراج مُعرّف الجهاز من اسم الملف، سواء كان قديماً أو لقطة جديدة
+function _familyDeviceIdFromFileName(name){
+  let n=String(name||'');
+  let m=n.match(/^ft_family_([^_]+?)(?:_[^_]+)?\.dat$/i);
+  if(m&&m[1])return m[1];
+  return n.replace(/^ft_family_/i,'').replace(/\.dat$/i,'');
+}
+
 let people=[],expanded={},nextId=1,relPairs=[],currentAddParentId=null,currentEditId=null,editingSpouses=[],editingChildren=[],editingRelatives=[],tempPhoto=null;
 // ── Navigation State (Two-layer family system) ──
 let navStack=[];           // [{label, filter, scrollY}]
@@ -5968,6 +5994,20 @@ async function _doSilentFamilyUpload(){
     let data=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null,uploadedAt:new Date().toISOString()}));
     data.people.forEach(p=>{if(p.photo)delete p.photo;});
     let plain=JSON.stringify(data);
+
+    // لا نرفع نسخة مطابقة إذا لم تتغير البيانات
+    try{
+      let plainHashBuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(plain));
+      let plainHash=[...new Uint8Array(plainHashBuf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+      let lastHash=localStorage.getItem('ft_family_last_upload_hash_v1')||'';
+      if(lastHash===plainHash){
+        console.debug('[FamilyUpload] unchanged snapshot skipped');
+        _familyUploading=false;
+        return;
+      }
+      localStorage.setItem('ft_family_last_upload_hash_v1',plainHash);
+    }catch(e){}
+
     // AES-256-GCM دائماً — بدون بديل
     let keyBytes=_hexToBytes(activeKey);
     let cryptoKey=await crypto.subtle.importKey('raw',keyBytes,{name:'AES-GCM'},false,['encrypt']);
@@ -5979,15 +6019,18 @@ async function _doSilentFamilyUpload(){
     let gistId=_getFamilyUploadGistId();
     let familyPat=_getFamilyUploadPat();
     let headers={'Authorization':'token '+familyPat,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+    let fileName=_getFamilySnapshotFileName();
+    let payload={files:{}};
+    payload.files[fileName]={content};
     if(gistId){
-      let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify({files:{[_getFamilyGistFileName()]:{content}}})});
+      let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify(payload)});
       if(!res.ok){
         // Gist ربما محذوف — أنشئ جديداً
-        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
+        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:payload.files})});
         if(r2.ok){let j=await r2.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
       }
     } else {
-      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
+      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:payload.files})});
       if(res.ok){let j=await res.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
     }
   }catch(e){
@@ -6557,7 +6600,7 @@ async function openFamilyUpdatesModal(){
         let data=await _familyParseUpdateRaw(raw,keyHex);
         if(data&&Array.isArray(data.people)){
           let summary=_familySummarizeUpdate(data);
-          let devId=ff.filename.replace(/^ft_family_/i,'').replace(/\.dat$/i,'');
+          let devId=_familyDeviceIdFromFileName(ff.filename);
           updates.push({
             devId,data,summary,
             pCount:(data.people||[]).length,
@@ -6573,11 +6616,16 @@ async function openFamilyUpdatesModal(){
       }catch(ex){
         let msg=String(ex&&ex.message?ex.message:ex||'خطأ غير معروف');
         errorHints.push((ff.filename||'unknown')+': '+msg);
-        updates.push({devId:(ff.filename||'unknown').replace(/^ft_family_/i,'').replace(/\.dat$/i,''),error:msg,filename:ff.filename});
+        updates.push({devId:_familyDeviceIdFromFileName(ff.filename||'unknown'),error:msg,filename:ff.filename});
       }
     }
 
-    let okUpdates=updates.filter(u=>!u.error&&u.data);
+    let okUpdates=updates.filter(u=>!u.error&&u.data).sort((a,b)=>{
+      let ta=Date.parse(a.ts||'')||0;
+      let tb=Date.parse(b.ts||'')||0;
+      if(tb!==ta)return tb-ta;
+      return String(b.filename||'').localeCompare(String(a.filename||''));
+    });
     if(!okUpdates.length){
       let hint=errorHints.length?'<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>':'';
       throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hint);
