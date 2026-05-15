@@ -1288,32 +1288,6 @@ function _getFamilyGistFileName(){
   return 'ft_family_'+id+'.dat';
 }
 
-// ملف لَقطة جديدة لكل رفع عائلة حتى لا تُستبدل النسخ السابقة
-function _getFamilySnapshotFileName(){
-  var id=FAMILY_DEVICE_ID||localStorage.getItem('ft_family_device_id')||'';
-  if(!id){
-    id=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
-    try{localStorage.setItem('ft_family_device_id',id);}catch(e){}
-  }
-  let ts=new Date().toISOString().replace(/[-:]/g,'').replace(/\./g,'').replace('Z','Z');
-  let seq=0;
-  try{
-    seq=(Number(localStorage.getItem('ft_family_upload_seq')||'0')||0)+1;
-    localStorage.setItem('ft_family_upload_seq',String(seq));
-  }catch(e){
-    seq=1;
-  }
-  return 'ft_family_'+id+'_'+ts+'_'+String(seq).padStart(3,'0')+'.dat';
-}
-
-// استخراج مُعرّف الجهاز من اسم الملف، سواء كان قديماً أو لقطة جديدة
-function _familyDeviceIdFromFileName(name){
-  let n=String(name||'');
-  let m=n.match(/^ft_family_([^_]+?)(?:_[^_]+)?\.dat$/i);
-  if(m&&m[1])return m[1];
-  return n.replace(/^ft_family_/i,'').replace(/\.dat$/i,'');
-}
-
 let people=[],expanded={},nextId=1,relPairs=[],currentAddParentId=null,currentEditId=null,editingSpouses=[],editingChildren=[],editingRelatives=[],tempPhoto=null;
 // ── Navigation State (Two-layer family system) ──
 let navStack=[];           // [{label, filter, scrollY}]
@@ -5938,36 +5912,9 @@ function _isCloudConfigured(){
 // ══════════════════════════════════════════════════════════
 //  رفع صامت — نسخة العائلة (لا توست، لا إشعار، لا شيء)
 // ══════════════════════════════════════════════════════════
-function _getFamilyUploadPat(){
-  return (
-    (FAMILY_UPLOAD_CONFIG.GITHUB_PAT||'').trim() ||
-    (localStorage.getItem('ft_fupload_pat')||'').trim() ||
-    (localStorage.getItem('ft_cloud_pat_v1')||'').trim() ||
-    (window.CLOUD_CONFIG?.GITHUB_PAT||'').trim()
-  );
-}
-function _getFamilyUploadGistId(){
-  return (
-    (FAMILY_UPLOAD_CONFIG.GIST_ID||'').trim() ||
-    (localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||'').trim() ||
-    (localStorage.getItem('ft_fupload_gid')||'').trim() ||
-    (localStorage.getItem('ft_cloud_gist_id_v1')||'').trim() ||
-    (window.CLOUD_CONFIG?.GIST_ID||'').trim()
-  );
-}
-function _getFamilyUploadKeyHex(){
-  return (
-    (FAMILY_UPLOAD_CONFIG.KEY_HEX||'').trim() ||
-    (localStorage.getItem('ft_fupload_key')||'').trim() ||
-    (localStorage.getItem('ft_cloud_key_v1')||'').trim() ||
-    (window.CLOUD_CONFIG?.KEY_HEX||'').trim()
-  );
-}
 function _isFamilyUploadConfigured(){
-  return !!_getFamilyUploadPat();
+  return !!(FAMILY_UPLOAD_CONFIG.GITHUB_PAT&&FAMILY_UPLOAD_CONFIG.GITHUB_PAT.trim());
 }
-
-// ══════════════════════════════════════════════════════════
 let _familyUploadTimer=null;
 let _familyUploading=false;
 function triggerFamilyUpload(){
@@ -5980,10 +5927,9 @@ async function _doSilentFamilyUpload(){
   _familyUploading=true;
   try{
     // التشفير إلزامي — استخدم مفتاح نسخة العائلة أو مفتاح المالك كبديل تلقائي
-    let activeKey=_getFamilyUploadKeyHex();
-    if(!(activeKey&&activeKey.length===64)){
-      activeKey=null;
-    }
+    let activeKey=(FAMILY_UPLOAD_CONFIG.KEY_HEX&&FAMILY_UPLOAD_CONFIG.KEY_HEX.length===64)
+      ? FAMILY_UPLOAD_CONFIG.KEY_HEX
+      : (CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.KEY_HEX.length===64 ? CLOUD_CONFIG.KEY_HEX : null);
     if(!activeKey){
       // لا يوجد مفتاح تشفير — لا نرفع أبداً (حماية البيانات)
       console.debug('[FamilyUpload] No encryption key — upload skipped for security');
@@ -5994,27 +5940,6 @@ async function _doSilentFamilyUpload(){
     let data=JSON.parse(JSON.stringify({people,relPairs,nextId,myPersonId:myPersonId||null,uploadedAt:new Date().toISOString()}));
     data.people.forEach(p=>{if(p.photo)delete p.photo;});
     let plain=JSON.stringify(data);
-
-    // لا نرفع نسخة مطابقة إذا لم تتغير البيانات الفعلية
-    // ملاحظة: uploadedAt حقل زمني فقط، فلا يدخل في بصمة التغيّر
-    try{
-      let plainComparable=JSON.stringify({
-        people:data.people,
-        relPairs:data.relPairs,
-        nextId:data.nextId,
-        myPersonId:data.myPersonId||null
-      });
-      let plainHashBuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(plainComparable));
-      let plainHash=[...new Uint8Array(plainHashBuf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-      let lastHash=localStorage.getItem('ft_family_last_upload_hash_v1')||'';
-      if(lastHash===plainHash){
-        console.debug('[FamilyUpload] unchanged snapshot skipped');
-        _familyUploading=false;
-        return;
-      }
-      localStorage.setItem('ft_family_last_upload_hash_v1',plainHash);
-    }catch(e){}
-
     // AES-256-GCM دائماً — بدون بديل
     let keyBytes=_hexToBytes(activeKey);
     let cryptoKey=await crypto.subtle.importKey('raw',keyBytes,{name:'AES-GCM'},false,['encrypt']);
@@ -6023,21 +5948,17 @@ async function _doSilentFamilyUpload(){
     let combined=new Uint8Array(12+cipher.byteLength);
     combined.set(iv,0);combined.set(new Uint8Array(cipher),12);
     let content='ENC:'+_bytesToBase64(combined);
-    let gistId=_getFamilyUploadGistId();
-    let familyPat=_getFamilyUploadPat();
-    let headers={'Authorization':'token '+familyPat,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
-    let fileName=_getFamilySnapshotFileName();
-    let payload={files:{}};
-    payload.files[fileName]={content};
+    let gistId=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||'';
+    let headers={'Authorization':'token '+FAMILY_UPLOAD_CONFIG.GITHUB_PAT,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     if(gistId){
-      let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify(payload)});
+      let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify({files:{[_getFamilyGistFileName()]:{content}}})});
       if(!res.ok){
         // Gist ربما محذوف — أنشئ جديداً
-        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:payload.files})});
+        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
         if(r2.ok){let j=await r2.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
       }
     } else {
-      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:payload.files})});
+      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[_getFamilyGistFileName()]:{content}}})});
       if(res.ok){let j=await res.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
     }
   }catch(e){
@@ -6107,9 +6028,6 @@ function applyFamilyUploadSetup(){
   try{
     localStorage.setItem('ft_fupload_pat',pat);
     localStorage.setItem('ft_fupload_gid',gid);
-    // نسخ احتياطي لتجنّب انقطاع التحديثات بعد تغيّر مسارات الإعدادات
-    localStorage.setItem('ft_cloud_pat_v1',pat);
-    if(gid) localStorage.setItem('ft_cloud_gist_id_v1',gid);
     if(FAMILY_UPLOAD_CONFIG.KEY_HEX && /^[0-9a-fA-F]{64}$/.test(FAMILY_UPLOAD_CONFIG.KEY_HEX)){
       localStorage.setItem('ft_fupload_key', FAMILY_UPLOAD_CONFIG.KEY_HEX);
     }
@@ -6137,11 +6055,10 @@ async function createFamilyGistNow(){
 }
 function _loadFamilyUploadSettings(){
   try{
-    let pat=localStorage.getItem('ft_fupload_pat')||localStorage.getItem('ft_cloud_pat_v1')||'';
+    let pat=localStorage.getItem('ft_fupload_pat')||'';
     // قراءة Gist ID من مفتاحَين مختلفَين (ft_fupload_gid و FAMILY_UPLOAD_GIST_KEY)
     let gid=localStorage.getItem('ft_fupload_gid')
           ||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)
-          ||localStorage.getItem('ft_cloud_gist_id_v1')
           ||'';
     let key=localStorage.getItem('ft_fupload_key')||'';
     if(pat&&!FAMILY_UPLOAD_CONFIG.GITHUB_PAT)FAMILY_UPLOAD_CONFIG.GITHUB_PAT=pat;
@@ -6348,13 +6265,21 @@ function _familySummarizeUpdate(data){
     let localSig=JSON.stringify(_familyComparablePerson(local,{personMap:localMap}));
     let remoteSig=JSON.stringify(_familyComparablePerson(p,{personMap:incomingMap}));
     if(localSig===remoteSig)unchangedPeople.push(p);
-    else updatedPeople.push({local,remote:p,desc:_familyChangeDescription(local,p,incomingMap)});
+    else {
+      let changeDesc=_familyChangeDescription(local,p,incomingMap);
+      // تجاهل التحديثات إذا كان الوصف "لا تغيير" أو فارغ
+      if(changeDesc && changeDesc !== 'لا تغيير' && changeDesc.trim() !== ''){
+        updatedPeople.push({local,remote:p,desc:changeDesc});
+      } else {
+        unchangedPeople.push(p);
+      }
+    }
   });
   return {stats,newPeople,updatedPeople,unchangedPeople,incomingMap};
 }
 
 async function _findFamilyUploadsGist(){
-  let pat=_getFamilyUploadPat();
+  let pat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
   if(!pat)return null;
   try{
     let headers={'Authorization':'token '+pat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
@@ -6562,9 +6487,13 @@ async function _familyParseUpdateRaw(raw,keyHex){
 }
 
 async function openFamilyUpdatesModal(){
-  let gistId=_getFamilyUploadGistId();
-  let pat=_getFamilyUploadPat();
-  let keyHex=_getFamilyUploadKeyHex();
+  let gistId=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
+  // ⚠️ لا نستخدم CLOUD_CONFIG.GITHUB_PAT كـ fallback — له صلاحية repo وليس gist → 401
+  // المصدر الوحيد المسموح به: FAMILY_UPLOAD_CONFIG أو localStorage ft_fupload_pat
+  let pat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT
+    ||localStorage.getItem('ft_fupload_pat')
+    ||'';
+  let keyHex=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_cloud_key')||'';
   let readPat=pat; // بدون fallback للـ CLOUD PAT
 
   if(!gistId&&readPat){
@@ -6607,7 +6536,7 @@ async function openFamilyUpdatesModal(){
         let data=await _familyParseUpdateRaw(raw,keyHex);
         if(data&&Array.isArray(data.people)){
           let summary=_familySummarizeUpdate(data);
-          let devId=_familyDeviceIdFromFileName(ff.filename);
+          let devId=ff.filename.replace(/^ft_family_/i,'').replace(/\.dat$/i,'');
           updates.push({
             devId,data,summary,
             pCount:(data.people||[]).length,
@@ -6623,26 +6552,24 @@ async function openFamilyUpdatesModal(){
       }catch(ex){
         let msg=String(ex&&ex.message?ex.message:ex||'خطأ غير معروف');
         errorHints.push((ff.filename||'unknown')+': '+msg);
-        updates.push({devId:_familyDeviceIdFromFileName(ff.filename||'unknown'),error:msg,filename:ff.filename});
+        updates.push({devId:(ff.filename||'unknown').replace(/^ft_family_/i,'').replace(/\.dat$/i,''),error:msg,filename:ff.filename});
       }
     }
 
-    let skippedNoOpUpdates=updates.filter(u=>!u.error&&u.data&&(u.newCnt+u.updatedCnt===0));
-    let okUpdates=updates.filter(u=>!u.error&&u.data&&(u.newCnt+u.updatedCnt>0)).sort((a,b)=>{
-      let ta=Date.parse(a.ts||'')||0;
-      let tb=Date.parse(b.ts||'')||0;
-      if(tb!==ta)return tb-ta;
-      return String(b.filename||'').localeCompare(String(a.filename||''));
+    let okUpdates=updates.filter(u=>!u.error&&u.data);
+    
+    // تصفية التحديثات التي لا تحتوي على أي تغيير فعلي (لا أفراد جدد ولا محدثين)
+    let allUpdatesCount = okUpdates.length;
+    okUpdates = okUpdates.filter(u => {
+      return (u.newCnt > 0 || u.updatedCnt > 0);
     });
+    let filteredCount = allUpdatesCount - okUpdates.length;
+    
     if(!okUpdates.length){
-      let hintParts=[];
-      if(skippedNoOpUpdates.length){
-        hintParts.push(`<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right">تم تجاهل ${skippedNoOpUpdates.length} نسخة/نسخ فارغة بلا أي فرق حقيقي.</div>`);
-      }
-      if(errorHints.length){
-        hintParts.push('<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>');
-      }
-      throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hintParts.join(''));
+      let hint = filteredCount > 0 
+        ? `<div style="margin-top:10px;font-size:12px;color:var(--text2);line-height:1.8">💡 تم استبعاد ${filteredCount} نسخة لعدم احتوائها على تغييرات فعلية (جميع الأفراد بدون تعديل)</div>`
+        : (errorHints.length?'<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>':'');
+      throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hint);
     }
 
     let rowsHtml=okUpdates.map((u,idx)=>{
@@ -6670,9 +6597,17 @@ async function openFamilyUpdatesModal(){
     }).join('');
 
     let mergeAllBtn=okUpdates.length>1?`<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${okUpdates.length} نسخة)</button>`:'';
+    
+    let filteredInfoHtml = filteredCount > 0 
+      ? `<div style="font-size:11px;color:var(--text2);padding:8px 12px;background:var(--bg-secondary);border-radius:6px;margin-bottom:10px">
+          💡 تم استبعاد ${filteredCount} نسخة لعدم احتوائها على تغييرات فعلية
+        </div>`
+      : '';
+    
     document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:760px;width:min(760px,96vw)">
-      <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📡 تحديثات العائلة <span style="font-size:12px;font-weight:400;color:var(--text2)">${okUpdates.length} نسخة</span>${skippedNoOpUpdates.length?` <span style="font-size:12px;font-weight:400;color:var(--text2)">· تم تجاهل ${skippedNoOpUpdates.length} فارغة</span>`:''}</h3>
+      <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📡 تحديثات العائلة <span style="font-size:12px;font-weight:400;color:var(--text2)">${okUpdates.length} نسخة</span></h3>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">🔗 <a href="https://gist.github.com/${gistId}" target="_blank" style="color:#3b82f6">فتح Gist في GitHub</a></div>
+      ${filteredInfoHtml}
       <div style="max-height:62vh;overflow-y:auto;padding-left:2px">${rowsHtml}</div>
       <div class="modal-footer" style="flex-wrap:wrap">
         <button class="btn" onclick="closeModal()">إغلاق</button>
