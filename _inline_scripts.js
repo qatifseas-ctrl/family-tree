@@ -6901,7 +6901,7 @@ self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting(
     ];
     var iconData={};
     await Promise.all(iconFiles.map(async function(path){
-      try{var iconUrl=new URL(path,location.href).href;var resp=await fetch(iconUrl,{cache:'no-store'});if(resp.ok)iconData[path]=await resp.arrayBuffer();}
+      try{var resp=await fetch('./'+path);if(resp.ok)iconData[path]=await resp.arrayBuffer();}
       catch(e){console.warn('Could not fetch icon:',path);}
     }));
 
@@ -7320,7 +7320,7 @@ function _updateFsaBtn(state){
     if(bar)bar.style.display='none';
   }else if(state==='prompt'){
     if(bar){
-      if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){bar.style.display='flex';}
+      bar.style.display='flex';
       var hint=document.getElementById('fsaHint');
       if(hint)hint.textContent='لضمان حفظ بياناتك على الجوال، اربط التطبيق بملف الـ HTML الخاص بك';
     }
@@ -7413,7 +7413,7 @@ function _fsaShowFallbackBar(){
   // للمتصفحات التي لا تدعم FSA — نُظهر زر التحميل اليدوي
   var bar=document.getElementById('fsaBar');
   if(bar){
-    if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){bar.style.display='flex';}
+    bar.style.display='flex';
     var hint=document.getElementById('fsaHint');
     if(hint)hint.textContent='متصفحك لا يدعم الحفظ التلقائي — اضغط "💾 حفظ نسخة" بعد كل تعديل';
     var btn=document.getElementById('fsaSaveBtn');
