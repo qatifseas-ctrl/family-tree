@@ -6265,15 +6265,7 @@ function _familySummarizeUpdate(data){
     let localSig=JSON.stringify(_familyComparablePerson(local,{personMap:localMap}));
     let remoteSig=JSON.stringify(_familyComparablePerson(p,{personMap:incomingMap}));
     if(localSig===remoteSig)unchangedPeople.push(p);
-    else {
-      let changeDesc=_familyChangeDescription(local,p,incomingMap);
-      // تجاهل التحديثات إذا كان الوصف "لا تغيير" أو فارغ
-      if(changeDesc && changeDesc !== 'لا تغيير' && changeDesc.trim() !== ''){
-        updatedPeople.push({local,remote:p,desc:changeDesc});
-      } else {
-        unchangedPeople.push(p);
-      }
-    }
+    else updatedPeople.push({local,remote:p,desc:_familyChangeDescription(local,p,incomingMap)});
   });
   return {stats,newPeople,updatedPeople,unchangedPeople,incomingMap};
 }
@@ -6557,18 +6549,8 @@ async function openFamilyUpdatesModal(){
     }
 
     let okUpdates=updates.filter(u=>!u.error&&u.data);
-    
-    // تصفية التحديثات التي لا تحتوي على أي تغيير فعلي (لا أفراد جدد ولا محدثين)
-    let allUpdatesCount = okUpdates.length;
-    okUpdates = okUpdates.filter(u => {
-      return (u.newCnt > 0 || u.updatedCnt > 0);
-    });
-    let filteredCount = allUpdatesCount - okUpdates.length;
-    
     if(!okUpdates.length){
-      let hint = filteredCount > 0 
-        ? `<div style="margin-top:10px;font-size:12px;color:var(--text2);line-height:1.8">💡 تم استبعاد ${filteredCount} نسخة لعدم احتوائها على تغييرات فعلية (جميع الأفراد بدون تعديل)</div>`
-        : (errorHints.length?'<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>':'');
+      let hint=errorHints.length?'<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>':'';
       throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hint);
     }
 
@@ -6597,17 +6579,9 @@ async function openFamilyUpdatesModal(){
     }).join('');
 
     let mergeAllBtn=okUpdates.length>1?`<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${okUpdates.length} نسخة)</button>`:'';
-    
-    let filteredInfoHtml = filteredCount > 0 
-      ? `<div style="font-size:11px;color:var(--text2);padding:8px 12px;background:var(--bg-secondary);border-radius:6px;margin-bottom:10px">
-          💡 تم استبعاد ${filteredCount} نسخة لعدم احتوائها على تغييرات فعلية
-        </div>`
-      : '';
-    
     document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:760px;width:min(760px,96vw)">
       <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📡 تحديثات العائلة <span style="font-size:12px;font-weight:400;color:var(--text2)">${okUpdates.length} نسخة</span></h3>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">🔗 <a href="https://gist.github.com/${gistId}" target="_blank" style="color:#3b82f6">فتح Gist في GitHub</a></div>
-      ${filteredInfoHtml}
       <div style="max-height:62vh;overflow-y:auto;padding-left:2px">${rowsHtml}</div>
       <div class="modal-footer" style="flex-wrap:wrap">
         <button class="btn" onclick="closeModal()">إغلاق</button>
