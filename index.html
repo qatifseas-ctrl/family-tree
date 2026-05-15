@@ -5995,9 +5995,16 @@ async function _doSilentFamilyUpload(){
     data.people.forEach(p=>{if(p.photo)delete p.photo;});
     let plain=JSON.stringify(data);
 
-    // لا نرفع نسخة مطابقة إذا لم تتغير البيانات
+    // لا نرفع نسخة مطابقة إذا لم تتغير البيانات الفعلية
+    // ملاحظة: uploadedAt حقل زمني فقط، فلا يدخل في بصمة التغيّر
     try{
-      let plainHashBuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(plain));
+      let plainComparable=JSON.stringify({
+        people:data.people,
+        relPairs:data.relPairs,
+        nextId:data.nextId,
+        myPersonId:data.myPersonId||null
+      });
+      let plainHashBuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(plainComparable));
       let plainHash=[...new Uint8Array(plainHashBuf)].map(b=>b.toString(16).padStart(2,'0')).join('');
       let lastHash=localStorage.getItem('ft_family_last_upload_hash_v1')||'';
       if(lastHash===plainHash){
@@ -6620,15 +6627,22 @@ async function openFamilyUpdatesModal(){
       }
     }
 
-    let okUpdates=updates.filter(u=>!u.error&&u.data).sort((a,b)=>{
+    let skippedNoOpUpdates=updates.filter(u=>!u.error&&u.data&&(u.newCnt+u.updatedCnt===0));
+    let okUpdates=updates.filter(u=>!u.error&&u.data&&(u.newCnt+u.updatedCnt>0)).sort((a,b)=>{
       let ta=Date.parse(a.ts||'')||0;
       let tb=Date.parse(b.ts||'')||0;
       if(tb!==ta)return tb-ta;
       return String(b.filename||'').localeCompare(String(a.filename||''));
     });
     if(!okUpdates.length){
-      let hint=errorHints.length?'<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>':'';
-      throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hint);
+      let hintParts=[];
+      if(skippedNoOpUpdates.length){
+        hintParts.push(`<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right">تم تجاهل ${skippedNoOpUpdates.length} نسخة/نسخ فارغة بلا أي فرق حقيقي.</div>`);
+      }
+      if(errorHints.length){
+        hintParts.push('<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>');
+      }
+      throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hintParts.join(''));
     }
 
     let rowsHtml=okUpdates.map((u,idx)=>{
@@ -6657,7 +6671,7 @@ async function openFamilyUpdatesModal(){
 
     let mergeAllBtn=okUpdates.length>1?`<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${okUpdates.length} نسخة)</button>`:'';
     document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:760px;width:min(760px,96vw)">
-      <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📡 تحديثات العائلة <span style="font-size:12px;font-weight:400;color:var(--text2)">${okUpdates.length} نسخة</span></h3>
+      <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📡 تحديثات العائلة <span style="font-size:12px;font-weight:400;color:var(--text2)">${okUpdates.length} نسخة</span>${skippedNoOpUpdates.length?` <span style="font-size:12px;font-weight:400;color:var(--text2)">· تم تجاهل ${skippedNoOpUpdates.length} فارغة</span>`:''}</h3>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">🔗 <a href="https://gist.github.com/${gistId}" target="_blank" style="color:#3b82f6">فتح Gist في GitHub</a></div>
       <div style="max-height:62vh;overflow-y:auto;padding-left:2px">${rowsHtml}</div>
       <div class="modal-footer" style="flex-wrap:wrap">
