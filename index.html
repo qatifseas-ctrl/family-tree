@@ -1238,12 +1238,31 @@ const FAMILY_UPLOAD_CONFIG = {
   // مفتاح التشفير (اختياري — اتركه فارغاً لرفع بدون تشفير؛ أو ضع مفتاح الأوُنر لتشفير أقوى)
   KEY_HEX: '',     // ← اختياري
 };
-// اسم ملف العائلة يعتمد على DEVICE_ID — كل نسخة لها ملفها في Gist
+// اسم ملف العائلة يعتمد على معرّف ثابت لكل تثبيت — كل نسخة لها ملفها في Gist
 const FAMILY_UPLOAD_GIST_KEY  = 'ft_family_gist_id_v1';
+const FAMILY_INSTALL_ID_KEY    = 'ft_family_install_id_v1';
 // علامة تُضمَّن في نسخة العائلة تلقائياً عند التصدير
 const IS_FAMILY_COPY = false;
-// معرّف الجهاز — يُنشأ عشوائياً لكل نسخة عائلة مصدَّرة (يبقى ثابتاً فيها)
+// معرّف قديم للتوافق فقط
 const FAMILY_DEVICE_ID = '';
+
+function _getOrCreateFamilyInstallId(){
+  try{
+    let id = '';
+    try{ id = localStorage.getItem(FAMILY_INSTALL_ID_KEY) || ''; }catch(e){}
+    if(!id){
+      try{ id = localStorage.getItem('ft_family_device_id') || ''; }catch(e){}
+    }
+    if(!id){
+      id = [...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+    try{ localStorage.setItem(FAMILY_INSTALL_ID_KEY, id); }catch(e){}
+    try{ localStorage.setItem('ft_family_device_id', id); }catch(e){}
+    return id;
+  }catch(e){
+    return FAMILY_DEVICE_ID || '';
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 //  سجل الدمج والاسترجاع قبل الدمج
@@ -1280,13 +1299,7 @@ let mergeHistory = [];
 // دالة اسم الملف الديناميكي
 
 function _getFamilyGistFileName(){
-  var id=FAMILY_DEVICE_ID||localStorage.getItem('ft_family_device_id')||'';
-  if(!id){
-    id=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
-    try{localStorage.setItem('ft_family_device_id',id);}catch(e){}
-  } else {
-    try{localStorage.setItem('ft_family_device_id',id);}catch(e){}
-  }
+  var id=_getOrCreateFamilyInstallId();
   return 'ft_family_'+id+'.dat';
 }
 
@@ -3174,7 +3187,7 @@ function doExportJSON(withPhotos){
 // \u062a\u0635\u062f\u064a\u0631 JSON \u062e\u0627\u0635 \u0628\u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u2014 \u0645\u0639 Gist ID + Device ID \u0641\u0631\u064a\u062f
 function doExportJSONFamily(withPhotos){
   closeModal();
-  var devId=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  var devId=_getOrCreateFamilyInstallId();
   var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
   var fuPat=FAMILY_UPLOAD_CONFIG.GITHUB_PAT||localStorage.getItem('ft_fupload_pat')||'';
   var fuKey=FAMILY_UPLOAD_CONFIG.KEY_HEX||localStorage.getItem('ft_fupload_key')||CLOUD_CONFIG.KEY_HEX||localStorage.getItem('ft_cloud_key')||'';
@@ -3377,11 +3390,20 @@ function _applyFamilyMetaIfNeeded(data){
   if(!IS_FAMILY_COPY) return; // المالك لا يحتاج هذا
   var meta=data._familyMeta;
   if(!meta) return;
-  // Device ID: نثبّته مرة واحدة فقط حتى يبقى الملف ثابتاً لكل جهاز
+  // Device ID: نثبّته محلياً مرة واحدة فقط، ولا نسمح للملف المستورد أن يغيّره لاحقاً
   try{
-    var existingDeviceId = localStorage.getItem('ft_family_device_id');
-    if(!existingDeviceId && meta.deviceId){
-      localStorage.setItem('ft_family_device_id', meta.deviceId);
+    var existingDeviceId = '';
+    try{ existingDeviceId = localStorage.getItem(FAMILY_INSTALL_ID_KEY) || ''; }catch(e){}
+    if(!existingDeviceId){
+      try{ existingDeviceId = localStorage.getItem('ft_family_device_id') || ''; }catch(e){}
+    }
+    if(!existingDeviceId){
+      var seededId = meta.deviceId || _getOrCreateFamilyInstallId();
+      try{localStorage.setItem(FAMILY_INSTALL_ID_KEY, seededId);}catch(e){}
+      try{localStorage.setItem('ft_family_device_id', seededId);}catch(e){}
+    } else {
+      try{localStorage.setItem(FAMILY_INSTALL_ID_KEY, existingDeviceId);}catch(e){}
+      try{localStorage.setItem('ft_family_device_id', existingDeviceId);}catch(e){}
     }
   }catch(e){}
   // FAMILY_UPLOAD_CONFIG
@@ -3398,7 +3420,6 @@ function _applyFamilyMetaIfNeeded(data){
     FAMILY_UPLOAD_CONFIG.KEY_HEX = meta.keyHex;
     try{localStorage.setItem('ft_fupload_key', meta.keyHex);}catch(e){}
   }
-  console.log('[Import] Family meta applied — deviceId:', meta.deviceId||'—', 'gistId:', meta.gistId||'—');
 }
 
 let _renderTreeRAF=null;
@@ -5929,6 +5950,10 @@ function triggerFamilyUpload(){
 }
 async function _doSilentFamilyUpload(){
   if(!_isFamilyUploadConfigured()||_familyUploading)return;
+  if(!Array.isArray(people)||people.length===0){
+    console.debug('[FamilyUpload] Empty dataset — upload skipped');
+    return;
+  }
   _familyUploading=true;
   try{
     // التشفير إلزامي — استخدم مفتاح نسخة العائلة أو مفتاح المالك كبديل تلقائي
@@ -5956,25 +5981,19 @@ async function _doSilentFamilyUpload(){
     let familyFileName=_getFamilyGistFileName();
     let gistId=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||'';
     let headers={'Authorization':'token '+FAMILY_UPLOAD_CONFIG.GITHUB_PAT,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
-    let readmeContent=
-      '# Family updates archive\n\n' +
-      '- device: ' + familyFileName.replace(/^ft_family_/i,'').replace(/\.dat$/i,'') + '\n' +
-      '- uploadedAt: ' + data.uploadedAt + '\n' +
-      '- people: ' + (data.people||[]).length + '\n\n' +
-      'The actual family update is stored in the `.dat` file next to this README.';
     let filesObj={
       [familyFileName]:{content},
-      'README.md':{content:readmeContent}
+      'README.md': null
     };
     if(gistId){
       let res=await fetch('https://api.github.com/gists/'+gistId,{method:'PATCH',headers,body:JSON.stringify({files:filesObj})});
       if(!res.ok){
         // Gist ربما محذوف — أنشئ جديداً
-        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:filesObj})});
+        let r2=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[familyFileName]:{content}}})});
         if(r2.ok){let j=await r2.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
       }
     } else {
-      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:filesObj})});
+      let res=await fetch('https://api.github.com/gists',{method:'POST',headers,body:JSON.stringify({description:'Family Tree — Auto Update',public:false,files:{[familyFileName]:{content}}})});
       if(res.ok){let j=await res.json();localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);}
     }
   }catch(e){
@@ -5983,7 +6002,7 @@ async function _doSilentFamilyUpload(){
   }finally{_familyUploading=false;}
 }
 
-// ══════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 //  واجهة المالك — إعداد نسخة العائلة
 // ══════════════════════════════════════════════════════════
 function openFamilyUploadSetup(){
@@ -6598,7 +6617,6 @@ async function openFamilyUpdatesModal(){
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
             <button class="btn" style="font-size:11px;padding:4px 10px;background:#dbeafe;border-color:#3b82f6;color:#1d4ed8" onclick="openFamilyUpdateDetails(${idx})">🔍 عرض التفاصيل</button>
-            <button class="btn" style="font-size:11px;padding:4px 10px;background:#eef2ff;border-color:#8b5cf6;color:#5b21b6" onclick="openFamilyUpdateFile(${idx})">🔗 فتح الملف</button>
             <button class="btn" style="font-size:11px;padding:4px 10px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
             <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_familyDownloadOne(${idx})">⬇️ JSON</button>
             <button class="btn" style="font-size:11px;padding:4px 10px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c" onclick="deleteFamilyUpdate(${idx})">🗑 حذف</button>
