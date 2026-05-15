@@ -5629,32 +5629,24 @@ async function openFamilyUpdatesModal(){
   document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay"><div class="modal" style="max-width:480px;text-align:center"><div style="font-size:32px;margin-bottom:12px">📡</div><div style="font-size:14px;color:var(--text)">جارٍ جلب تحديثات العائلة...</div></div></div>`;
   try{
     let headers={'Authorization':'token '+readPat,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
-    let commitsRes=await fetch('https://api.github.com/gists/'+gistId+'/commits',{headers});
-    if(!commitsRes.ok) throw new Error('GitHub Commits API: '+commitsRes.status);
-    let commits=await commitsRes.json();
-    let allVersions=[];
-    for(let c of commits){
-      try{
-        let verRes=await fetch('https://api.github.com/gists/'+gistId+'/'+c.version,{headers});
-        if(!verRes.ok) continue;
-        let verJson=await verRes.json();
-        let files=Object.values(verJson.files||{}).filter(f=>f.filename&&/^ft_family_.*\.dat$/i.test(f.filename));
-        for(let ff of files){
-          allVersions.push({ff,version:c.version,committed_at:c.committed_at});
-        }
-      }catch(_e){}
-    }
+    let res=await fetch('https://api.github.com/gists/'+gistId,{headers});
 
-    let familyFiles=allVersions;
+    // ── معالجة 401 / 403 بذكاء ──
+    if(res.status===401||res.status===403){
+      _showFamilyUpdates401Modal(res.status===403?'forbidden':'unauthorized', gistId, readPat);
+      return;
+    }
+    if(!res.ok) throw new Error('GitHub API: '+res.status);
+    let j=await res.json();
+
+    let familyFiles=Object.values(j.files||{}).filter(f=>f.filename&&/^ft_family_.*\.dat$/i.test(f.filename));
     if(!familyFiles.length){
       throw new Error('لا توجد ملفات تحديثات عائلة داخل الـ Gist');
     }
 
-
-
     let updates=[];
     let errorHints=[];
-    for(let item of familyFiles){ let ff=item.ff;
+    for(let ff of familyFiles){
       try{
         let raw=ff.content||'';
         if(ff.truncated&&ff.raw_url){
@@ -5668,8 +5660,7 @@ async function openFamilyUpdatesModal(){
           updates.push({
             devId,data,summary,
             pCount:(data.people||[]).length,
-            ts:data.uploadedAt||item.committed_at||'',
-            version:item.version,
+            ts:data.uploadedAt||'',
             filename:ff.filename,
             newCnt:summary.newPeople.length,
             updatedCnt:summary.updatedPeople.length,
@@ -5701,7 +5692,7 @@ async function openFamilyUpdatesModal(){
       return `<div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:10px">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <div style="min-width:0">
-            <div style="font-size:12px;font-family:monospace;color:var(--text2);background:var(--bg-secondary);padding:1px 6px;border-radius:4px;display:inline-flex;align-items:center;gap:4px">📱 ${u.devId}<div style="font-size:10px;color:var(--text2);margin-top:3px">${(u.version||'').slice(0,7)}</div></div>
+            <div style="font-size:12px;font-family:monospace;color:var(--text2);background:var(--bg-secondary);padding:1px 6px;border-radius:4px;display:inline-flex;align-items:center;gap:4px">📱 ${u.devId}</div>
             <div style="font-size:12px;color:var(--text2);margin-top:5px">${u.pCount} فرد · ${ts}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">

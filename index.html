@@ -1284,6 +1284,8 @@ function _getFamilyGistFileName(){
   if(!id){
     id=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
     try{localStorage.setItem('ft_family_device_id',id);}catch(e){}
+  } else {
+    try{localStorage.setItem('ft_family_device_id',id);}catch(e){}
   }
   return 'ft_family_'+id+'.dat';
 }
@@ -3375,10 +3377,13 @@ function _applyFamilyMetaIfNeeded(data){
   if(!IS_FAMILY_COPY) return; // المالك لا يحتاج هذا
   var meta=data._familyMeta;
   if(!meta) return;
-  // Device ID
-  if(meta.deviceId){
-    try{localStorage.setItem('ft_family_device_id', meta.deviceId);}catch(e){}
-  }
+  // Device ID: نثبّته مرة واحدة فقط حتى يبقى الملف ثابتاً لكل جهاز
+  try{
+    var existingDeviceId = localStorage.getItem('ft_family_device_id');
+    if(!existingDeviceId && meta.deviceId){
+      localStorage.setItem('ft_family_device_id', meta.deviceId);
+    }
+  }catch(e){}
   // FAMILY_UPLOAD_CONFIG
   if(meta.pat){
     FAMILY_UPLOAD_CONFIG.GITHUB_PAT = meta.pat;
@@ -6549,6 +6554,12 @@ async function openFamilyUpdatesModal(){
     }
 
     let okUpdates=updates.filter(u=>!u.error&&u.data);
+    okUpdates.sort((a,b)=>{
+      let ta=new Date(a.ts||0).getTime();
+      let tb=new Date(b.ts||0).getTime();
+      if(tb!==ta) return tb-ta; // الأحدث أولاً
+      return String(a.devId||'').localeCompare(String(b.devId||''),'ar');
+    });
     if(!okUpdates.length){
       let hint=errorHints.length?'<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;text-align:right;max-height:120px;overflow:auto">'+errorHints.slice(0,6).map(s=>'• '+s.replace(/</g,'&lt;').replace(/>/g,'&gt;')).join('<br>')+'</div>':'';
       throw new Error('لا يمكن قراءة أي تحديث صالح من النسخ الموجودة'+hint);
