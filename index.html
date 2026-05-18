@@ -963,6 +963,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   <div class="legend">
     <div class="legend-item"><div class="gender-dot male-dot"></div> ذكر</div>
     <div class="legend-item"><div class="gender-dot female-dot"></div> أنثى</div>
+    <button id="statsToggleBtn" onclick="toggleStats()" title="إظهار/إخفاء الإحصائيات" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:6px;background:var(--card-bg);color:var(--text);font-size:14px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;line-height:1;">📊</button>
     <div class="legend-item" style="background:#e8f5e9;padding:2px 6px;border-radius:4px;">هلال أخضر = متوفى</div>
     <div class="legend-item"><span class="status-dot dot-divorced">م</span> = مطلق/ة</div>
     <div class="legend-item"><span style="font-size:13px">🔗</span> متزوج/ة من شخص في الشجرة</div>
@@ -972,8 +973,8 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   </div>
   <!-- My Person Banner -->
 
-  <!-- Stats -->
-  <div id="statsBar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
+  <!-- Stats Bar -->
+  <div id="statsBar" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
 
   <div class="toolbar">
     <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
@@ -984,7 +985,9 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button id="searchClearBtn" style="display:none">✕</button>
     <div id="searchResultsPanel" style="display:none"></div>
     <button class="btn primary" onclick="openAddModal(null)">+ إضافة فرد</button>
-    <button class="btn" id="toggleAllBtn" onclick="toggleAllStates()">⊕ فتح الكل</button>
+    <button class="btn" onclick="toggleAll(true)">فتح الكل</button>
+    <button class="btn" onclick="toggleAll(false)">غلق الكل</button>
+    <button class="btn" onclick="exportData()" title="حفظ كملف HTML مع الإعدادات السحابية — للمالك فقط">💾 حفظ نسخة</button>
     <button class="btn" id="fsaSaveBtn2" onclick="fsaPickFile()" title="ربط الملف للحفظ التلقائي على الجوال — Chrome/Edge" style="display:none">📁 ربط الملف</button>
     <button class="btn" id="exportFamilyBtn" onclick="exportFamilyCopy()" title="حفظ نسخة للمشاركة مع العائلة — تحتوي إعدادات الرفع الصامت تلقائياً" style="display:none">📤 نسخة للعائلة</button>
     <button class="btn" id="familyUploadSetupBtn" onclick="openFamilyUploadSetup()" title="إعداد الرفع الصامت لنسخة العائلة" style="display:none">⚙️ إعداد رفع العائلة</button>
@@ -2569,27 +2572,14 @@ function buildKinTree(path1,path2,lcaId,p1,p2){
     </div>
   </div>`;
 }
-function toggleAllStates(){
-  const btn=document.getElementById('toggleAllBtn');
-  const allExpanded=people.every(p=>expanded[p.id]===true);
-  
-  if(allExpanded){
-    // إغلاق الكل
+function toggleAll(open){
+  if(open&&document.body.classList.contains('mobile-mode')){
+    // وضع الجوال: افتح الجذور فقط (مستوى واحد)
+    let roots=getRoots();
     people.forEach(p=>expanded[p.id]=false);
-    btn.textContent='⊕ فتح الكل';
-    btn.setAttribute('aria-pressed','false');
+    roots.forEach(r=>expanded[r.id]=true);
   } else {
-    // فتح الكل
-    if(document.body.classList.contains('mobile-mode')){
-      // وضع الجوال: افتح الجذور فقط
-      let roots=getRoots();
-      people.forEach(p=>expanded[p.id]=false);
-      roots.forEach(r=>expanded[r.id]=true);
-    } else {
-      people.forEach(p=>expanded[p.id]=true);
-    }
-    btn.textContent='⊖ غلق الكل';
-    btn.setAttribute('aria-pressed','true');
+    people.forEach(p=>expanded[p.id]=open);
   }
   renderAll();
 }
@@ -3011,6 +3001,23 @@ function searchNavigateTo(id){
     }
   },360);
 }
+let _statsVisible = false; // حالة ظهور الإحصائيات
+
+function toggleStats(){
+  _statsVisible = !_statsVisible;
+  let statsBar = document.getElementById('statsBar');
+  let btn = document.getElementById('statsToggleBtn');
+  
+  if(_statsVisible){
+    statsBar.style.display = 'grid';
+    btn.style.background = 'var(--primary-color)';
+    btn.style.color = 'white';
+  } else {
+    statsBar.style.display = 'none';
+    btn.style.background = 'var(--card-bg)';
+    btn.style.color = 'var(--text)';
+  }
+}
 function renderStats(){
   let total=people.length;
   let males=people.filter(p=>p.gender==='male').length;
@@ -3273,7 +3280,7 @@ function handleImportFile(e){
           for(let ii=0;ii<ib.length;ii++)iu8[ii]=ib.charCodeAt(ii);
           d=JSON.parse(new TextDecoder().decode(iu8));
         } else {
-          throw new Error('لم يتم العثور على بيانات مضمّنة في الملف.\nتأكد من تصدير JSON كامل.');
+          throw new Error('لم يتم العثور على بيانات مضمّنة في الملف.\nتأكد أن الملف محفوظ بزر "💾 حفظ نسخة" أو تصدير JSON كامل.');
         }
       } else {
         d=JSON.parse(text);
@@ -5691,6 +5698,7 @@ function renderGuide(){
 
     {id:'s7',icon:'💾',title:'الحفظ والنسخ الاحتياطي',html:`
 <p><strong>تلقائي محلياً:</strong> كل تغيير يُحفظ في المتصفح فوراً (إشعار ✔).</p>
+<p><strong>💾 حفظ نسخة:</strong> يُنشئ ملف HTML يحتوي كل البيانات — افتحه في أي جهاز مباشرةً. يُضمَّن فيه إعدادات السحابة إن كانت مُفعَّلة.</p>
 <p><strong>📤 تصدير JSON:</strong> نسخة احتياطية خفيفة — خياران: بدون صور (موصى به) أو مع الصور.</p>
 <p><strong>📥 استيراد:</strong> يقبل HTML و JSON — خياران: استبدال كامل أو دمج آمن.</p>`},
 
@@ -5705,6 +5713,7 @@ function renderGuide(){
 <ol style="padding-right:18px;margin:0 0 10px;line-height:2">
   <li>على الجهاز الأول: اضغط <strong>☁️ مزامنة</strong> بعد كل تعديل</li>
   <li>على الجهاز الثاني: اضغط <strong>⬇️ استعادة</strong> للحصول على آخر نسخة</li>
+  <li>لنقل الإعدادات للجهاز الثاني: اضغط <strong>💾 حفظ نسخة</strong> على الجهاز الأول — الملف يحتوي الإعدادات مُضمَّنة</li>
 </ol>
 <h4 style="margin:10px 0 5px;font-size:13px">رفع الصور (delta):</h4>
 <p>عند الضغط على ☁️ مزامنة يُرفع فقط الصور <strong>الجديدة أو المعدَّلة</strong> — الصور القديمة لا تُرفع مجدداً. عند الاستعادة تُضاف الصور غير الموجودة محلياً تلقائياً.</p>`},
@@ -5734,36 +5743,6 @@ function renderGuide(){
     {id:'s10',icon:'📸',title:'الصور',html:`
 <p>في نموذج التعديل: 📷 لرفع صورة، اضغط عليها لعرضها كاملة، 🗑 لحذفها. الصور تُضغط تلقائياً إلى 400px.</p>
 <p>عند الضغط على اسم متوفى تظهر بطاقة الفاتحة 3 ثوانٍ.</p>`},
-
-    {id:'s11',icon:'⌨️',title:'اختصارات لوحة المفاتيح',html:`
-<p><strong>⚠️ ملاحظة مهمة:</strong> هذه الاختصارات تعمل <strong>فقط داخل التطبيق</strong> — لا تتعارض مع متصفحك!</p>
-<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:12px">
-  <tr style="background:var(--card-border);border-bottom:1px solid var(--card-border)">
-    <td style="padding:8px;text-align:right;font-weight:bold;width:45%">المفتاح</td>
-    <td style="padding:8px;text-align:right;font-weight:bold">الوظيفة</td>
-  </tr>
-  <tr style="border-bottom:1px solid var(--card-border)">
-    <td style="padding:8px;text-align:right;direction:ltr"><code>Ctrl/Cmd + K</code></td>
-    <td style="padding:8px;text-align:right"><strong>فتح نافذة البحث</strong> (يعمل بالعربي والإنجليزي)</td>
-  </tr>
-  <tr style="border-bottom:1px solid var(--card-border)">
-    <td style="padding:8px;text-align:right;direction:ltr"><code>/</code></td>
-    <td style="padding:8px;text-align:right"><strong>فتح نافذة البحث</strong> (يعمل بالعربي والإنجليزي)</td>
-  </tr>
-  <tr style="border-bottom:1px solid var(--card-border)">
-    <td style="padding:8px;text-align:right;direction:ltr"><code>Esc</code></td>
-    <td style="padding:8px;text-align:right">إغلاق نافذة البحث أو أي نافذة أخرى مفتوحة</td>
-  </tr>
-  <tr style="border-bottom:1px solid var(--card-border)">
-    <td style="padding:8px;text-align:right;direction:ltr"><code>Enter</code></td>
-    <td style="padding:8px;text-align:right">تأكيد البحث / اختيار من النتائج</td>
-  </tr>
-  <tr>
-    <td style="padding:8px;text-align:right;direction:ltr"><code>↑ ↓</code></td>
-    <td style="padding:8px;text-align:right">التنقل بين نتائج البحث</td>
-  </tr>
-</table>
-<p style="margin-top:12px;font-size:12px;color:var(--text2)"><strong>💡 نصيحة:</strong> استخدم <code>Ctrl/Cmd + K</code> أو <code>/</code> بحرية — لا تقلق من تعارضها مع المتصفح!</p>`},
   ];
 
   let html=`<div style="max-width:700px;margin:0 auto;padding:4px">`;
@@ -7667,7 +7646,7 @@ function openCloudSetup(){
     :`<div class="form-row"><label>🔗 معرّف Gist (اختياري — اتركه فارغاً للبحث التلقائي)</label><input id="cs_gist" type="text" style="font-family:monospace;font-size:11px" placeholder="يُملأ تلقائياً — أو الصق الـ ID يدوياً"></div>`}
     <div style="padding:10px 12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:12px;color:#065f46;margin-bottom:8px">
       <strong>✅ الإعدادات تُحفظ تلقائياً</strong> في هذا المتصفح على هذا الجهاز.<br>
-      لنقل البيانات بين الأجهزة: استخدم المزامنة السحابية ☁️ أو تصدير استيراد JSON.
+      لنقلها لجهاز آخر: بعد الإعداد اضغط <strong>💾 حفظ نسخة</strong> — ستُضمَّن الإعدادات في ملف HTML.
     </div>
     <div style="padding:10px 12px;background:#ede9fe;border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:#5b21b6;margin-bottom:14px">
       <strong>📐 هيكلية الأمان:</strong><br>
@@ -8397,9 +8376,9 @@ function _fsaShowFallbackBar(){
   if(bar){
     bar.style.display='flex';
     var hint=document.getElementById('fsaHint');
-    if(hint)hint.textContent='متصفحك يدعم الحفظ المحلي الآمن — استخدم المزامنة السحابية ☁️ لنقل البيانات بين الأجهزة';
+    if(hint)hint.textContent='متصفحك لا يدعم الحفظ التلقائي — اضغط "💾 حفظ نسخة" بعد كل تعديل';
     var btn=document.getElementById('fsaSaveBtn');
-    if(btn){btn.innerHTML='📥 استيراد JSON';btn.onclick=importData;}
+    if(btn){btn.innerHTML='💾 حفظ نسخة';btn.onclick=exportData;}
   }
 }
 async function fsaRequestPermission(){
@@ -8597,7 +8576,7 @@ window.addEventListener('beforeunload',function(e){
   if(_cloudEnabled&&_isCloudConfigured())return; // السحابة مفعّلة — البيانات محفوظة
   if(IS_FAMILY_COPY&&_isFamilyUploadConfigured())return; // نسخة عائلة مع رفع
   e.preventDefault();
-  e.returnValue='البيانات قد لا تُحفظ. تأكد من تفعيل الحفظ السحابي ☁️ أو الاحتفاظ بنسخة احتياطية.';
+  e.returnValue='البيانات قد لا تُحفظ. اضغط "💾 حفظ نسخة" أولاً.';
 });
 window.addEventListener('appinstalled',function(){
   let b=document.getElementById('installBanner');
