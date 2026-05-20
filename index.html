@@ -539,16 +539,6 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .list-search-box{position:relative;flex:1;min-width:220px}
 .list-search-box input{width:100%;padding:10px 36px 10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
 .list-search-box input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.12)}
-.voice-field-wrap{position:relative;display:block;width:100%}
-.voice-field-input{width:100%;box-sizing:border-box;padding-right:42px}
-.voice-field-wrap-sm .voice-field-input{padding:8px 42px 8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px}
-.voice-field-wrap .voice-mic-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border:none;background:transparent;cursor:pointer;font-size:16px;line-height:1;opacity:.65;display:flex;align-items:center;justify-content:center;padding:0;border-radius:50%;z-index:3}
-.voice-field-wrap .voice-mic-btn:hover{opacity:1;background:rgba(0,0,0,.05)}
-.voice-mic-btn-list{right:8px}
-.list-search-box .voice-field-input-list{padding:10px 74px 10px 12px}
-.list-search-box .voice-mic-btn-list{right:34px}
-.list-search-box .list-search-clear-has-mic{left:8px;z-index:4}
-
 .list-search-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border:none;border-radius:50%;background:transparent;color:var(--text2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
 .list-search-clear:hover{background:var(--card-border);color:var(--text)}
 .list-quick-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
@@ -931,6 +921,19 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   opacity:0;pointer-events:none;transition:opacity .3s;
 }
 #mob-action-sheet-overlay.open { opacity:1;pointer-events:auto; }
+
+/* ── أزرار الصوت في الحقول ── */
+.field-mic-btn{
+  background:none;border:none;cursor:pointer;font-size:15px;
+  opacity:.55;padding:4px 6px;line-height:1;border-radius:50%;
+  flex-shrink:0;transition:opacity .15s;
+}
+.field-mic-btn:hover{opacity:1!important;}
+.field-mic-btn.voice-active{animation:fieldVoicePulse .7s ease-in-out infinite;}
+@keyframes fieldVoicePulse{0%,100%{opacity:.6;}50%{opacity:1;transform:scale(1.25);}}
+.kin-input-row{display:flex;align-items:center;gap:0;position:relative;}
+.kin-input-row input{flex:1;}
+.list-mic-wrap{display:flex;align-items:center;gap:0;}
 </style>
 
 </head>
@@ -2012,7 +2015,10 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(1)">✕</span>
         </div>
         <div class="kin-search-box" id="kin1box" style="display:${p1?'none':'block'}">
-          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
+          <div class="kin-input-row">
+            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
+            <button id="kin1voice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('kin1input',v=>{kinSearch(v,1)},'kin1voice')">🎤</button>
+          </div>
           <div class="kin-results" id="kin1results" style="display:none"></div>
         </div>
       </div>
@@ -2027,7 +2033,10 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(2)">✕</span>
         </div>
         <div class="kin-search-box" id="kin2box" style="display:${p2?'none':'block'}">
-          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
+          <div class="kin-input-row">
+            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
+            <button id="kin2voice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('kin2input',v=>{kinSearch(v,2)},'kin2voice')">🎤</button>
+          </div>
           <div class="kin-results" id="kin2results" style="display:none"></div>
         </div>
       </div>
@@ -3865,6 +3874,7 @@ function renderList(){
         <input id="listSearchBox" type="text" value="${searchVal.replace(/"/g,'&quot;')}" placeholder="ابحث بالاسم، اللقب، الأب، الأم، أو الملاحظات..." oninput="setListSearch(this.value,false)" />
         ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث">✕</button>`:''}
       </div>
+      <button id="listVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('listSearchBox',v=>{setListSearch(v,true)},'listVoice')" style="font-size:17px;padding:6px 8px;">🎤</button>
       <button class="btn" onclick="clearListSearch()" style="font-size:11px;padding:8px 12px;white-space:nowrap">مسح</button>
     </div>
     <div class="list-quick-filters">${filterBtns}</div>
@@ -5419,7 +5429,10 @@ function openMyPersonPicker(){
     <h3>أنا في الشجرة</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">اختر اسمك لعرض صلة قرابتك مع كل شخص في الشجرة</p>
     <div style="position:relative;margin-bottom:8px">
-      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+        <button id="myPersonVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('mySearchInput',v=>{filterMyPicker(v)},'myPersonVoice')">🎤</button>
+      </div>
     </div>
     <div id="myPickerList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px">${opts}</div>
     ${myPersonId?`<div style="margin-top:10px;text-align:center"><button class="btn" onclick="setMyPerson(null)" style="color:#ef4444">✕ إلغاء تحديد الاسم</button></div>`:''}
@@ -9038,6 +9051,51 @@ function startVoiceSearch(){
   try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActive(false); }
 }
 function mssVoiceSearch(){ startVoiceSearch(); }
+
+// ══════════════════════════════════════════════════════════
+//  البحث الصوتي العام – لحقول متعددة (kin1 / kin2 / myPerson / list)
+// ══════════════════════════════════════════════════════════
+let _fieldVoiceRec = {};   // btnId → SpeechRecognition instance
+function startFieldVoice(inputId, onResult, btnId){
+  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecog){ alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.'); return; }
+  // toggle off إذا كان نشطاً بالفعل
+  if(_fieldVoiceRec[btnId]){
+    _fieldVoiceRec[btnId].stop();
+    delete _fieldVoiceRec[btnId];
+    _setFieldVoiceActive(btnId, false);
+    return;
+  }
+  let r = new SpeechRecog();
+  r.lang = 'ar-SA';
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 3;
+  _fieldVoiceRec[btnId] = r;
+  _setFieldVoiceActive(btnId, true);
+  r.onresult = e=>{
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
+    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u,'').trim();
+    let inp = document.getElementById(inputId);
+    if(inp){ inp.value = transcript; }
+    if(onResult) onResult(transcript);
+  };
+  r.onend  = ()=>{ delete _fieldVoiceRec[btnId]; _setFieldVoiceActive(btnId, false); };
+  r.onerror= ()=>{ delete _fieldVoiceRec[btnId]; _setFieldVoiceActive(btnId, false); };
+  try { r.start(); } catch(err){ delete _fieldVoiceRec[btnId]; _setFieldVoiceActive(btnId, false); }
+}
+function _setFieldVoiceActive(btnId, on){
+  let btn = document.getElementById(btnId);
+  if(btn) btn.classList.toggle('voice-active', on);
+  let t = document.getElementById('saveToast');
+  if(on){
+    if(t){ t.style.background='#7c3aed'; t.textContent='🎤 استمع...'; t.style.opacity='1';
+           clearTimeout(window._toastTimer); }
+  } else {
+    if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
+  }
+}
+
 function _setVoiceActive(on){
   let btns = document.querySelectorAll('#mss-mic-btn, [onclick*="startVoiceSearch"]');
   btns.forEach(b=>b.classList.toggle('voice-active', on));
