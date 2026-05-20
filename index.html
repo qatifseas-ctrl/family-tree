@@ -571,7 +571,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .file-input-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
 .kin-container{padding:4px 0;}
 .kin-search-box{position:relative;margin-bottom:8px;}
-.kin-search-box input{width:100%;padding:9px 12px;padding-right:40px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px;}
+.kin-search-box input{width:100%;padding:9px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px;}
 .kin-results{position:absolute;top:100%;right:0;left:0;background:var(--card-bg);border:1px solid var(--card-border);border-radius:8px;z-index:50;max-height:180px;overflow-y:auto;margin-top:2px;box-shadow:0 4px 16px rgba(0,0,0,.12);}
 .kin-result-item{padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:0.5px solid var(--card-border);}
 .kin-result-item:last-child{border:none;}
@@ -2003,7 +2003,7 @@ function renderKinPanel(){
         </div>
         <div class="kin-search-box" id="kin1box" style="display:${p1?'none':'block'}">
           <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
-          <button type="button" id="kin1voice" class="kin-voice-btn" onclick="startKinVoiceSearch(1)" title="بحث صوتي للشخص الأول" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;opacity:0.55;padding:6px;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.55'">🎤</button>
+          <button id="kin1voice" onclick="startKinVoiceSearch(1)" title="بحث صوتي" style="background:none;border:none;cursor:pointer;font-size:16px;opacity:.6;padding:5px 6px;line-height:1;border-radius:50%;position:absolute;right:10px;top:50%;transform:translateY(-50%);" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">🎤</button>
           <div class="kin-results" id="kin1results" style="display:none"></div>
         </div>
       </div>
@@ -2019,7 +2019,7 @@ function renderKinPanel(){
         </div>
         <div class="kin-search-box" id="kin2box" style="display:${p2?'none':'block'}">
           <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
-          <button type="button" id="kin2voice" class="kin-voice-btn" onclick="startKinVoiceSearch(2)" title="بحث صوتي للشخص الثاني" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;opacity:0.55;padding:6px;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.55'">🎤</button>
+          <button id="kin2voice" onclick="startKinVoiceSearch(2)" title="بحث صوتي" style="background:none;border:none;cursor:pointer;font-size:16px;opacity:.6;padding:5px 6px;line-height:1;border-radius:50%;position:absolute;right:10px;top:50%;transform:translateY(-50%);" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">🎤</button>
           <div class="kin-results" id="kin2results" style="display:none"></div>
         </div>
       </div>
@@ -3855,7 +3855,7 @@ function renderList(){
     <div class="list-search-row">
       <div class="list-search-box">
         <input id="listSearchBox" type="text" value="${searchVal.replace(/"/g,'&quot;')}" placeholder="ابحث بالاسم، اللقب، الأب، الأم، أو الملاحظات..." oninput="setListSearch(this.value,false)" />
-        <button type="button" id="listVoice" class="list-voice-btn" onclick="startListVoiceSearch()" title="بحث صوتي" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:14px;cursor:pointer;opacity:0.55;padding:4px 6px;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.55'">🎤</button>
+        <button id="listVoice" onclick="startListVoiceSearch()" title="بحث صوتي" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6;padding:4px 6px;line-height:1;border-radius:50%;position:absolute;right:10px;top:50%;transform:translateY(-50%);" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">🎤</button>
         ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث">✕</button>`:''}
       </div>
       <button class="btn" onclick="clearListSearch()" style="font-size:11px;padding:8px 12px;white-space:nowrap">مسح</button>
@@ -5412,8 +5412,8 @@ function openMyPersonPicker(){
     <h3>أنا في الشجرة</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">اختر اسمك لعرض صلة قرابتك مع كل شخص في الشجرة</p>
     <div style="position:relative;margin-bottom:8px">
-      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px;padding-left:45px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
-      <button type="button" id="myPersonVoice" class="my-voice-btn" onclick="startMyPersonVoiceSearch()" title="بحث صوتي" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:14px;cursor:pointer;opacity:0.55;padding:4px 6px;line-height:1;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.55'">🎤</button>
+      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+      <button id="myPersonVoice" onclick="startMyPersonVoiceSearch()" title="بحث صوتي" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6;padding:4px 6px;line-height:1;border-radius:50%;position:absolute;left:12px;top:50%;transform:translateY(-50%);" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">🎤</button>
     </div>
     <div id="myPickerList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px">${opts}</div>
     ${myPersonId?`<div style="margin-top:10px;text-align:center"><button class="btn" onclick="setMyPerson(null)" style="color:#ef4444">✕ إلغاء تحديد الاسم</button></div>`:''}

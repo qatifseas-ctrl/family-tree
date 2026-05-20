@@ -8080,6 +8080,136 @@ function _setVoiceActive(on){
   }
 }
 
+function startKinVoiceSearch(personNum){
+  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecog){
+    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
+    return;
+  }
+  if(_voiceRecognition){
+    _voiceRecognition.stop();
+    _voiceRecognition = null;
+    return;
+  }
+  let inputId = `kin${personNum}input`;
+  let inp = document.getElementById(inputId);
+  if(!inp) return;
+  
+  let r = new SpeechRecog();
+  r.lang = 'ar-SA';
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 3;
+  _voiceRecognition = r;
+  let btn = document.getElementById(`kin${personNum}voice`);
+  if(btn) btn.classList.add('voice-active');
+  
+  r.onresult = e=>{
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
+    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
+    inp.value = transcript;
+    kinSearch(transcript, personNum);
+  };
+  r.onend = ()=>{
+    _voiceRecognition=null;
+    let btn = document.getElementById(`kin${personNum}voice`);
+    if(btn) btn.classList.remove('voice-active');
+  };
+  r.onerror = e=>{
+    _voiceRecognition=null;
+    let btn = document.getElementById(`kin${personNum}voice`);
+    if(btn) btn.classList.remove('voice-active');
+  };
+  
+  try { r.start(); } catch(err){ _voiceRecognition=null; }
+}
+
+function startMyPersonVoiceSearch(){
+  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecog){
+    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
+    return;
+  }
+  if(_voiceRecognition){
+    _voiceRecognition.stop();
+    _voiceRecognition = null;
+    return;
+  }
+  let inp = document.getElementById('mySearchInput');
+  if(!inp) return;
+  
+  let r = new SpeechRecog();
+  r.lang = 'ar-SA';
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 3;
+  _voiceRecognition = r;
+  let btn = document.getElementById('myPersonVoice');
+  if(btn) btn.classList.add('voice-active');
+  
+  r.onresult = e=>{
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
+    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
+    inp.value = transcript;
+    filterMyPicker(transcript);
+  };
+  r.onend = ()=>{
+    _voiceRecognition=null;
+    let btn = document.getElementById('myPersonVoice');
+    if(btn) btn.classList.remove('voice-active');
+  };
+  r.onerror = e=>{
+    _voiceRecognition=null;
+    let btn = document.getElementById('myPersonVoice');
+    if(btn) btn.classList.remove('voice-active');
+  };
+  
+  try { r.start(); } catch(err){ _voiceRecognition=null; }
+}
+
+function startListVoiceSearch(){
+  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecog){
+    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
+    return;
+  }
+  if(_voiceRecognition){
+    _voiceRecognition.stop();
+    _voiceRecognition = null;
+    return;
+  }
+  let inp = document.getElementById('listSearchBox');
+  if(!inp) return;
+  
+  let r = new SpeechRecog();
+  r.lang = 'ar-SA';
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 3;
+  _voiceRecognition = r;
+  let btn = document.getElementById('listVoice');
+  if(btn) btn.classList.add('voice-active');
+  
+  r.onresult = e=>{
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
+    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
+    inp.value = transcript;
+    setListSearch(transcript, false);
+  };
+  r.onend = ()=>{
+    _voiceRecognition=null;
+    let btn = document.getElementById('listVoice');
+    if(btn) btn.classList.remove('voice-active');
+  };
+  r.onerror = e=>{
+    _voiceRecognition=null;
+    let btn = document.getElementById('listVoice');
+    if(btn) btn.classList.remove('voice-active');
+  };
+  
+  try { r.start(); } catch(err){ _voiceRecognition=null; }
+}
+
 // ══════════════════════════════════════════════════════════
 //  مساعدات شريط التنقل الأزرق (SNB)
 // ══════════════════════════════════════════════════════════
@@ -9411,162 +9541,3 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     try { if (window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX = initSettings.keyHex; } catch (e) {}
   }
 })();
-
-// ══════════════════════════════════════════════════════════
-//  دوال البحث الصوتي للحقول الإضافية (خارج IIFE)
-// ══════════════════════════════════════════════════════════
-
-/**
- * البحث الصوتي لحقل كاشف القرابة (الشخص 1 أو 2)
- */
-window.startKinVoiceSearch = function(personNum){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-  
-  let inputId = `kin${personNum}input`;
-  let inp = document.getElementById(inputId);
-  if(!inp) return;
-  
-  // استخدم المتغير من IIFE
-  if(window._voiceRecognition){
-    window._voiceRecognition.stop();
-    window._voiceRecognition = null;
-  }
-  
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-  window._voiceRecognition = r;
-  window._setVoiceActiveKin(true, personNum);
-  
-  r.onresult = e=>{
-    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-    inp.value = transcript;
-    kinSearch(transcript, personNum);
-  };
-  r.onend = ()=>{ window._voiceRecognition=null; window._setVoiceActiveKin(false, personNum); };
-  r.onerror = e=>{ window._voiceRecognition=null; window._setVoiceActiveKin(false, personNum); };
-  
-  try { r.start(); } catch(err){ window._voiceRecognition=null; window._setVoiceActiveKin(false, personNum); }
-};
-
-/**
- * البحث الصوتي لحقل "أنا في الشجرة"
- */
-window.startMyPersonVoiceSearch = function(){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-  
-  let inp = document.getElementById('mySearchInput');
-  if(!inp) return;
-  
-  if(window._voiceRecognition){
-    window._voiceRecognition.stop();
-    window._voiceRecognition = null;
-  }
-  
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-  window._voiceRecognition = r;
-  window._setVoiceActiveMy(true);
-  
-  r.onresult = e=>{
-    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-    inp.value = transcript;
-    filterMyPicker(transcript);
-  };
-  r.onend = ()=>{ window._voiceRecognition=null; window._setVoiceActiveMy(false); };
-  r.onerror = e=>{ window._voiceRecognition=null; window._setVoiceActiveMy(false); };
-  
-  try { r.start(); } catch(err){ window._voiceRecognition=null; window._setVoiceActiveMy(false); }
-};
-
-/**
- * البحث الصوتي لحقل قائمة الأفراد
- */
-window.startListVoiceSearch = function(){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-  
-  let inp = document.getElementById('listSearchBox');
-  if(!inp) return;
-  
-  if(window._voiceRecognition){
-    window._voiceRecognition.stop();
-    window._voiceRecognition = null;
-  }
-  
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-  window._voiceRecognition = r;
-  window._setVoiceActiveList(true);
-  
-  r.onresult = e=>{
-    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-    inp.value = transcript;
-    setListSearch(transcript, false);
-  };
-  r.onend = ()=>{ window._voiceRecognition=null; window._setVoiceActiveList(false); };
-  r.onerror = e=>{ window._voiceRecognition=null; window._setVoiceActiveList(false); };
-  
-  try { r.start(); } catch(err){ window._voiceRecognition=null; window._setVoiceActiveList(false); }
-};
-
-/**
- * مساعدات التحكم بحالة الأزرار
- */
-window._setVoiceActiveKin = function(on, personNum){
-  let btn = document.getElementById(`kin${personNum}voice`);
-  if(btn) btn.classList.toggle('voice-active', on);
-  if(on){
-    let t = document.getElementById('saveToast');
-    if(t){ t.style.background='#7c3aed'; t.textContent='🎤 استمع...'; t.style.opacity='1'; }
-  } else {
-    let t = document.getElementById('saveToast');
-    if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
-  }
-};
-
-window._setVoiceActiveMy = function(on){
-  let btn = document.getElementById('myPersonVoice');
-  if(btn) btn.classList.toggle('voice-active', on);
-  if(on){
-    let t = document.getElementById('saveToast');
-    if(t){ t.style.background='#7c3aed'; t.textContent='🎤 استمع...'; t.style.opacity='1'; }
-  } else {
-    let t = document.getElementById('saveToast');
-    if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
-  }
-};
-
-window._setVoiceActiveList = function(on){
-  let btn = document.getElementById('listVoice');
-  if(btn) btn.classList.toggle('voice-active', on);
-  if(on){
-    let t = document.getElementById('saveToast');
-    if(t){ t.style.background='#7c3aed'; t.textContent='🎤 استمع...'; t.style.opacity='1'; }
-  } else {
-    let t = document.getElementById('saveToast');
-    if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
-  }
-};
