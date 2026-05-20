@@ -537,7 +537,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .list-title .title-text{font-size:13px;font-weight:700;color:var(--text)}
 .list-search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .list-search-box{position:relative;flex:1;min-width:220px}
-.list-search-box input{width:100%;padding:10px 36px 10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
+.list-search-box input{width:100%;padding:10px 36px 10px 40px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
 .list-search-box input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.12)}
 .list-search-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border:none;border-radius:50%;background:transparent;color:var(--text2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
 .list-search-clear:hover{background:var(--card-border);color:var(--text)}
@@ -571,7 +571,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .file-input-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
 .kin-container{padding:4px 0;}
 .kin-search-box{position:relative;margin-bottom:8px;}
-.kin-search-box input{width:100%;padding:9px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px;}
+.kin-search-box input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px;}
 .kin-results{position:absolute;top:100%;right:0;left:0;background:var(--card-bg);border:1px solid var(--card-border);border-radius:8px;z-index:50;max-height:180px;overflow-y:auto;margin-top:2px;box-shadow:0 4px 16px rgba(0,0,0,.12);}
 .kin-result-item{padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:0.5px solid var(--card-border);}
 .kin-result-item:last-child{border:none;}
@@ -922,18 +922,21 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
 }
 #mob-action-sheet-overlay.open { opacity:1;pointer-events:auto; }
 
-/* ── أزرار الصوت في الحقول ── */
+/* ── أزرار الصوت داخل الحقول ── */
 .field-mic-btn{
-  background:none;border:none;cursor:pointer;font-size:15px;
-  opacity:.55;padding:4px 6px;line-height:1;border-radius:50%;
+  position:absolute;
+  left:6px;
+  top:50%;
+  transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;
+  font-size:14px;opacity:.5;padding:3px 4px;
+  line-height:1;border-radius:50%;
   flex-shrink:0;transition:opacity .15s;
+  z-index:2;
 }
-.field-mic-btn:hover{opacity:1!important;}
+.field-mic-btn:hover{opacity:.9!important;}
 .field-mic-btn.voice-active{animation:fieldVoicePulse .7s ease-in-out infinite;}
-@keyframes fieldVoicePulse{0%,100%{opacity:.6;}50%{opacity:1;transform:scale(1.25);}}
-.kin-input-row{display:flex;align-items:center;gap:0;position:relative;}
-.kin-input-row input{flex:1;}
-.list-mic-wrap{display:flex;align-items:center;gap:0;}
+@keyframes fieldVoicePulse{0%,100%{opacity:.5;}50%{opacity:1;transform:translateY(-50%) scale(1.25);}}
 </style>
 
 </head>
@@ -2015,10 +2018,8 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(1)">✕</span>
         </div>
         <div class="kin-search-box" id="kin1box" style="display:${p1?'none':'block'}">
-          <div class="kin-input-row">
-            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
-            <button id="kin1voice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('kin1input',v=>{kinSearch(v,1)},'kin1voice')">🎤</button>
-          </div>
+          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
+          <button id="kin1voice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('kin1input',v=>{kinSearch(v,1)},'kin1voice')">🎤</button>
           <div class="kin-results" id="kin1results" style="display:none"></div>
         </div>
       </div>
@@ -2033,10 +2034,8 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(2)">✕</span>
         </div>
         <div class="kin-search-box" id="kin2box" style="display:${p2?'none':'block'}">
-          <div class="kin-input-row">
-            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
-            <button id="kin2voice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('kin2input',v=>{kinSearch(v,2)},'kin2voice')">🎤</button>
-          </div>
+          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
+          <button id="kin2voice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('kin2input',v=>{kinSearch(v,2)},'kin2voice')">🎤</button>
           <div class="kin-results" id="kin2results" style="display:none"></div>
         </div>
       </div>
@@ -3872,9 +3871,9 @@ function renderList(){
     <div class="list-search-row">
       <div class="list-search-box">
         <input id="listSearchBox" type="text" value="${searchVal.replace(/"/g,'&quot;')}" placeholder="ابحث بالاسم، اللقب، الأب، الأم، أو الملاحظات..." oninput="setListSearch(this.value,false)" />
-        ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث">✕</button>`:''}
+        <button id="listVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('listSearchBox',v=>{setListSearch(v,true)},'listVoice')">🎤</button>
+        ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث" style="left:34px">✕</button>`:''}
       </div>
-      <button id="listVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('listSearchBox',v=>{setListSearch(v,true)},'listVoice')" style="font-size:17px;padding:6px 8px;">🎤</button>
       <button class="btn" onclick="clearListSearch()" style="font-size:11px;padding:8px 12px;white-space:nowrap">مسح</button>
     </div>
     <div class="list-quick-filters">${filterBtns}</div>
@@ -5429,10 +5428,8 @@ function openMyPersonPicker(){
     <h3>أنا في الشجرة</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">اختر اسمك لعرض صلة قرابتك مع كل شخص في الشجرة</p>
     <div style="position:relative;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:4px;">
-        <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
-        <button id="myPersonVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('mySearchInput',v=>{filterMyPicker(v)},'myPersonVoice')">🎤</button>
-      </div>
+      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px 8px 34px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+      <button id="myPersonVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('mySearchInput',v=>{filterMyPicker(v)},'myPersonVoice')">🎤</button>
     </div>
     <div id="myPickerList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px">${opts}</div>
     ${myPersonId?`<div style="margin-top:10px;text-align:center"><button class="btn" onclick="setMyPerson(null)" style="color:#ef4444">✕ إلغاء تحديد الاسم</button></div>`:''}
