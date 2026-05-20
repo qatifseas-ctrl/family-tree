@@ -537,7 +537,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .list-title .title-text{font-size:13px;font-weight:700;color:var(--text)}
 .list-search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .list-search-box{position:relative;flex:1;min-width:220px}
-.list-search-box input{width:100%;padding:10px 36px 10px 40px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
+.list-search-box input{width:100%;padding:10px 40px 10px 36px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
 .list-search-box input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.12)}
 .list-search-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border:none;border-radius:50%;background:transparent;color:var(--text2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
 .list-search-clear:hover{background:var(--card-border);color:var(--text)}
@@ -571,7 +571,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .file-input-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
 .kin-container{padding:4px 0;}
 .kin-search-box{position:relative;margin-bottom:8px;}
-.kin-search-box input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px;}
+.kin-search-box input{width:100%;padding:9px 34px 9px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px;}
 .kin-results{position:absolute;top:100%;right:0;left:0;background:var(--card-bg);border:1px solid var(--card-border);border-radius:8px;z-index:50;max-height:180px;overflow-y:auto;margin-top:2px;box-shadow:0 4px 16px rgba(0,0,0,.12);}
 .kin-result-item{padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:0.5px solid var(--card-border);}
 .kin-result-item:last-child{border:none;}
@@ -925,7 +925,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
 /* ── أزرار الصوت داخل الحقول ── */
 .field-mic-btn{
   position:absolute;
-  left:6px;
+  right:8px;
   top:50%;
   transform:translateY(-50%);
   background:none;border:none;cursor:pointer;
@@ -3872,7 +3872,7 @@ function renderList(){
       <div class="list-search-box">
         <input id="listSearchBox" type="text" value="${searchVal.replace(/"/g,'&quot;')}" placeholder="ابحث بالاسم، اللقب، الأب، الأم، أو الملاحظات..." oninput="setListSearch(this.value,false)" />
         <button id="listVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('listSearchBox',v=>{setListSearch(v,true)},'listVoice')">🎤</button>
-        ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث" style="left:34px">✕</button>`:''}
+        ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث">✕</button>`:''}
       </div>
       <button class="btn" onclick="clearListSearch()" style="font-size:11px;padding:8px 12px;white-space:nowrap">مسح</button>
     </div>
@@ -5428,7 +5428,7 @@ function openMyPersonPicker(){
     <h3>أنا في الشجرة</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">اختر اسمك لعرض صلة قرابتك مع كل شخص في الشجرة</p>
     <div style="position:relative;margin-bottom:8px">
-      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px 8px 34px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 34px 8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
       <button id="myPersonVoice" class="field-mic-btn" title="بحث صوتي" onclick="startFieldVoice('mySearchInput',v=>{filterMyPicker(v)},'myPersonVoice')">🎤</button>
     </div>
     <div id="myPickerList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px">${opts}</div>
