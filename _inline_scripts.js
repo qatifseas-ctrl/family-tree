@@ -8069,12 +8069,12 @@ function startVoiceSearch(){
 function mssVoiceSearch(){ startVoiceSearch(); }
 
 // ──── دوال البحث الصوتي للحقول الإضافية ────
+// تم إضافتها إلى window object لضمان الوصول العام
 
 /**
  * البحث الصوتي لحقل كاشف القرابة (الشخص 1 أو 2)
- * @param {number} personNum - 1 أو 2
  */
-function startKinVoiceSearch(personNum){
+window.startKinVoiceSearch = function(personNum){
   let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SpeechRecog){
     alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
@@ -8100,9 +8100,7 @@ function startKinVoiceSearch(personNum){
   _setVoiceActiveKin(true, personNum);
   
   r.onresult = e=>{
-    let transcript = Array.from(e.results)
-      .map(res=>res[0].transcript)
-      .join('');
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
     transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
     inp.value = transcript;
     kinSearch(transcript, personNum);
@@ -8111,12 +8109,12 @@ function startKinVoiceSearch(personNum){
   r.onerror = e=>{ _voiceRecognition=null; _setVoiceActiveKin(false, personNum); };
   
   try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActiveKin(false, personNum); }
-}
+};
 
 /**
  * البحث الصوتي لحقل "أنا في الشجرة"
  */
-function startMyPersonVoiceSearch(){
+window.startMyPersonVoiceSearch = function(){
   let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SpeechRecog){
     alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
@@ -8141,9 +8139,7 @@ function startMyPersonVoiceSearch(){
   _setVoiceActiveMy(true);
   
   r.onresult = e=>{
-    let transcript = Array.from(e.results)
-      .map(res=>res[0].transcript)
-      .join('');
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
     transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
     inp.value = transcript;
     filterMyPicker(transcript);
@@ -8152,12 +8148,12 @@ function startMyPersonVoiceSearch(){
   r.onerror = e=>{ _voiceRecognition=null; _setVoiceActiveMy(false); };
   
   try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActiveMy(false); }
-}
+};
 
 /**
  * البحث الصوتي لحقل قائمة الأفراد
  */
-function startListVoiceSearch(){
+window.startListVoiceSearch = function(){
   let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SpeechRecog){
     alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
@@ -8182,9 +8178,7 @@ function startListVoiceSearch(){
   _setVoiceActiveList(true);
   
   r.onresult = e=>{
-    let transcript = Array.from(e.results)
-      .map(res=>res[0].transcript)
-      .join('');
+    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
     transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
     inp.value = transcript;
     setListSearch(transcript, false);
@@ -8193,10 +8187,13 @@ function startListVoiceSearch(){
   r.onerror = e=>{ _voiceRecognition=null; _setVoiceActiveList(false); };
   
   try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActiveList(false); }
-}
+};
 
-function _setVoiceActiveKin(on, personNum){
-  let btn = document.querySelector(`[onclick*="startKinVoiceSearch(${personNum})"]`) || document.querySelector(`#kin${personNum}voice`);
+/**
+ * مساعدات التحكم بحالة الأزرار
+ */
+window._setVoiceActiveKin = function(on, personNum){
+  let btn = document.getElementById(`kin${personNum}voice`);
   if(btn) btn.classList.toggle('voice-active', on);
   if(on){
     let t = document.getElementById('saveToast');
@@ -8205,10 +8202,10 @@ function _setVoiceActiveKin(on, personNum){
     let t = document.getElementById('saveToast');
     if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
   }
-}
+};
 
-function _setVoiceActiveMy(on){
-  let btn = document.querySelector('[onclick*="startMyPersonVoiceSearch"]') || document.querySelector('#myPersonVoice');
+window._setVoiceActiveMy = function(on){
+  let btn = document.getElementById('myPersonVoice');
   if(btn) btn.classList.toggle('voice-active', on);
   if(on){
     let t = document.getElementById('saveToast');
@@ -8217,10 +8214,10 @@ function _setVoiceActiveMy(on){
     let t = document.getElementById('saveToast');
     if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
   }
-}
+};
 
-function _setVoiceActiveList(on){
-  let btn = document.querySelector('[onclick*="startListVoiceSearch"]') || document.querySelector('#listVoice');
+window._setVoiceActiveList = function(on){
+  let btn = document.getElementById('listVoice');
   if(btn) btn.classList.toggle('voice-active', on);
   if(on){
     let t = document.getElementById('saveToast');
@@ -8229,7 +8226,7 @@ function _setVoiceActiveList(on){
     let t = document.getElementById('saveToast');
     if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
   }
-}
+};
 
 function _setVoiceActive(on){
   let btns = document.querySelectorAll('#mss-mic-btn, [onclick*="startVoiceSearch"]');
@@ -8310,18 +8307,6 @@ function _setVoiceActive(on){
   /* صوت نشط */
   .voice-active{animation:voicePulse .7s ease-in-out infinite;}
   @keyframes voicePulse{0%,100%{opacity:.6;}50%{opacity:1;transform:translateY(-50%) scale(1.2);}}
-  /* Styling for voice buttons in various search fields */
-  .kin-voice-btn, .my-voice-btn, .list-voice-btn {
-    transition: opacity 0.2s ease, color 0.2s ease !important;
-    color: var(--text2, #6b7280) !important;
-  }
-  .kin-voice-btn:hover, .my-voice-btn:hover, .list-voice-btn:hover {
-    color: var(--text, #1f2937) !important;
-  }
-  .kin-voice-btn.voice-active, .my-voice-btn.voice-active, .list-voice-btn.voice-active {
-    animation: voicePulse 0.7s ease-in-out infinite;
-    color: #7c3aed !important;
-  }
   `;
   document.head.appendChild(st);
 
