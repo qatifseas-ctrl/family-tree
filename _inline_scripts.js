@@ -1108,10 +1108,7 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(1)">✕</span>
         </div>
         <div class="kin-search-box" id="kin1box" style="display:${p1?'none':'block'}">
-          <div class="voice-field-wrap">
-            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input" class="voice-field-input">
-            <button class="voice-mic-btn" type="button" onclick="startVoiceInput('kin1input','kinSearch')" title="بحث صوتي" aria-label="بحث صوتي">🎤</button>
-          </div>
+          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
           <div class="kin-results" id="kin1results" style="display:none"></div>
         </div>
       </div>
@@ -1126,10 +1123,7 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(2)">✕</span>
         </div>
         <div class="kin-search-box" id="kin2box" style="display:${p2?'none':'block'}">
-          <div class="voice-field-wrap">
-            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input" class="voice-field-input">
-            <button class="voice-mic-btn" type="button" onclick="startVoiceInput('kin2input','kinSearch')" title="بحث صوتي" aria-label="بحث صوتي">🎤</button>
-          </div>
+          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
           <div class="kin-results" id="kin2results" style="display:none"></div>
         </div>
       </div>
@@ -2946,9 +2940,8 @@ function renderList(){
     </div>
     <div class="list-search-row">
       <div class="list-search-box">
-        <input id="listSearchBox" type="text" value="${searchVal.replace(/"/g,'&quot;')}" placeholder="ابحث بالاسم، اللقب، الأب، الأم، أو الملاحظات..." oninput="setListSearch(this.value,false)" class="voice-field-input voice-field-input-list" />
-        <button class="voice-mic-btn voice-mic-btn-list" type="button" onclick="startVoiceInput('listSearchBox','setListSearch')" title="بحث صوتي" aria-label="بحث صوتي">🎤</button>
-        ${listSearchTerm?`<button class="list-search-clear list-search-clear-has-mic" onclick="clearListSearch()" title="مسح البحث">✕</button>`:''}
+        <input id="listSearchBox" type="text" value="${searchVal.replace(/"/g,'&quot;')}" placeholder="ابحث بالاسم، اللقب، الأب، الأم، أو الملاحظات..." oninput="setListSearch(this.value,false)" />
+        ${listSearchTerm?`<button class="list-search-clear" onclick="clearListSearch()" title="مسح البحث">✕</button>`:''}
       </div>
       <button class="btn" onclick="clearListSearch()" style="font-size:11px;padding:8px 12px;white-space:nowrap">مسح</button>
     </div>
@@ -4503,9 +4496,8 @@ function openMyPersonPicker(){
   <div class="modal" style="max-width:380px">
     <h3>أنا في الشجرة</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">اختر اسمك لعرض صلة قرابتك مع كل شخص في الشجرة</p>
-    <div class="voice-field-wrap voice-field-wrap-sm">
-      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" class="voice-field-input">
-      <button class="voice-mic-btn" type="button" onclick="startVoiceInput('mySearchInput','filterMyPicker')" title="بحث صوتي" aria-label="بحث صوتي">🎤</button>
+    <div style="position:relative;margin-bottom:8px">
+      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
     </div>
     <div id="myPickerList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px">${opts}</div>
     ${myPersonId?`<div style="margin-top:10px;text-align:center"><button class="btn" onclick="setMyPerson(null)" style="color:#ef4444">✕ إلغاء تحديد الاسم</button></div>`:''}
@@ -8075,60 +8067,6 @@ function startVoiceSearch(){
   try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActive(false); }
 }
 function mssVoiceSearch(){ startVoiceSearch(); }
-
-// بحث صوتي عام لأي حقل إدخال
-function startVoiceInput(targetInputId, callbackName){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-
-  if(_voiceRecognition){
-    _voiceRecognition.stop();
-    _voiceRecognition = null;
-  }
-
-  let input = document.getElementById(targetInputId);
-  if(!input)return;
-
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-
-  _voiceRecognition = r;
-  _setVoiceActive(true);
-
-  r.onresult = e=>{
-    let transcript = Array.from(e.results)
-      .map(res=>res[0].transcript)
-      .join('');
-
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-
-    input.value = transcript;
-
-    if(callbackName && typeof window[callbackName] === 'function'){
-      if(callbackName === 'kinSearch'){
-        let which = targetInputId === 'kin1input' ? 1 : 2;
-        window[callbackName](transcript, which);
-      } else {
-        window[callbackName](transcript);
-      }
-    }
-
-    input.dispatchEvent(new Event('input', { bubbles:true }));
-  };
-
-  r.onend = ()=>{ _voiceRecognition=null; _setVoiceActive(false); };
-  r.onerror = ()=>{ _voiceRecognition=null; _setVoiceActive(false); };
-
-  try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActive(false); }
-}
-
-function mssVoiceSearch(){ startVoiceSearch(); }
 function _setVoiceActive(on){
   let btns = document.querySelectorAll('#mss-mic-btn, [onclick*="startVoiceSearch"]');
   btns.forEach(b=>b.classList.toggle('voice-active', on));
@@ -9472,15 +9410,4 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     _showCloudButtons(true);
     try { if (window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX = initSettings.keyHex; } catch (e) {}
   }
-
-  // Expose voice/search helpers for inline event handlers
-  window.startVoiceSearch = startVoiceSearch;
-  window.startVoiceInput = startVoiceInput;
-  window.mssVoiceSearch = mssVoiceSearch;
-  window.kinSearch = kinSearch;
-  window.filterMyPicker = filterMyPicker;
-  window.renderAll = renderAll;
-  window.setListSearch = setListSearch;
-  window.clearListSearch = clearListSearch;
-
 })();
