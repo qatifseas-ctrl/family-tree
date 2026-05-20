@@ -1108,7 +1108,10 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(1)">✕</span>
         </div>
         <div class="kin-search-box" id="kin1box" style="display:${p1?'none':'block'}">
-          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,1)" onfocus="kinSearch(this.value,1)" id="kin1input" style="flex:1">
+            <button class="btn" type="button" onclick="startVoiceInput('kin1input','kinSearch')" title="بحث صوتي">🎤</button>
+          </div>
           <div class="kin-results" id="kin1results" style="display:none"></div>
         </div>
       </div>
@@ -1123,7 +1126,10 @@ function renderKinPanel(){
           <span class="clear" onclick="clearKin(2)">✕</span>
         </div>
         <div class="kin-search-box" id="kin2box" style="display:${p2?'none':'block'}">
-          <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" placeholder="ابحث أو اضغط لعرض الكل..." oninput="kinSearch(this.value,2)" onfocus="kinSearch(this.value,2)" id="kin2input" style="flex:1">
+            <button class="btn" type="button" onclick="startVoiceInput('kin2input','kinSearch')" title="بحث صوتي">🎤</button>
+          </div>
           <div class="kin-results" id="kin2results" style="display:none"></div>
         </div>
       </div>
@@ -4496,8 +4502,9 @@ function openMyPersonPicker(){
   <div class="modal" style="max-width:380px">
     <h3>أنا في الشجرة</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">اختر اسمك لعرض صلة قرابتك مع كل شخص في الشجرة</p>
-    <div style="position:relative;margin-bottom:8px">
-      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+    <div style="position:relative;margin-bottom:8px;display:flex;gap:6px;align-items:center">
+      <input type="text" id="mySearchInput" placeholder="ابحث بالاسم..." oninput="filterMyPicker(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:13px">
+      <button class="btn" type="button" onclick="startVoiceInput('mySearchInput','filterMyPicker')" title="بحث صوتي">🎤</button>
     </div>
     <div id="myPickerList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px">${opts}</div>
     ${myPersonId?`<div style="margin-top:10px;text-align:center"><button class="btn" onclick="setMyPerson(null)" style="color:#ef4444">✕ إلغاء تحديد الاسم</button></div>`:''}
@@ -8067,6 +8074,60 @@ function startVoiceSearch(){
   try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActive(false); }
 }
 function mssVoiceSearch(){ startVoiceSearch(); }
+
+// بحث صوتي عام لأي حقل إدخال
+function startVoiceInput(targetInputId, callbackName){
+  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecog){
+    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
+    return;
+  }
+
+  if(_voiceRecognition){
+    _voiceRecognition.stop();
+    _voiceRecognition = null;
+  }
+
+  let input = document.getElementById(targetInputId);
+  if(!input)return;
+
+  let r = new SpeechRecog();
+  r.lang = 'ar-SA';
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 3;
+
+  _voiceRecognition = r;
+  _setVoiceActive(true);
+
+  r.onresult = e=>{
+    let transcript = Array.from(e.results)
+      .map(res=>res[0].transcript)
+      .join('');
+
+    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
+
+    input.value = transcript;
+
+    if(callbackName && typeof window[callbackName] === 'function'){
+      if(callbackName === 'kinSearch'){
+        let which = targetInputId === 'kin1input' ? 1 : 2;
+        window[callbackName](transcript, which);
+      } else {
+        window[callbackName](transcript);
+      }
+    }
+
+    input.dispatchEvent(new Event('input', { bubbles:true }));
+  };
+
+  r.onend = ()=>{ _voiceRecognition=null; _setVoiceActive(false); };
+  r.onerror = ()=>{ _voiceRecognition=null; _setVoiceActive(false); };
+
+  try { r.start(); } catch(err){ _voiceRecognition=null; _setVoiceActive(false); }
+}
+
+function mssVoiceSearch(){ startVoiceSearch(); }
 function _setVoiceActive(on){
   let btns = document.querySelectorAll('#mss-mic-btn, [onclick*="startVoiceSearch"]');
   btns.forEach(b=>b.classList.toggle('voice-active', on));
@@ -8078,136 +8139,6 @@ function _setVoiceActive(on){
     let t = document.getElementById('saveToast');
     if(t){ t.style.opacity='0'; setTimeout(()=>{ t.style.background='#22c55e'; t.textContent='✔ تم الحفظ'; },400); }
   }
-}
-
-function startKinVoiceSearch(personNum){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-  if(_voiceRecognition){
-    _voiceRecognition.stop();
-    _voiceRecognition = null;
-    return;
-  }
-  let inputId = `kin${personNum}input`;
-  let inp = document.getElementById(inputId);
-  if(!inp) return;
-  
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-  _voiceRecognition = r;
-  let btn = document.getElementById(`kin${personNum}voice`);
-  if(btn) btn.classList.add('voice-active');
-  
-  r.onresult = e=>{
-    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-    inp.value = transcript;
-    kinSearch(transcript, personNum);
-  };
-  r.onend = ()=>{
-    _voiceRecognition=null;
-    let btn = document.getElementById(`kin${personNum}voice`);
-    if(btn) btn.classList.remove('voice-active');
-  };
-  r.onerror = e=>{
-    _voiceRecognition=null;
-    let btn = document.getElementById(`kin${personNum}voice`);
-    if(btn) btn.classList.remove('voice-active');
-  };
-  
-  try { r.start(); } catch(err){ _voiceRecognition=null; }
-}
-
-function startMyPersonVoiceSearch(){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-  if(_voiceRecognition){
-    _voiceRecognition.stop();
-    _voiceRecognition = null;
-    return;
-  }
-  let inp = document.getElementById('mySearchInput');
-  if(!inp) return;
-  
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-  _voiceRecognition = r;
-  let btn = document.getElementById('myPersonVoice');
-  if(btn) btn.classList.add('voice-active');
-  
-  r.onresult = e=>{
-    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-    inp.value = transcript;
-    filterMyPicker(transcript);
-  };
-  r.onend = ()=>{
-    _voiceRecognition=null;
-    let btn = document.getElementById('myPersonVoice');
-    if(btn) btn.classList.remove('voice-active');
-  };
-  r.onerror = e=>{
-    _voiceRecognition=null;
-    let btn = document.getElementById('myPersonVoice');
-    if(btn) btn.classList.remove('voice-active');
-  };
-  
-  try { r.start(); } catch(err){ _voiceRecognition=null; }
-}
-
-function startListVoiceSearch(){
-  let SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecog){
-    alert('متصفحك لا يدعم البحث الصوتي. استخدم Chrome أو Edge.');
-    return;
-  }
-  if(_voiceRecognition){
-    _voiceRecognition.stop();
-    _voiceRecognition = null;
-    return;
-  }
-  let inp = document.getElementById('listSearchBox');
-  if(!inp) return;
-  
-  let r = new SpeechRecog();
-  r.lang = 'ar-SA';
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 3;
-  _voiceRecognition = r;
-  let btn = document.getElementById('listVoice');
-  if(btn) btn.classList.add('voice-active');
-  
-  r.onresult = e=>{
-    let transcript = Array.from(e.results).map(res=>res[0].transcript).join('');
-    transcript = transcript.replace(/[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u060C\u061B\u061F\u06D4\u002E\u066A-\u066D]+$/u, '').trim();
-    inp.value = transcript;
-    setListSearch(transcript, false);
-  };
-  r.onend = ()=>{
-    _voiceRecognition=null;
-    let btn = document.getElementById('listVoice');
-    if(btn) btn.classList.remove('voice-active');
-  };
-  r.onerror = e=>{
-    _voiceRecognition=null;
-    let btn = document.getElementById('listVoice');
-    if(btn) btn.classList.remove('voice-active');
-  };
-  
-  try { r.start(); } catch(err){ _voiceRecognition=null; }
 }
 
 // ══════════════════════════════════════════════════════════
