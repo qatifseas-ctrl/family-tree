@@ -459,6 +459,15 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 }
 .voice-btn:active{transform:scale(.98);}
 
+.voice-input-wrap{position:relative;flex:1;min-width:0}
+.voice-input{width:100%;box-sizing:border-box;padding:10px 78px 10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
+.voice-input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.12)}
+.voice-input-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;min-width:30px;padding:0;border:none;border-radius:8px;background:transparent;color:var(--text2);cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;z-index:2}
+.voice-input-btn:hover{background:var(--card-border);color:var(--text)}
+.voice-input-btn:active{transform:translateY(-50%) scale(.96)}
+.kin-search-box .voice-input{padding:9px 78px 9px 12px}
+#mySearchInput.voice-input{padding:8px 78px 8px 12px}
+
 .tabs{display:flex;gap:4px;margin-bottom:12px;}
 .tab{padding:7px 16px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text2);font-size:13px;cursor:pointer;}
 .tab.active{background:#3b82f6;color:#fff;border-color:#3b82f6;}
@@ -546,7 +555,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .list-title .title-text{font-size:13px;font-weight:700;color:var(--text)}
 .list-search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;direction:rtl}
 .list-search-box{position:relative;flex:1;min-width:220px}
-.list-search-box input{width:100%;padding:10px 36px 10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
+.list-search-box input{width:100%;padding:10px 78px 10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--bg-secondary);color:var(--text);font-size:14px;outline:none}
 .list-search-box input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.12)}
 .list-search-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border:none;border-radius:50%;background:transparent;color:var(--text2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
 .list-search-clear:hover{background:var(--card-border);color:var(--text)}
