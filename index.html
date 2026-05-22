@@ -10445,284 +10445,203 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 </script>
 
 
+</body>
+</html>
+
 <!-- ═══════════════════════════════════════════════════════════════════════
-     FAMILY UPDATES — SUPABASE EDITION
-     Replaces the GitHub Gist-based family update system with an
-     append-only, AES-GCM encrypted, Supabase-backed solution.
-     All Gist infrastructure is kept as a migration source only.
+     FAMILY UPDATES — SUPABASE ONLY (v2)
+     نظام تحديثات العائلة — Supabase فقط، بدون Gist
      ═══════════════════════════════════════════════════════════════════════ -->
 <script>
 (function () {
   'use strict';
 
-  /* ─────────────────────────────────────────────────────────────────
-     CONSTANTS
-  ───────────────────────────────────────────────────────────────── */
-  const FU_SCHEMA_VERSION   = 1;
-  const FU_TABLE            = 'family_updates';
-  const FU_LAST_HASH_KEY    = 'ft_fu_last_hash_v1';
-  const FU_MIGRATED_KEY     = 'ft_fu_gist_migrated_v1';
-  const FU_UPLOAD_RETRY_MS  = 5000;   // debounce before upload
-  const FU_MAX_RECORDS      = 500;    // cap for SELECT
-  const FU_PAGE_SIZE        = 50;     // records per page in UI
+  /* ─── ثوابت ─────────────────────────────────────────────────────────── */
+  const FU_TABLE           = 'family_updates';
+  const FU_SCHEMA_VERSION  = 1;
+  const FU_LAST_HASH_KEY   = 'ft_fu_last_hash_v2';   // v2 لتجنب تعارض cache قديم
+  const FU_DEBOUNCE_MS     = 5000;
+  const FU_MAX_RECORDS     = 500;
+  const FU_PAGE_SIZE       = 50;
 
-  /* ─────────────────────────────────────────────────────────────────
-     HELPERS — reuse already-defined global utilities
-  ───────────────────────────────────────────────────────────────── */
+  /* ─── أدوات مساعدة ──────────────────────────────────────────────────── */
 
-  /** Get persistent device-id (shared with Gist layer). */
-  function _fuDeviceId() {
-    let id = '';
-    try { id = localStorage.getItem('ft_family_device_id') || ''; } catch (e) {}
-    if (!id) {
-      id = [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, '0')).join('');
-      try { localStorage.setItem('ft_family_device_id', id); } catch (e) {}
-    }
-    return id;
+  function _fuLog(...args) {
+    console.debug('[FU]', ...args);
   }
 
-  /** Get device display name. */
+  /** معرّف الجهاز — UUID ثابت لكل متصفح */
+  function _fuDeviceId() {
+    try {
+      let id = localStorage.getItem('ft_family_device_id') || '';
+      if (!id) {
+        id = [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2,'0')).join('');
+        localStorage.setItem('ft_family_device_id', id);
+      }
+      return id;
+    } catch (e) { return 'unknown'; }
+  }
+
+  /** اسم الجهاز للعرض */
   function _fuDeviceName() {
     try { return localStorage.getItem('ft_family_device_name') || _fuDeviceId(); } catch (e) { return _fuDeviceId(); }
   }
 
-  /** Read the active encryption key from any available source. */
-  function _fuResolveKey() {
-    // Priority 1: Supabase settings via exposed window function
+  /** مفتاح التشفير — من إعدادات Supabase أو CLOUD_CONFIG */
+  function _fuKey() {
     try {
       if (typeof window._ftReadSettings === 'function') {
-        const s = window._ftReadSettings();
-        if (s.keyHex && /^[0-9a-fA-F]{64}$/i.test(s.keyHex)) return s.keyHex.toLowerCase();
+        const k = window._ftReadSettings().keyHex || '';
+        if (/^[0-9a-fA-F]{64}$/.test(k)) return k.toLowerCase();
       }
     } catch (e) {}
-    // Priority 2: legacy FAMILY_UPLOAD_CONFIG / CLOUD_CONFIG
-    const candidates = [
-      (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.KEY_HEX : ''),
-      (typeof CLOUD_CONFIG         !== 'undefined' ? CLOUD_CONFIG.KEY_HEX         : ''),
-    ];
-    try { candidates.push(localStorage.getItem('ft_fupload_key') || ''); } catch (e) {}
-    try { candidates.push(localStorage.getItem('ft_cloud_key')   || ''); } catch (e) {}
-    const valid = candidates.find(k => k && /^[0-9a-fA-F]{64}$/i.test(k));
-    return valid ? valid.toLowerCase() : '';
+    try {
+      const k = window.CLOUD_CONFIG?.KEY_HEX || '';
+      if (/^[0-9a-fA-F]{64}$/.test(k)) return k.toLowerCase();
+    } catch (e) {}
+    return '';
   }
 
-  /** Return the family_id (= Supabase syncId). */
+  /** معرّف العائلة = syncId من الإعدادات */
   function _fuFamilyId() {
     try {
-      const fn = window._ftReadSettings || (typeof _ftReadSettings === 'function' ? _ftReadSettings : null);
-      const s = fn ? fn() : {};
-      return (s.syncId || '').trim() || 'default';
-    } catch (e) { return 'default'; }
+      if (typeof window._ftReadSettings === 'function') {
+        return (window._ftReadSettings().syncId || '').trim() || 'family-sync';
+      }
+    } catch (e) {}
+    return 'family-sync';
   }
 
-  /** Compute SHA-256 hex digest of a string. */
+  /** هل Supabase مُعدَّة ومستعدة؟ */
+  function _fuReady() {
+    try { if (typeof window._ftSettingsReady === 'function') return window._ftSettingsReady(); } catch (e) {}
+    try { if (typeof window._isCloudConfigured === 'function') return window._isCloudConfigured(); } catch (e) {}
+    return false;
+  }
+
+  /* ─── SHA-256 ────────────────────────────────────────────────────────── */
   async function _fuSHA256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
   }
 
-  /** Build a deterministic content fingerprint from the local people array.
-   *  Photos are stripped; only structural/semantic fields are hashed. */
-  async function _fuContentHash() {
-    try {
-      const arr = Array.isArray(window.people) ? window.people : [];
-      const stripped = arr.map(p => {
-        if (!p) return null;
-        const { photo, ...rest } = p; // eslint-disable-line no-unused-vars
-        return rest;
-      }).filter(Boolean);
-      const relArr = Array.isArray(window.relPairs) ? window.relPairs : [];
-      const sig = JSON.stringify({ people: stripped, relPairs: relArr, nextId: window.nextId || 0 });
-      return await _fuSHA256(sig);
-    } catch (e) {
-      return '';
-    }
-  }
-
-  /** Returns true only when real family content has changed since last upload. */
-  async function _fuHasRealChanges() {
-    const hash = await _fuContentHash();
-    if (!hash) return false;
-    try {
-      const last = localStorage.getItem(FU_LAST_HASH_KEY) || '';
-      return hash !== last;
-    } catch (e) { return true; }
-  }
-
-  /** Encrypt plaintext with AES-GCM. Returns { iv, payload_encrypted, checksum }. */
-  async function _fuEncrypt(plainText, keyHex) {
-    if (!keyHex || !/^[0-9a-fA-F]{64}$/i.test(keyHex)) {
-      throw new Error('مفتاح التشفير غير صالح');
-    }
-    const keyBytes = _hexToBytes(keyHex);
-    const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const cipher = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      cryptoKey,
-      new TextEncoder().encode(plainText)
-    );
-    const checksum = await _fuSHA256(plainText);
+  /* ─── AES-GCM تشفير / فك تشفير ─────────────────────────────────────── */
+  async function _fuEncrypt(plain, keyHex) {
+    if (!keyHex) throw new Error('مفتاح التشفير مفقود');
+    const key = await crypto.subtle.importKey('raw', _hexToBytes(keyHex), {name:'AES-GCM'}, false, ['encrypt']);
+    const iv  = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plain));
     return {
-      iv: _bytesToBase64(iv),
-      payload_encrypted: _bytesToBase64(new Uint8Array(cipher)),
-      checksum,
+      iv:                _bytesToBase64(iv),
+      payload_encrypted: _bytesToBase64(new Uint8Array(enc)),
+      checksum:          await _fuSHA256(plain),
     };
   }
 
-  /** Decrypt an AES-GCM record. Returns plaintext string. */
-  async function _fuDecrypt(ivB64, payloadB64, keyHex) {
-    if (!keyHex || !/^[0-9a-fA-F]{64}$/i.test(keyHex)) {
-      throw new Error('مفتاح التشفير غير صالح — لا يمكن فك التشفير');
-    }
-    const keyBytes = _hexToBytes(keyHex);
-    const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
-    const iv = _base64ToBytes(ivB64);
-    const cipher = _base64ToBytes(payloadB64);
+  async function _fuDecrypt(ivB64, payB64, keyHex) {
+    if (!keyHex) throw new Error('مفتاح التشفير مفقود');
+    const key  = await crypto.subtle.importKey('raw', _hexToBytes(keyHex), {name:'AES-GCM'}, false, ['decrypt']);
+    const iv   = _base64ToBytes(ivB64);
+    const ciph = _base64ToBytes(payB64);
     let plain;
     try {
-      plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, cipher);
+      plain = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ciph);
     } catch (e) {
-      throw new Error('فشل فك التشفير — المفتاح غير صحيح أو البيانات تالفة');
+      throw new Error('فشل فك التشفير — تحقق من مفتاح التشفير');
     }
     return new TextDecoder().decode(plain);
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     SUPABASE TABLE ACCESS (REST via supabase-js client)
-  ───────────────────────────────────────────────────────────────── */
-
-  /** Get a Supabase client (uses exposed window._ftGetSupabaseClient). */
-  async function _fuClient() {
-    // Use the exposed function from the cloud module
-    if (typeof window._ftGetSupabaseClient === 'function') {
-      return window._ftGetSupabaseClient();
+  /* ─── Supabase: INSERT + SELECT ─────────────────────────────────────── */
+  async function _fuGetClient() {
+    if (typeof window._ftGetSupabaseClient !== 'function') {
+      throw new Error('دالة Supabase غير متاحة — أعد تحميل الصفحة');
     }
-    // Fallback: if cloud module not yet loaded, wait a tick and retry
-    throw new Error('Supabase غير مُهيَّأ — تأكد من حفظ إعدادات المزامنة السحابية أولاً');
+    return window._ftGetSupabaseClient();
   }
 
-  /**
-   * INSERT a single row into family_updates.
-   * Append-only: no UPDATE/UPSERT ever.
-   */
-  async function _fuInsert(record) {
-    const client = await _fuClient();
-    const { error } = await client.from(FU_TABLE).insert([record]);
-    if (error) throw new Error('فشل الإدراج في Supabase: ' + (error.message || JSON.stringify(error)));
+  async function _fuInsert(row) {
+    const client = await _fuGetClient();
+    const { error } = await client.from(FU_TABLE).insert([row]);
+    if (error) throw new Error('خطأ في الإدراج: ' + (error.message || JSON.stringify(error)));
   }
 
-  /**
-   * SELECT all records for this family, newest first.
-   * Returns an array of raw DB rows.
-   */
-  async function _fuSelect(familyId, limit) {
-    const client = await _fuClient();
+  async function _fuSelect(familyId) {
+    const client = await _fuGetClient();
     const { data, error } = await client
       .from(FU_TABLE)
       .select('*')
       .eq('family_id', familyId)
       .order('created_at', { ascending: false })
-      .limit(limit || FU_MAX_RECORDS);
-    if (error) throw new Error('فشل جلب التحديثات من Supabase: ' + (error.message || JSON.stringify(error)));
+      .limit(FU_MAX_RECORDS);
+    if (error) throw new Error('خطأ في الجلب: ' + (error.message || JSON.stringify(error)));
     return data || [];
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     UPLOAD — replaces _doSilentFamilyUpload
-  ───────────────────────────────────────────────────────────────── */
+  /* ─── كشف التغييرات الحقيقية ────────────────────────────────────────── */
+  async function _fuContentHash() {
+    try {
+      const people = (Array.isArray(window.people) ? window.people : []).map(p => {
+        if (!p) return null;
+        const { photo, ...rest } = p;
+        return rest;
+      }).filter(Boolean);
+      const sig = JSON.stringify({
+        people,
+        relPairs: Array.isArray(window.relPairs) ? window.relPairs : [],
+        nextId:   window.nextId || 0,
+      });
+      return _fuSHA256(sig);
+    } catch (e) { return ''; }
+  }
 
+  async function _fuHasChanges() {
+    const hash = await _fuContentHash();
+    if (!hash) return false;
+    try {
+      return hash !== (localStorage.getItem(FU_LAST_HASH_KEY) || '');
+    } catch (e) { return true; }
+  }
+
+  /* ─── الرفع الصامت ──────────────────────────────────────────────────── */
   let _fuUploading = false;
-  let _fuUploadTimer = null;
+  let _fuTimer     = null;
 
-  /**
-   * Check if the family upload system is ready.
-   * Uses the exposed window._ftSettingsReady from the cloud module.
-   */
-  function _isFamilyUploadConfigured() {
-    // Use the cloud module's own readiness check (most reliable)
-    try {
-      if (typeof window._ftSettingsReady === 'function' && window._ftSettingsReady()) return true;
-    } catch (e) {}
-    // Also check window._isCloudConfigured (also exposed)
-    try {
-      if (typeof window._isCloudConfigured === 'function' && window._isCloudConfigured()) return true;
-    } catch (e) {}
-    // Manual check with window._ftReadSettings
-    try {
-      if (typeof window._ftReadSettings === 'function') {
-        const s = window._ftReadSettings();
-        if (s.url && s.anonKey && _fuResolveKey()) return true;
-      }
-    } catch (e) {}
-    // Fallback: old Gist config (backward compatibility)
-    try {
-      const gistId = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GIST_ID : '')
-        || localStorage.getItem('ft_fupload_gid') || '';
-      const pat = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GITHUB_PAT : '')
-        || localStorage.getItem('ft_fupload_pat') || '';
-      if (gistId && pat && _fuResolveKey()) return true;
-    } catch (e) {}
-    return false;
-  }
-
-  /**
-   * Debounced trigger — called from saveData() just like before.
-   */
   function triggerFamilyUpload() {
-    if (!_isFamilyUploadConfigured()) return;
-    clearTimeout(_fuUploadTimer);
-    _fuUploadTimer = setTimeout(() => _doSilentFamilyUpload(), FU_UPLOAD_RETRY_MS);
+    if (!_fuReady()) return;
+    clearTimeout(_fuTimer);
+    _fuTimer = setTimeout(_doSilentFamilyUpload, FU_DEBOUNCE_MS);
   }
 
-  /**
-   * The actual upload worker — fully replaces the Gist version.
-   */
   async function _doSilentFamilyUpload() {
-    if (!_isFamilyUploadConfigured() || _fuUploading) return;
+    if (!_fuReady() || _fuUploading) return;
     _fuUploading = true;
     try {
-      // 1) Resolve encryption key — abort if missing
-      const keyHex = _fuResolveKey();
-      if (!keyHex) {
-        console.debug('[FU] No encryption key — upload skipped for security');
-        return;
-      }
+      const keyHex = _fuKey();
+      if (!keyHex) { _fuLog('لا يوجد مفتاح تشفير — تم التخطي'); return; }
 
-      // 2) Change detection — skip trivial / empty payloads
-      const hasChanges = await _fuHasRealChanges();
-      if (!hasChanges) {
-        console.debug('[FU] No real changes detected — upload skipped');
-        return;
-      }
+      const hasChanges = await _fuHasChanges();
+      if (!hasChanges) { _fuLog('لا يوجد تغيير حقيقي — تم التخطي'); return; }
 
-      // 3) Build payload (no photos — same as before)
       const arr = Array.isArray(window.people) ? window.people : [];
-      if (!arr.length) {
-        console.debug('[FU] Empty people array — upload skipped');
-        return;
-      }
-      const data = JSON.parse(JSON.stringify({
-        people: arr,
-        relPairs: Array.isArray(window.relPairs) ? window.relPairs : [],
-        nextId: window.nextId || 1,
-        myPersonId: (typeof window.myPersonId !== 'undefined') ? window.myPersonId : null,
+      if (!arr.length) { _fuLog('قائمة الأشخاص فارغة — تم التخطي'); return; }
+
+      // بناء الحمولة (بدون صور)
+      const payload = JSON.parse(JSON.stringify({
+        people:     arr,
+        relPairs:   Array.isArray(window.relPairs) ? window.relPairs : [],
+        nextId:     window.nextId || 1,
+        myPersonId: window.myPersonId ?? null,
         uploadedAt: new Date().toISOString(),
+        deviceId:   _fuDeviceId(),
         deviceName: _fuDeviceName(),
-        deviceId: _fuDeviceId(),
       }));
-      // Strip photos
-      data.people.forEach(p => { if (p && p.photo !== undefined) delete p.photo; });
+      payload.people.forEach(p => { if (p) delete p.photo; });
 
-      const plainText = JSON.stringify(data);
+      const { iv, payload_encrypted, checksum } = await _fuEncrypt(JSON.stringify(payload), keyHex);
 
-      // 4) Encrypt
-      const { iv, payload_encrypted, checksum } = await _fuEncrypt(plainText, keyHex);
-
-      // 5) INSERT append-only record
-      const familyId = _fuFamilyId();
       await _fuInsert({
-        family_id:         familyId,
+        family_id:         _fuFamilyId(),
         device_id:         _fuDeviceId(),
         device_name:       _fuDeviceName(),
         schema_version:    FU_SCHEMA_VERSION,
@@ -10732,510 +10651,231 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         update_type:       'auto',
       });
 
-      // 6) Persist hash so we don't re-upload unchanged data
+      // حفظ الهاش الجديد
       const newHash = await _fuContentHash();
       try { localStorage.setItem(FU_LAST_HASH_KEY, newHash); } catch (e) {}
+      _fuLog('✓ تم الرفع — family_id:', _fuFamilyId());
 
-      console.debug('[FU] Upload OK — family_id:', familyId, 'device:', _fuDeviceId());
     } catch (e) {
-      // Silent fail — local data is always safe
-      console.debug('[FU] Upload error (silent):', e.message || e);
+      _fuLog('✗ خطأ في الرفع:', e.message || e);
     } finally {
       _fuUploading = false;
     }
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     GIST → SUPABASE MIGRATION
-  ───────────────────────────────────────────────────────────────── */
-
-  /**
-   * One-shot migration: reads old Gist records and inserts them
-   * as Supabase rows with update_type='migration'.
-   * Safe to re-run: skips if already migrated.
-   * Returns { migrated: N, skipped: M, errors: [] }.
-   */
-  async function _fuMigrateFromGist() {
-    try {
-      const alreadyDone = localStorage.getItem(FU_MIGRATED_KEY);
-      if (alreadyDone === '1') {
-        return { migrated: 0, skipped: 0, errors: [], alreadyDone: true };
-      }
-    } catch (e) {}
-
-    const keyHex = _fuResolveKey();
-    if (!keyHex) return { migrated: 0, skipped: 0, errors: ['لا يوجد مفتاح تشفير للهجرة'] };
-
-    let gistId = '';
-    try {
-      gistId = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GIST_ID : '')
-        || localStorage.getItem('ft_fupload_gid')
-        || localStorage.getItem('ft_family_gist_id_v1')
-        || '';
-    } catch (e) {}
-
-    if (!gistId) return { migrated: 0, skipped: 0, errors: ['لا يوجد Gist ID للهجرة'] };
-
-    let pat = '';
-    try {
-      pat = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GITHUB_PAT : '')
-        || localStorage.getItem('ft_fupload_pat')
-        || '';
-    } catch (e) {}
-
-    if (!pat) return { migrated: 0, skipped: 0, errors: ['لا يوجد GitHub PAT للقراءة من Gist'] };
-
-    // Fetch Gist
-    let gistFiles = {};
-    try {
-      const res = await fetch('https://api.github.com/gists/' + gistId, {
-        headers: { 'Authorization': 'token ' + pat, 'Accept': 'application/vnd.github+json' }
-      });
-      if (!res.ok) throw new Error('GitHub API: ' + res.status);
-      const j = await res.json();
-      gistFiles = j.files || {};
-    } catch (e) {
-      return { migrated: 0, skipped: 0, errors: ['فشل جلب Gist: ' + e.message] };
-    }
-
-    const familyFiles = Object.values(gistFiles).filter(f => f && f.filename && /^ft_family_.*\.dat$/i.test(f.filename));
-    if (!familyFiles.length) {
-      try { localStorage.setItem(FU_MIGRATED_KEY, '1'); } catch (e) {}
-      return { migrated: 0, skipped: 0, errors: [] };
-    }
-
-    const familyId = _fuFamilyId();
-    let migrated = 0, skipped = 0;
-    const errors = [];
-
-    // Check for existing migration records to avoid duplicates
-    let existingDeviceIds = new Set();
-    try {
-      const existing = await _fuSelect(familyId, FU_MAX_RECORDS);
-      existing.filter(r => r.update_type === 'migration').forEach(r => existingDeviceIds.add(r.device_id));
-    } catch (e) {}
-
-    for (const ff of familyFiles) {
-      const devId = (ff.filename || '').replace(/^ft_family_/i, '').replace(/\.dat$/i, '');
-      // Skip already-migrated devices
-      if (existingDeviceIds.has(devId)) { skipped++; continue; }
-
-      try {
-        let raw = ff.content || '';
-        if (ff.truncated && ff.raw_url) {
-          const r = await fetch(ff.raw_url, {
-            headers: { 'Authorization': 'token ' + pat }
-          });
-          raw = await r.text();
-        }
-        // Parse using existing helper
-        const data = await _familyParseUpdateRaw(raw, keyHex);
-        if (!data || !Array.isArray(data.people)) { skipped++; continue; }
-
-        // Strip photos from migrated data
-        data.people.forEach(p => { if (p && p.photo !== undefined) delete p.photo; });
-        const plainText = JSON.stringify(data);
-
-        const { iv, payload_encrypted, checksum } = await _fuEncrypt(plainText, keyHex);
-
-        await _fuInsert({
-          family_id:         familyId,
-          device_id:         devId,
-          device_name:       data.deviceName || devId,
-          schema_version:    FU_SCHEMA_VERSION,
-          payload_encrypted,
-          iv,
-          checksum,
-          update_type:       'migration',
-        });
-
-        migrated++;
-      } catch (e) {
-        errors.push(devId + ': ' + (e.message || String(e)));
-        skipped++;
-      }
-    }
-
-    if (errors.length === 0) {
-      try { localStorage.setItem(FU_MIGRATED_KEY, '1'); } catch (e) {}
-    }
-
-    return { migrated, skipped, errors };
-  }
-
-  /* ─────────────────────────────────────────────────────────────────
-     UI — FAMILY UPDATES MODAL (full replacement)
-  ───────────────────────────────────────────────────────────────── */
-
-  /**
-   * Main entry point — replaces the old Gist-based openFamilyUpdatesModal.
-   */
+  /* ─── نافذة تحديثات العائلة ─────────────────────────────────────────── */
   async function openFamilyUpdatesModal() {
-    if (!_isFamilyUploadConfigured()) {
-      _fuShowNotConfiguredModal();
+    if (!_fuReady()) {
+      _fuShowError('⚙️ يجب إعداد المزامنة السحابية أولاً', [
+        { label: '⚙️ إعداد Supabase', action: 'closeModal();openCloudSetup()' },
+      ]);
       return;
     }
 
-    // Show loading
+    // نافذة التحميل
     document.getElementById('modalContainer').innerHTML =
-      `<div class="modal-overlay"><div class="modal" style="max-width:480px;text-align:center">
-         <div style="font-size:32px;margin-bottom:12px">📡</div>
-         <div style="font-size:14px;color:var(--text)">جارٍ جلب تحديثات العائلة من Supabase…</div>
+      `<div class="modal-overlay"><div class="modal" style="max-width:420px;text-align:center;padding:32px">
+         <div style="font-size:36px;margin-bottom:12px">📡</div>
+         <div style="font-size:14px;color:var(--text2)">جارٍ جلب تحديثات العائلة…</div>
        </div></div>`;
 
     try {
       const familyId = _fuFamilyId();
-      const keyHex   = _fuResolveKey();
+      const keyHex   = _fuKey();
+      const rows     = await _fuSelect(familyId);
 
-      const rows = await _fuSelect(familyId, FU_MAX_RECORDS);
+      // فلترة: تجاهل سجلات الهجرة القديمة تماماً، فقط auto/manual
+      const realRows = rows.filter(r => r.update_type !== 'migration');
 
-      if (!rows.length) {
-        _fuShowEmptyModal(familyId);
+      if (!realRows.length) {
+        _fuShowEmpty(familyId);
         return;
       }
 
-      // Decrypt and parse records
+      // فك التشفير
       const parsed = [];
-      for (const row of rows) {
-        let decryptStatus = 'ok';
-        let data = null;
+      for (const row of realRows) {
+        let data = null, errMsg = '';
         try {
           const plain = await _fuDecrypt(row.iv, row.payload_encrypted, keyHex);
           data = JSON.parse(plain);
-          if (!data || !Array.isArray(data.people)) throw new Error('لا يحتوي على people');
+          if (!Array.isArray(data?.people)) throw new Error('بنية غير صالحة');
         } catch (e) {
-          decryptStatus = e.message || 'فشل فك التشفير';
-          data = null;
+          errMsg = e.message || 'خطأ';
         }
-        parsed.push({ row, data, decryptStatus });
+        const summary = data && typeof _familySummarizeUpdate === 'function'
+          ? _familySummarizeUpdate(data) : { newPeople:[], updatedPeople:[], unchangedPeople:[], stats:{} };
+        parsed.push({ row, data, errMsg, summary });
       }
 
-      const valid   = parsed.filter(x => x.data && x.decryptStatus === 'ok');
-      const invalid = parsed.filter(x => x.decryptStatus !== 'ok');
+      window._familyUpdates = parsed;
+      _fuRenderList(parsed, familyId);
 
-      // Deduplicate: per-device keep all records (append-only), group by device
-      // Build display list: one entry per unique (device_id × created_at)
-      // Also summarize against local data
-      const displayList = valid.map(({ row, data }) => {
-        const summary = (typeof _familySummarizeUpdate === 'function')
-          ? _familySummarizeUpdate(data)
-          : { stats: {}, newPeople: [], updatedPeople: [], unchangedPeople: [] };
-        return {
-          row,
-          data,
-          summary,
-          devId:   row.device_id,
-          devName: row.device_name || row.device_id,
-          pCount:  (data.people || []).length,
-          ts:      row.created_at || data.uploadedAt || '',
-          newCnt:  summary.newPeople.length,
-          updCnt:  summary.updatedPeople.length,
-          unchCnt: summary.unchangedPeople.length,
-          updateType: row.update_type || 'auto',
-        };
-      });
-
-      // Store for use by action callbacks
-      window._familyUpdates = displayList;
-
-      _fuRenderModal(displayList, invalid, familyId);
     } catch (e) {
-      const errMsg = String(e.message || e);
-      let helpHtml = '';
-      
-      // Check if it's a table-not-found error
-      if (errMsg.includes('relation') || errMsg.includes('family_updates') || errMsg.includes('does not exist')) {
-        helpHtml = `<div style="padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;margin-top:10px;line-height:1.7">
-          💡 يبدو أن جدول <code>family_updates</code> لم يُنشأ في Supabase بعد.<br>
-          اضغط على "🛠 عرض SQL" لنسخ وتنفيذ أوامر SQL الإنشاء.
-        </div>`;
-      }
-      
+      const msg  = e.message || String(e);
+      const hint = /relation|does not exist/i.test(msg)
+        ? `<div style="margin-top:10px;padding:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e">
+            💡 جدول <code>family_updates</code> غير موجود — اضغط "🛠 SQL" لإنشائه
+           </div>`
+        : '';
       document.getElementById('modalContainer').innerHTML =
         `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
            <div class="modal" style="max-width:520px">
              <h3>📡 تحديثات العائلة</h3>
-             <div style="padding:14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;line-height:1.8">
-               ❌ ${errMsg.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-             </div>
-             ${helpHtml}
+             <div style="padding:12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b">${escapeHtml(msg)}</div>
+             ${hint}
              <div class="modal-footer">
                <button class="btn" onclick="closeModal()">إغلاق</button>
-               <button class="btn" style="font-size:11px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="window._fuShowSQLGuide()">🛠 عرض SQL</button>
-               <button class="btn primary" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>
+               <button class="btn" onclick="window._fuShowSQL()">🛠 SQL</button>
              </div>
            </div>
          </div>`;
     }
   }
 
-  function _fuShowEmptyModal(familyId) {
+  /* ─── عرض النافذة الفارغة ───────────────────────────────────────────── */
+  function _fuShowEmpty(familyId) {
     document.getElementById('modalContainer').innerHTML =
       `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-         <div class="modal" style="max-width:480px;text-align:center">
-           <div style="font-size:36px;margin-bottom:10px">📭</div>
-           <h3>لا توجد تحديثات بعد</h3>
-           <div style="font-size:12px;color:var(--text2);line-height:1.8;margin:12px 0">
-             لم يرفع أي فرد من العائلة تحديثات إلى Supabase بعد.<br>
-             <code style="font-size:10px">${familyId}</code>
+         <div class="modal" style="max-width:460px;text-align:center;padding:32px 24px">
+           <div style="font-size:40px;margin-bottom:12px">📭</div>
+           <div style="font-size:16px;font-weight:600;margin-bottom:8px">لا توجد تحديثات بعد</div>
+           <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:16px">
+             لم يرفع أي جهاز تحديثاً إلى Supabase بعد.<br>
+             عدّل أي بيانات ثم احفظ — سيُرفع تلقائياً خلال 5 ثوانٍ.<br>
+             <code style="font-size:10px;background:var(--bg-secondary);padding:2px 6px;border-radius:4px">${escapeHtml(familyId)}</code>
            </div>
-           <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px">
-             <button class="btn" onclick="closeModal()">إغلاق</button>
-             <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();_fuRunMigrationUI()">🔄 هجرة من Gist</button>
-           </div>
+           <button class="btn" onclick="closeModal()">إغلاق</button>
          </div>
        </div>`;
   }
 
-  function _fuShowNotConfiguredModal() {
+  /* ─── عرض رسالة خطأ ─────────────────────────────────────────────────── */
+  function _fuShowError(msg, btns) {
+    const btnsHtml = (btns || []).map(b =>
+      `<button class="btn primary" onclick="${b.action}">${b.label}</button>`
+    ).join('');
     document.getElementById('modalContainer').innerHTML =
       `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-         <div class="modal" style="max-width:480px">
+         <div class="modal" style="max-width:440px">
            <h3>📡 تحديثات العائلة</h3>
-           <div style="padding:12px;background:#fff7ed;border:1px solid #fb923c;border-radius:8px;font-size:13px;color:#9a3412;line-height:1.8;margin-bottom:14px">
-             ⚙️ يجب إعداد Supabase أولاً لاستخدام نظام تحديثات العائلة.
-           </div>
+           <div style="padding:12px;background:#fff7ed;border:1px solid #fb923c;border-radius:8px;font-size:13px;color:#9a3412;margin-bottom:14px">${msg}</div>
            <div class="modal-footer">
              <button class="btn" onclick="closeModal()">إغلاق</button>
-             <button class="btn primary" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>
+             ${btnsHtml}
            </div>
          </div>
        </div>`;
   }
 
-  function _fuRenderModal(list, invalidRows, familyId) {
-    const perPage = FU_PAGE_SIZE;
-    let page = 0;
-    const totalPages = Math.ceil(list.length / perPage);
+  /* ─── عرض قائمة التحديثات (مع pagination) ──────────────────────────── */
+  function _fuRenderList(list, familyId) {
+    const validCount   = list.filter(x => x.data).length;
+    const invalidCount = list.filter(x => x.errMsg).length;
 
-    function renderPage(p) {
-      const slice = list.slice(p * perPage, (p + 1) * perPage);
-      return slice.map((u, localIdx) => {
-        const idx = p * perPage + localIdx; // global index in window._familyUpdates
-        const ts = u.ts
-          ? new Date(u.ts).toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-          : '—';
-        const typeBadge = u.updateType === 'migration'
-          ? `<span style="font-size:10px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px">هجرة</span>`
-          : u.updateType === 'manual'
-            ? `<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:4px;padding:1px 5px">يدوي</span>`
-            : '';
-        const st = u.summary.stats || {};
-        const chips = [
-          `👨 ${st.males || 0}`, `👩 ${st.females || 0}`, `⚰️ ${st.deceased || 0}`, `🖼 ${st.photos || 0}`
-        ].map(t => `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px">${t}</span>`).join('');
-        const changeChips = [
-          u.newCnt > 0
-            ? `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;background:#d1fae5;color:#065f46;border-color:#10b981">➕ ${u.newCnt} جديد</span>`
-            : `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;color:var(--text3)">➕ 0</span>`,
-          u.updCnt > 0
-            ? `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;background:#dbeafe;color:#1d4ed8;border-color:#3b82f6">🔄 ${u.updCnt} محدَّث</span>`
-            : `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;color:var(--text3)">🔄 0</span>`,
-          `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px">⏭ ${u.unchCnt}</span>`,
-        ].join('');
-        return `<div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:10px">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <div style="min-width:0">
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                <span style="font-size:13px;font-weight:600;color:var(--text)">📱 ${escapeHtml(u.devName)}</span>
-                ${typeBadge}
-              </div>
-              <div style="font-size:10px;font-family:monospace;color:var(--text2);margin-top:2px">${escapeHtml(u.devId)}</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:5px">${u.pCount} فرد · ${ts}</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-              <button class="btn" style="font-size:11px;padding:4px 10px;background:#dbeafe;border-color:#3b82f6;color:#1d4ed8" onclick="openFamilyUpdateDetails(${idx})">🔍 تفاصيل</button>
-              <button class="btn" style="font-size:11px;padding:4px 10px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
-              <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_familyDownloadOne(${idx})">⬇️ JSON</button>
-            </div>
-          </div>
-          <div class="kin-stats" style="margin:0;padding:8px 0 0;border-top:1px dashed var(--card-border);background:transparent">${chips}${changeChips}</div>
+    function cardHtml(u, idx) {
+      const ts = u.row.created_at
+        ? new Date(u.row.created_at).toLocaleString('ar-SA', {
+            timeZone:'Asia/Riyadh', month:'short', day:'numeric',
+            hour:'2-digit', minute:'2-digit'
+          })
+        : '—';
+      const st = u.summary.stats || {};
+      const np = u.summary.newPeople?.length || 0;
+      const up = u.summary.updatedPeople?.length || 0;
+      const uc = u.summary.unchangedPeople?.length || 0;
+
+      if (u.errMsg) {
+        return `<div style="padding:10px 14px;border:1px solid #fca5a5;border-radius:10px;background:#fff5f5;margin-bottom:10px;font-size:12px;color:#991b1b">
+          ⚠️ سجل تالف أو مفتاح خاطئ — ${escapeHtml(u.errMsg)}
+          <span style="font-size:10px;color:#aaa;margin-right:8px">${escapeHtml(u.row.device_id||'')}</span>
         </div>`;
-      }).join('');
+      }
+
+      const pCount = u.data.people?.length || 0;
+      return `<div style="padding:12px 14px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:10px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">📱 ${escapeHtml(u.row.device_name||u.row.device_id)}</div>
+            <div style="font-size:10px;font-family:monospace;color:var(--text3);margin-top:1px">${escapeHtml(u.row.device_id||'')}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">${pCount} فرد · ${ts}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn" style="font-size:11px;padding:3px 9px;background:#dbeafe;border-color:#3b82f6;color:#1d4ed8" onclick="openFamilyUpdateDetails(${idx})">🔍 تفاصيل</button>
+            <button class="btn" style="font-size:11px;padding:3px 9px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
+            <button class="btn" style="font-size:11px;padding:3px 9px" onclick="_familyDownloadOne(${idx})">⬇️</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;padding-top:7px;border-top:1px dashed var(--card-border)">
+          <span class="kin-stat">👨 ${st.males||0}</span>
+          <span class="kin-stat">👩 ${st.females||0}</span>
+          <span class="kin-stat">⚰️ ${st.deceased||0}</span>
+          <span class="kin-stat">🖼 ${st.photos||0}</span>
+          ${np ? `<span class="kin-stat" style="background:#d1fae5;color:#065f46;border-color:#10b981">➕ ${np} جديد</span>` : `<span class="kin-stat" style="opacity:.5">➕ 0</span>`}
+          ${up ? `<span class="kin-stat" style="background:#dbeafe;color:#1d4ed8;border-color:#3b82f6">🔄 ${up} محدَّث</span>` : `<span class="kin-stat" style="opacity:.5">🔄 0</span>`}
+          <span class="kin-stat" style="opacity:.6">⏭ ${uc}</span>
+        </div>
+      </div>`;
     }
 
-    const decryptErrHtml = invalidRows.length
-      ? `<div style="padding:8px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:11px;color:#9a3412;margin-bottom:10px">
-           ⚠️ ${invalidRows.length} سجل لم يمكن فك تشفيره — تحقق من صحة مفتاح التشفير
-         </div>`
-      : '';
+    // pagination
+    let page = 0;
+    const totalPages = Math.ceil(list.length / FU_PAGE_SIZE);
 
-    const mergeAllBtn = list.length > 1
-      ? `<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${list.length} سجل)</button>`
+    function pageHtml(p) {
+      return list.slice(p * FU_PAGE_SIZE, (p+1) * FU_PAGE_SIZE)
+        .map((u, i) => cardHtml(u, p * FU_PAGE_SIZE + i)).join('');
+    }
+
+    const errNotice = invalidCount
+      ? `<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:11px;color:#9a3412;margin-bottom:10px">⚠️ ${invalidCount} سجل لم يُفك تشفيره — تحقق من مفتاح التشفير</div>`
       : '';
 
     const paginationHtml = totalPages > 1
       ? `<div style="display:flex;gap:6px;align-items:center;justify-content:center;padding:8px 0;border-top:1px solid var(--card-border)">
-           <button class="btn" style="font-size:11px;padding:3px 10px" id="fuPrevBtn" onclick="window._fuChangePage(-1)">‹ السابق</button>
-           <span id="fuPageLabel" style="font-size:11px;color:var(--text2)">صفحة 1 / ${totalPages}</span>
-           <button class="btn" style="font-size:11px;padding:3px 10px" id="fuNextBtn" onclick="window._fuChangePage(1)">التالي ›</button>
+           <button class="btn" id="fuPrev" style="font-size:11px;padding:3px 10px" onclick="window._fuPage(-1)">‹</button>
+           <span id="fuPageLbl" style="font-size:11px;color:var(--text2)">1 / ${totalPages}</span>
+           <button class="btn" id="fuNext" style="font-size:11px;padding:3px 10px" onclick="window._fuPage(1)">›</button>
          </div>`
+      : '';
+
+    const mergeAllBtn = validCount > 1
+      ? `<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${validCount})</button>`
       : '';
 
     document.getElementById('modalContainer').innerHTML =
       `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-         <div class="modal" style="max-width:760px;width:min(760px,96vw)">
+         <div class="modal" style="max-width:720px;width:min(720px,96vw)">
            <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
              📡 تحديثات العائلة
              <span style="font-size:12px;font-weight:400;color:var(--text2)">${list.length} سجل · <code style="font-size:10px">${escapeHtml(familyId)}</code></span>
            </h3>
-           ${decryptErrHtml}
-           <div id="fuListBody" style="max-height:55vh;overflow-y:auto;padding-left:2px">${renderPage(0)}</div>
+           ${errNotice}
+           <div id="fuBody" style="max-height:58vh;overflow-y:auto;padding-left:2px">${pageHtml(0)}</div>
            ${paginationHtml}
-           <div class="modal-footer" style="flex-wrap:wrap">
+           <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
              <button class="btn" onclick="closeModal()">إغلاق</button>
-             <button class="btn" style="font-size:11px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();_fuRunMigrationUI()">🔄 هجرة من Gist</button>
              ${mergeAllBtn}
            </div>
          </div>
        </div>`;
 
-    // Pagination state
-    window._fuCurrentPage = 0;
-    window._fuChangePage = function (delta) {
-      const newPage = window._fuCurrentPage + delta;
-      if (newPage < 0 || newPage >= totalPages) return;
-      window._fuCurrentPage = newPage;
-      const body = document.getElementById('fuListBody');
-      if (body) body.innerHTML = renderPage(newPage);
-      const lbl = document.getElementById('fuPageLabel');
-      if (lbl) lbl.textContent = `صفحة ${newPage + 1} / ${totalPages}`;
-      const prev = document.getElementById('fuPrevBtn');
-      const next = document.getElementById('fuNextBtn');
-      if (prev) prev.disabled = newPage === 0;
-      if (next) next.disabled = newPage === totalPages - 1;
+    // pagination handlers
+    window._fuPage = function(delta) {
+      const np = page + delta;
+      if (np < 0 || np >= totalPages) return;
+      page = np;
+      const body = document.getElementById('fuBody');
+      if (body) body.innerHTML = pageHtml(page);
+      const lbl = document.getElementById('fuPageLbl');
+      if (lbl) lbl.textContent = `${page+1} / ${totalPages}`;
     };
   }
 
-  /* ─────────────────────────────────────────────────────────────────
-     MIGRATION UI
-  ───────────────────────────────────────────────────────────────── */
-
-  window._fuRunMigrationUI = async function () {
-    document.getElementById('modalContainer').innerHTML =
-      `<div class="modal-overlay"><div class="modal" style="max-width:460px;text-align:center">
-         <div style="font-size:32px;margin-bottom:10px">🔄</div>
-         <div style="font-size:14px;color:var(--text)">جارٍ نقل بيانات Gist إلى Supabase…</div>
-       </div></div>`;
-
-    try {
-      const result = await _fuMigrateFromGist();
-      let msg = '';
-      if (result.alreadyDone) {
-        msg = '✅ تمت الهجرة مسبقاً — جميع السجلات موجودة في Supabase.';
-      } else if (result.migrated === 0 && result.errors.length === 0) {
-        msg = '✅ لا توجد بيانات قديمة للهجرة (Gist فارغ أو غير مُعدَّ).';
-      } else {
-        msg = `✅ تمت هجرة ${result.migrated} سجل بنجاح.`
-          + (result.skipped ? ` تخطّي: ${result.skipped}.` : '')
-          + (result.errors.length ? `<br>⚠️ أخطاء: ${result.errors.join('; ')}` : '');
-      }
-      document.getElementById('modalContainer').innerHTML =
-        `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-           <div class="modal" style="max-width:460px">
-             <h3>🔄 هجرة Gist → Supabase</h3>
-             <div style="padding:12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:13px;color:#065f46;line-height:1.8">${msg}</div>
-             <div class="modal-footer">
-               <button class="btn" onclick="closeModal()">إغلاق</button>
-               <button class="btn primary" onclick="openFamilyUpdatesModal()">📡 عرض التحديثات</button>
-             </div>
-           </div>
-         </div>`;
-    } catch (e) {
-      document.getElementById('modalContainer').innerHTML =
-        `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-           <div class="modal" style="max-width:460px">
-             <h3>🔄 هجرة Gist → Supabase</h3>
-             <div style="padding:12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b">
-               ❌ ${(e.message || String(e)).replace(/</g,'&lt;')}
-             </div>
-             <div class="modal-footer">
-               <button class="btn" onclick="closeModal()">إغلاق</button>
-             </div>
-           </div>
-         </div>`;
-    }
-  };
-
-  /* ─────────────────────────────────────────────────────────────────
-     SETUP PANEL (simplified — no GitHub PAT needed)
-  ───────────────────────────────────────────────────────────────── */
-
-  function openFamilyUploadSetup() {
-    const devId   = _fuDeviceId();
-    const devName = _fuDeviceName();
-    const ready   = _isFamilyUploadConfigured();
-    const familyId = _fuFamilyId();
-
-    document.getElementById('modalContainer').innerHTML =
-      `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-         <div class="modal" style="max-width:520px">
-           <h3>📡 إعداد تحديثات العائلة</h3>
-           <div style="padding:10px 12px;background:${ready ? '#d1fae5' : '#fff7ed'};border:1px solid ${ready ? '#10b981' : '#fb923c'};border-radius:8px;font-size:12px;color:${ready ? '#065f46' : '#9a3412'};margin-bottom:14px;line-height:1.8">
-             ${ready
-               ? `✅ Supabase مُعدَّ — التحديثات تُرفع تلقائياً.<br>معرّف العائلة: <code>${escapeHtml(familyId)}</code>`
-               : '⚙️ يجب إعداد Supabase أولاً. اضغط "إعداد Supabase" أدناه.'}
-           </div>
-           <div class="form-row">
-             <label>👤 اسم الجهاز / صاحبه</label>
-             <input id="fu_devname_sb" type="text" value="${escapeHtml(devName)}" placeholder="مثال: هاتف أحمد، جهاز فاطمة…" style="font-size:13px">
-             <div style="font-size:11px;color:var(--text2);margin-top:4px">
-               💡 معرّف هذا الجهاز: <code style="background:var(--bg-secondary);padding:1px 6px;border-radius:4px;font-family:monospace">${escapeHtml(devId)}</code>
-             </div>
-           </div>
-           <div style="padding:10px 12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1d4ed8;margin-bottom:14px">
-             <strong>🔐 التشفير تلقائي:</strong> يُستخدم نفس مفتاح AES-256 الخاص بإعداد Supabase.
-             لا يحتاج إعداداً إضافياً — البيانات مشفّرة قبل مغادرة الجهاز.
-           </div>
-           <div class="modal-footer">
-             <button class="btn" onclick="closeModal()">إغلاق</button>
-             ${ready ? '' : '<button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>'}
-             <button class="btn primary" onclick="_fuApplyDeviceName()">✓ حفظ الاسم</button>
-           </div>
-         </div>
-       </div>`;
-  }
-
-  window._fuApplyDeviceName = function () {
-    const name = (document.getElementById('fu_devname_sb') || {}).value || '';
-    if (name.trim()) {
-      try { localStorage.setItem('ft_family_device_name', name.trim()); } catch (e) {}
-    }
-    closeModal();
-    _showCloudToast('✅ تم حفظ اسم الجهاز', 'success', 2000);
-  };
-
-  /** applyFamilyUploadSetup — kept for backward compat (old family copies may call it). */
-  function applyFamilyUploadSetup() {
-    // Absorb old calls gracefully
-    const pat   = (document.getElementById('fu_pat')     || {}).value || '';
-    const gid   = (document.getElementById('fu_gid')     || {}).value || '';
-    const dname = (document.getElementById('fu_devname') || {}).value || '';
-    if (pat.trim()) {
-      try { localStorage.setItem('ft_fupload_pat', pat.trim()); } catch (e) {}
-      if (typeof FAMILY_UPLOAD_CONFIG !== 'undefined') FAMILY_UPLOAD_CONFIG.GITHUB_PAT = pat.trim();
-    }
-    if (gid.trim()) {
-      try { localStorage.setItem('ft_fupload_gid', gid.trim()); } catch (e) {}
-      if (typeof FAMILY_UPLOAD_CONFIG !== 'undefined') FAMILY_UPLOAD_CONFIG.GIST_ID = gid.trim();
-    }
-    if (dname.trim()) { try { localStorage.setItem('ft_family_device_name', dname.trim()); } catch (e) {} }
-    closeModal();
-    _showCloudToast('✅ تم الحفظ', 'success', 2000);
-  }
-
-  /* ─────────────────────────────────────────────────────────────────
-     SQL HELPER — exposed on window for the setup guide
-  ───────────────────────────────────────────────────────────────── */
-
-  /**
-   * Returns the SQL needed to create the family_updates table.
-   * Show this to the user in a help modal.
-   */
-  window._fuGetSetupSQL = function () {
-    return `-- Run this once in your Supabase SQL Editor
--- (Database → SQL Editor → New Query)
-
+  /* ─── SQL setup helper ──────────────────────────────────────────────── */
+  window._fuShowSQL = function () {
+    const sql =
+`-- شغّل هذا في Supabase → SQL Editor → New Query
 CREATE TABLE IF NOT EXISTS public.family_updates (
   id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id         text        NOT NULL,
@@ -11248,86 +10888,68 @@ CREATE TABLE IF NOT EXISTS public.family_updates (
   checksum          text,
   update_type       text        NOT NULL DEFAULT 'auto'
 );
-
--- Indexes for fast filtering
-CREATE INDEX IF NOT EXISTS family_updates_family_id_idx
-  ON public.family_updates (family_id);
-CREATE INDEX IF NOT EXISTS family_updates_created_at_idx
-  ON public.family_updates (created_at DESC);
-
--- Row Level Security (defence-in-depth; encryption is primary security)
+CREATE INDEX IF NOT EXISTS fu_family_idx ON public.family_updates(family_id);
+CREATE INDEX IF NOT EXISTS fu_time_idx   ON public.family_updates(created_at DESC);
 ALTER TABLE public.family_updates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "insert" ON public.family_updates FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "select" ON public.family_updates FOR SELECT TO authenticated USING (true);`;
 
-CREATE POLICY "Authenticated users can insert"
-  ON public.family_updates FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
-
-CREATE POLICY "Authenticated users can select"
-  ON public.family_updates FOR SELECT
-  TO authenticated
-  USING (true);`;
-  };
-
-  /** Show the SQL setup guide. */
-  window._fuShowSQLGuide = function () {
-    const sql = window._fuGetSetupSQL();
     document.getElementById('modalContainer').innerHTML =
       `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-         <div class="modal" style="max-width:680px;width:min(680px,96vw)">
-           <h3>🛠 إعداد جدول family_updates في Supabase</h3>
-           <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px">
-             افتح لوحة Supabase → <strong>SQL Editor</strong> → <strong>New Query</strong> ثم الصق الكود التالي ونفّذه:
+         <div class="modal" style="max-width:660px;width:min(660px,96vw)">
+           <h3>🛠 إنشاء جدول family_updates</h3>
+           <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+             افتح Supabase → SQL Editor → New Query ثم انسخ والصق:
            </div>
-           <pre style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:12px;font-family:monospace;font-size:11px;overflow-x:auto;direction:ltr;text-align:left;max-height:50vh;overflow-y:auto;white-space:pre">${sql.replace(/</g,'&lt;')}</pre>
+           <pre style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:8px;padding:12px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:50vh;white-space:pre">${sql.replace(/</g,'&lt;')}</pre>
            <div class="modal-footer">
              <button class="btn" onclick="closeModal()">إغلاق</button>
-             <button class="btn primary" onclick="navigator.clipboard&&navigator.clipboard.writeText(window._fuGetSetupSQL()).then(()=>{this.textContent='✅ تم النسخ';setTimeout(()=>{this.textContent='📋 نسخ';},2000)}).catch(()=>{});this.textContent='📋 نسخ'">📋 نسخ SQL</button>
+             <button class="btn primary" onclick="navigator.clipboard?.writeText(${JSON.stringify(sql)}).then(()=>{this.textContent='✅ تم';setTimeout(()=>{this.textContent='📋 نسخ'},2000)})">📋 نسخ</button>
            </div>
          </div>
        </div>`;
   };
 
-  /* ─────────────────────────────────────────────────────────────────
-     EXPOSE OVERRIDES TO GLOBAL SCOPE
-  ───────────────────────────────────────────────────────────────── */
+  /* ─── كشف الدوال على window ─────────────────────────────────────────── */
+  window.openFamilyUpdatesModal    = openFamilyUpdatesModal;
+  window.triggerFamilyUpload       = triggerFamilyUpload;
+  window._doSilentFamilyUpload     = _doSilentFamilyUpload;
+  window._isFamilyUploadConfigured = _fuReady;
+  window.openFamilyUploadSetup     = function () {
+    const id   = _fuDeviceId();
+    const name = _fuDeviceName();
+    const ok   = _fuReady();
+    document.getElementById('modalContainer').innerHTML =
+      `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+         <div class="modal" style="max-width:480px">
+           <h3>📡 إعداد تحديثات العائلة</h3>
+           <div style="padding:10px 12px;background:${ok?'#d1fae5':'#fff7ed'};border:1px solid ${ok?'#10b981':'#fb923c'};border-radius:8px;font-size:12px;color:${ok?'#065f46':'#9a3412'};margin-bottom:14px;line-height:1.8">
+             ${ok
+               ? `✅ Supabase مُعدَّة — التحديثات تُرفع تلقائياً بعد 5 ثوانٍ من الحفظ.`
+               : `⚙️ أعدّ المزامنة السحابية أولاً ثم عُد هنا.`}
+           </div>
+           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">👤 اسم هذا الجهاز</label>
+           <input id="_fuNameInp" type="text" value="${escapeHtml(name)}"
+             placeholder="مثال: هاتف أحمد، جهاز فاطمة…"
+             style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--card-border);border-radius:7px;font-size:13px;background:var(--bg-input,var(--card-bg));color:var(--text)">
+           <div style="font-size:10px;color:var(--text3);margin-top:5px">
+             معرّف هذا الجهاز: <code style="background:var(--bg-secondary);padding:1px 5px;border-radius:4px">${escapeHtml(id)}</code>
+           </div>
+           <div class="modal-footer">
+             <button class="btn" onclick="closeModal()">إغلاق</button>
+             ${!ok ? `<button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>` : ''}
+             <button class="btn primary" onclick="
+               const v=(document.getElementById('_fuNameInp')||{}).value||'';
+               if(v.trim()){try{localStorage.setItem('ft_family_device_name',v.trim())}catch(e){}}
+               closeModal();
+               if(typeof _showCloudToast==='function')_showCloudToast('✅ تم حفظ اسم الجهاز','success',2000);
+             ">✓ حفظ</button>
+           </div>
+         </div>
+       </div>`;
+  };
 
-  window.openFamilyUpdatesModal  = openFamilyUpdatesModal;
-  window.openFamilyUploadSetup   = openFamilyUploadSetup;
-  window.applyFamilyUploadSetup  = applyFamilyUploadSetup;
-  window.triggerFamilyUpload     = triggerFamilyUpload;
-  window._doSilentFamilyUpload   = _doSilentFamilyUpload;
-  window._isFamilyUploadConfigured = _isFamilyUploadConfigured;
-
-  // Run migration check on first load (silent, non-blocking)
-  window.addEventListener('load', function () {
-    setTimeout(async function () {
-      if (!_isFamilyUploadConfigured()) return;
-      try {
-        const alreadyDone = localStorage.getItem(FU_MIGRATED_KEY);
-        if (alreadyDone === '1') return;
-        // Only auto-migrate if old Gist config is present
-        const gistId = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GIST_ID : '')
-          || localStorage.getItem('ft_fupload_gid') || '';
-        const pat = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GITHUB_PAT : '')
-          || localStorage.getItem('ft_fupload_pat') || '';
-        if (!gistId || !pat) {
-          // No old data — mark as migrated to skip future checks
-          try { localStorage.setItem(FU_MIGRATED_KEY, '1'); } catch (e) {}
-          return;
-        }
-        const result = await _fuMigrateFromGist();
-        if (result.migrated > 0) {
-          console.info('[FU] Auto-migrated', result.migrated, 'Gist records to Supabase.');
-        }
-      } catch (e) {
-        console.debug('[FU] Auto-migration skipped:', e.message);
-      }
-    }, 8000); // delayed so as not to block startup
-  });
-
-  console.info('[FU] Family Updates — Supabase edition loaded ✓');
-
+  _fuLog('Family Updates v2 (Supabase-only) loaded ✓');
 })();
 </script>
 
