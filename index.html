@@ -10627,13 +10627,34 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   /**
    * Check if the family upload system is ready.
    * Now depends on Supabase being configured (no GitHub PAT needed).
+   * Relaxed check: if Supabase settings exist OR encryption key exists.
    */
   function _isFamilyUploadConfigured() {
-    if (typeof _ftSettingsReady === 'function') return _ftSettingsReady();
-    if (typeof _ftReadSettings === 'function') {
-      const s = _ftReadSettings();
-      return !!(s.url && s.anonKey && _fuResolveKey());
+    // Try existing _ftSettingsReady first if available
+    if (typeof _ftSettingsReady === 'function') {
+      try {
+        if (_ftSettingsReady()) return true;
+      } catch (e) {}
     }
+    // Manual check: Supabase + encryption key
+    if (typeof _ftReadSettings === 'function') {
+      try {
+        const s = _ftReadSettings();
+        const hasSupabase = !!(s.url && s.anonKey);
+        const hasKey = !!_fuResolveKey();
+        // Ready if: (Supabase + key) OR (old Gist config still present for backward compat)
+        if (hasSupabase && hasKey) return true;
+      } catch (e) {}
+    }
+    // Fallback: check if old Gist config is still set (backward compatibility)
+    try {
+      const gistId = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GIST_ID : '')
+        || localStorage.getItem('ft_fupload_gid') || '';
+      const pat = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GITHUB_PAT : '')
+        || localStorage.getItem('ft_fupload_pat') || '';
+      const key = _fuResolveKey();
+      if (gistId && pat && key) return true;  // old system still works
+    } catch (e) {}
     return false;
   }
 
@@ -10911,15 +10932,28 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
       _fuRenderModal(displayList, invalid, familyId);
     } catch (e) {
+      const errMsg = String(e.message || e);
+      let helpHtml = '';
+      
+      // Check if it's a table-not-found error
+      if (errMsg.includes('relation') || errMsg.includes('family_updates') || errMsg.includes('does not exist')) {
+        helpHtml = `<div style="padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;margin-top:10px;line-height:1.7">
+          💡 يبدو أن جدول <code>family_updates</code> لم يُنشأ في Supabase بعد.<br>
+          اضغط على "🛠 عرض SQL" لنسخ وتنفيذ أوامر SQL الإنشاء.
+        </div>`;
+      }
+      
       document.getElementById('modalContainer').innerHTML =
         `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
            <div class="modal" style="max-width:520px">
              <h3>📡 تحديثات العائلة</h3>
              <div style="padding:14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;line-height:1.8">
-               ❌ ${String(e.message || e).replace(/</g,'&lt;')}
+               ❌ ${errMsg.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
              </div>
+             ${helpHtml}
              <div class="modal-footer">
                <button class="btn" onclick="closeModal()">إغلاق</button>
+               <button class="btn" style="font-size:11px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="window._fuShowSQLGuide()">🛠 عرض SQL</button>
                <button class="btn primary" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>
              </div>
            </div>
