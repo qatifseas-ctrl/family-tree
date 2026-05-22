@@ -10436,6 +10436,11 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     _showCloudButtons(true);
     try { if (window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX = initSettings.keyHex; } catch (e) {}
   }
+
+  // Expose internal helpers so Family Updates module can reuse the same client
+  window._ftGetSupabaseClient = _ftGetSupabaseClient;
+  window._ftReadSettings      = _ftReadSettings;
+  window._ftSettingsReady     = _ftSettingsReady;
 })();
 </script>
 
@@ -10483,17 +10488,20 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
   /** Read the active encryption key from any available source. */
   function _fuResolveKey() {
-    // Priority: Supabase settings → FAMILY_UPLOAD_CONFIG → CLOUD_CONFIG → localStorage
+    // Priority 1: Supabase settings via exposed window function
     try {
-      const sbKey = (typeof _ftReadSettings === 'function') ? (_ftReadSettings().keyHex || '') : '';
-      if (sbKey && /^[0-9a-fA-F]{64}$/i.test(sbKey)) return sbKey.toLowerCase();
+      if (typeof window._ftReadSettings === 'function') {
+        const s = window._ftReadSettings();
+        if (s.keyHex && /^[0-9a-fA-F]{64}$/i.test(s.keyHex)) return s.keyHex.toLowerCase();
+      }
     } catch (e) {}
+    // Priority 2: legacy FAMILY_UPLOAD_CONFIG / CLOUD_CONFIG
     const candidates = [
       (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.KEY_HEX : ''),
       (typeof CLOUD_CONFIG         !== 'undefined' ? CLOUD_CONFIG.KEY_HEX         : ''),
     ];
     try { candidates.push(localStorage.getItem('ft_fupload_key') || ''); } catch (e) {}
-    try { candidates.push(localStorage.getItem('ft_cloud_key') || ''); } catch (e) {}
+    try { candidates.push(localStorage.getItem('ft_cloud_key')   || ''); } catch (e) {}
     const valid = candidates.find(k => k && /^[0-9a-fA-F]{64}$/i.test(k));
     return valid ? valid.toLowerCase() : '';
   }
@@ -10501,7 +10509,8 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   /** Return the family_id (= Supabase syncId). */
   function _fuFamilyId() {
     try {
-      const s = (typeof _ftReadSettings === 'function') ? _ftReadSettings() : {};
+      const fn = window._ftReadSettings || (typeof _ftReadSettings === 'function' ? _ftReadSettings : null);
+      const s = fn ? fn() : {};
       return (s.syncId || '').trim() || 'default';
     } catch (e) { return 'default'; }
   }
@@ -10583,12 +10592,14 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
      SUPABASE TABLE ACCESS (REST via supabase-js client)
   ───────────────────────────────────────────────────────────────── */
 
-  /** Get a Supabase client (uses existing _ftGetSupabaseClient). */
+  /** Get a Supabase client (uses exposed window._ftGetSupabaseClient). */
   async function _fuClient() {
-    if (typeof _ftGetSupabaseClient === 'function') {
-      return _ftGetSupabaseClient();
+    // Use the exposed function from the cloud module
+    if (typeof window._ftGetSupabaseClient === 'function') {
+      return window._ftGetSupabaseClient();
     }
-    throw new Error('Supabase غير مُهيَّأ — شغّل إعداد المزامنة السحابية أولاً');
+    // Fallback: if cloud module not yet loaded, wait a tick and retry
+    throw new Error('Supabase غير مُهيَّأ — تأكد من حفظ إعدادات المزامنة السحابية أولاً');
   }
 
   /**
@@ -10626,34 +10637,31 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
   /**
    * Check if the family upload system is ready.
-   * Now depends on Supabase being configured (no GitHub PAT needed).
-   * Relaxed check: if Supabase settings exist OR encryption key exists.
+   * Uses the exposed window._ftSettingsReady from the cloud module.
    */
   function _isFamilyUploadConfigured() {
-    // Try existing _ftSettingsReady first if available
-    if (typeof _ftSettingsReady === 'function') {
-      try {
-        if (_ftSettingsReady()) return true;
-      } catch (e) {}
-    }
-    // Manual check: Supabase + encryption key
-    if (typeof _ftReadSettings === 'function') {
-      try {
-        const s = _ftReadSettings();
-        const hasSupabase = !!(s.url && s.anonKey);
-        const hasKey = !!_fuResolveKey();
-        // Ready if: (Supabase + key) OR (old Gist config still present for backward compat)
-        if (hasSupabase && hasKey) return true;
-      } catch (e) {}
-    }
-    // Fallback: check if old Gist config is still set (backward compatibility)
+    // Use the cloud module's own readiness check (most reliable)
+    try {
+      if (typeof window._ftSettingsReady === 'function' && window._ftSettingsReady()) return true;
+    } catch (e) {}
+    // Also check window._isCloudConfigured (also exposed)
+    try {
+      if (typeof window._isCloudConfigured === 'function' && window._isCloudConfigured()) return true;
+    } catch (e) {}
+    // Manual check with window._ftReadSettings
+    try {
+      if (typeof window._ftReadSettings === 'function') {
+        const s = window._ftReadSettings();
+        if (s.url && s.anonKey && _fuResolveKey()) return true;
+      }
+    } catch (e) {}
+    // Fallback: old Gist config (backward compatibility)
     try {
       const gistId = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GIST_ID : '')
         || localStorage.getItem('ft_fupload_gid') || '';
       const pat = (typeof FAMILY_UPLOAD_CONFIG !== 'undefined' ? FAMILY_UPLOAD_CONFIG.GITHUB_PAT : '')
         || localStorage.getItem('ft_fupload_pat') || '';
-      const key = _fuResolveKey();
-      if (gistId && pat && key) return true;  // old system still works
+      if (gistId && pat && _fuResolveKey()) return true;
     } catch (e) {}
     return false;
   }
