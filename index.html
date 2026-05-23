@@ -3131,7 +3131,567 @@ function exportData(){
         '<div id="modalContainer"></div>\n'+
         dataTag+'\n'+
         '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-        '</body>\n</html>';
+        '
+<!-- ═══════════════════════════════════════════════════════════════════
+SUPABASE ENCRYPTED FAMILY UPDATES MIGRATION LAYER
+Production-grade append-only encrypted sync
+═══════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════════════════════════════ */
+window.SUPABASE_CONFIG = window.SUPABASE_CONFIG || {
+  URL: localStorage.getItem('ft_supabase_url') || '',
+  ANON_KEY: localStorage.getItem('ft_supabase_anon') || '',
+  FAMILY_ID: localStorage.getItem('ft_family_id') || 'default-family',
+  ENCRYPTION_KEY: localStorage.getItem('ft_family_enc_key') || '',
+  SCHEMA_VERSION: 1
+};
+
+const SUPABASE_TABLE = 'family_updates';
+const UPDATE_QUEUE_KEY = 'ft_supabase_queue_v1';
+const LAST_HASH_KEY = 'ft_last_family_hash_v1';
+const MIGRATION_KEY = 'ft_gist_migration_done_v1';
+const DEVICE_ID = (
+  localStorage.getItem('ft_device_id_v1') ||
+  ('dev_' + crypto.randomUUID())
+);
+
+localStorage.setItem('ft_device_id_v1', DEVICE_ID);
+
+let _supabase = null;
+
+function getSupabaseClient(){
+  if(_supabase) return _supabase;
+
+  if(!window.supabase || !SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY){
+    console.warn('[Supabase] Missing configuration.');
+    return null;
+  }
+
+  _supabase = window.supabase.createClient(
+    SUPABASE_CONFIG.URL,
+    SUPABASE_CONFIG.ANON_KEY,
+    {
+      auth:{persistSession:false},
+      global:{headers:{'X-Family-Device':DEVICE_ID}}
+    }
+  );
+
+  return _supabase;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SQL / RLS DOCUMENTATION
+═══════════════════════════════════════════════════════════════ */
+/*
+CREATE TABLE public.family_updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id text NOT NULL,
+  device_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  schema_version integer NOT NULL DEFAULT 1,
+  payload_encrypted text NOT NULL,
+  iv text NOT NULL,
+  checksum text,
+  update_type text DEFAULT 'family_update',
+  merge_status text DEFAULT 'pending',
+  metadata jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.family_updates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "family_select"
+ON public.family_updates
+FOR SELECT
+USING (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE POLICY "family_insert"
+ON public.family_updates
+FOR INSERT
+WITH CHECK (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE INDEX idx_family_updates_family_created
+ON public.family_updates(family_id, created_at DESC);
+*/
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════ */
+function showSyncToast(message, color){
+  try{
+    const toast = document.getElementById('cloudToast');
+    if(!toast) return;
+
+    toast.textContent = message;
+    toast.style.background = color || '#111827';
+    toast.style.color = '#fff';
+    toast.style.opacity = '1';
+
+    clearTimeout(showSyncToast._t);
+    showSyncToast._t = setTimeout(function(){
+      toast.style.opacity = '0';
+    }, 3500);
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+function stableStringify(obj){
+  if(obj === null || typeof obj !== 'object'){
+    return JSON.stringify(obj);
+  }
+
+  if(Array.isArray(obj)){
+    return '[' + obj.map(stableStringify).join(',') + ']';
+  }
+
+  return '{' + Object.keys(obj).sort().map(function(k){
+    return JSON.stringify(k) + ':' + stableStringify(obj[k]);
+  }).join(',') + '}';
+}
+
+async function sha256(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b=>b.toString(16).padStart(2,'0'))
+    .join('');
+}
+
+function sanitizeFamilyPayload(raw){
+  const cloned = JSON.parse(JSON.stringify(raw || {}));
+
+  [
+    'lastViewedAt',
+    'lastSyncAt',
+    'cloudSyncTimestamp',
+    'syncStatus',
+    'temporaryFlags'
+  ].forEach(function(key){
+    delete cloned[key];
+  });
+
+  return cloned;
+}
+
+async function generateDeterministicHash(data){
+  return sha256(stableStringify(sanitizeFamilyPayload(data)));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AES-GCM ENCRYPTION
+═══════════════════════════════════════════════════════════════ */
+async function deriveAesKey(password){
+  if(!password || password.length < 12){
+    throw new Error('Encryption key must be at least 12 characters.');
+  }
+
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name:'PBKDF2',
+      salt:new TextEncoder().encode(SUPABASE_CONFIG.FAMILY_ID),
+      iterations:150000,
+      hash:'SHA-256'
+    },
+    material,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+function arrayBufferToBase64(buffer){
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for(let i=0;i<bytes.byteLength;i++){
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for(let i=0;i<binary.length;i++){
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+async function encryptFamilyPayload(payload){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const plainText = stableStringify({
+    version:1,
+    payload:payload
+  });
+
+  const encrypted = await crypto.subtle.encrypt(
+    {name:'AES-GCM', iv:iv},
+    key,
+    new TextEncoder().encode(plainText)
+  );
+
+  return {
+    payload_encrypted: arrayBufferToBase64(encrypted),
+    iv: arrayBufferToBase64(iv),
+    checksum: await sha256(plainText)
+  };
+}
+
+async function decryptFamilyPayload(record){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name:'AES-GCM',
+      iv:new Uint8Array(base64ToArrayBuffer(record.iv))
+    },
+    key,
+    base64ToArrayBuffer(record.payload_encrypted)
+  );
+
+  const text = new TextDecoder().decode(decrypted);
+  const parsed = JSON.parse(text);
+
+  return parsed.payload;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UPDATE CREATION
+═══════════════════════════════════════════════════════════════ */
+async function buildFamilyUpdateRecord(){
+  const familyData = (
+    window.familyData ||
+    window.family ||
+    window.treeData ||
+    {}
+  );
+
+  const cleaned = sanitizeFamilyPayload(familyData);
+
+  if(!cleaned || !Object.keys(cleaned).length){
+    throw new Error('Empty payload rejected.');
+  }
+
+  const currentHash = await generateDeterministicHash(cleaned);
+  const lastHash = localStorage.getItem(LAST_HASH_KEY);
+
+  if(lastHash && lastHash === currentHash){
+    throw new Error('No real changes detected.');
+  }
+
+  const encrypted = await encryptFamilyPayload(cleaned);
+
+  localStorage.setItem(LAST_HASH_KEY, currentHash);
+
+  return {
+    family_id: SUPABASE_CONFIG.FAMILY_ID,
+    device_id: DEVICE_ID,
+    schema_version: SUPABASE_CONFIG.SCHEMA_VERSION,
+    payload_encrypted: encrypted.payload_encrypted,
+    iv: encrypted.iv,
+    checksum: encrypted.checksum,
+    update_type:'family_update',
+    merge_status:'pending',
+    metadata:{
+      platform:navigator.platform,
+      userAgent:navigator.userAgent.slice(0,120)
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OFFLINE QUEUE
+═══════════════════════════════════════════════════════════════ */
+function getOfflineQueue(){
+  try{
+    return JSON.parse(localStorage.getItem(UPDATE_QUEUE_KEY) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue){
+  localStorage.setItem(UPDATE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+async function uploadQueuedUpdates(){
+  const client = getSupabaseClient();
+  if(!client) return;
+
+  const queue = getOfflineQueue();
+  if(!queue.length) return;
+
+  const remaining = [];
+
+  for(const item of queue){
+    try{
+      const res = await client
+        .from(SUPABASE_TABLE)
+        .insert(item);
+
+      if(res.error){
+        throw res.error;
+      }
+    }catch(err){
+      console.warn('[Queue Upload Failed]', err);
+      remaining.push(item);
+    }
+  }
+
+  saveOfflineQueue(remaining);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN UPLOAD
+═══════════════════════════════════════════════════════════════ */
+window.uploadFamilyUpdateToSupabase = async function(){
+  try{
+    const record = await buildFamilyUpdateRecord();
+    const client = getSupabaseClient();
+
+    if(!navigator.onLine || !client){
+      const queue = getOfflineQueue();
+      queue.push(record);
+      saveOfflineQueue(queue);
+
+      showSyncToast('📦 تم حفظ التحديث محلياً بانتظار الاتصال', '#92400e');
+      return;
+    }
+
+    const result = await client
+      .from(SUPABASE_TABLE)
+      .insert(record)
+      .select('id')
+      .single();
+
+    if(result.error){
+      throw result.error;
+    }
+
+    showSyncToast('✅ تم رفع تحديث العائلة بأمان', '#065f46');
+
+    await renderFamilyUpdates();
+  }catch(err){
+    console.error(err);
+
+    if(String(err.message || '').includes('No real changes detected')){
+      showSyncToast('ℹ️ لا توجد تغييرات حقيقية للرفع', '#1d4ed8');
+      return;
+    }
+
+    showSyncToast('❌ فشل رفع التحديث — تم الاحتفاظ بالبيانات محلياً', '#991b1b');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRIEVAL
+═══════════════════════════════════════════════════════════════ */
+window.fetchFamilyUpdatesFromSupabase = async function(){
+  const client = getSupabaseClient();
+
+  if(!client){
+    return [];
+  }
+
+  const result = await client
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('family_id', SUPABASE_CONFIG.FAMILY_ID)
+    .order('created_at', {ascending:false})
+    .limit(500);
+
+  if(result.error){
+    throw result.error;
+  }
+
+  const output = [];
+
+  for(const row of (result.data || [])){
+    try{
+      const payload = await decryptFamilyPayload(row);
+
+      if(!payload || !Object.keys(payload).length){
+        continue;
+      }
+
+      output.push({
+        row:row,
+        payload:payload,
+        decrypted:true
+      });
+    }catch(err){
+      output.push({
+        row:row,
+        decrypted:false,
+        error:String(err.message || err)
+      });
+    }
+  }
+
+  return output;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   UI RENDERING
+═══════════════════════════════════════════════════════════════ */
+window.renderFamilyUpdates = async function(){
+  try{
+    const list = await fetchFamilyUpdatesFromSupabase();
+
+    let container = document.getElementById('familyUpdatesSupabaseList');
+
+    if(!container){
+      container = document.createElement('div');
+      container.id = 'familyUpdatesSupabaseList';
+      container.style.marginTop = '12px';
+
+      document.body.appendChild(container);
+    }
+
+    container.innerHTML = list.map(function(item){
+      const row = item.row;
+
+      return `
+        <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <strong>📡 ${new Date(row.created_at).toLocaleString('ar-SA')}</strong>
+            <span style="font-size:12px;color:var(--text2)">🖥️ ${row.device_id}</span>
+          </div>
+
+          <div style="margin-top:8px;font-size:12px;color:var(--text2)">
+            النوع: ${row.update_type || 'family_update'} —
+            الحالة: ${row.merge_status || 'pending'} —
+            الإصدار: ${row.schema_version}
+          </div>
+
+          <div style="margin-top:6px;font-size:12px">
+            ${
+              item.decrypted
+              ? '<span style="color:#065f46">🔓 تم فك التشفير بنجاح</span>'
+              : '<span style="color:#991b1b">⚠️ فشل فك التشفير</span>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  }catch(err){
+    console.error(err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GIST MIGRATION
+═══════════════════════════════════════════════════════════════ */
+window.migrateLegacyGistUpdates = async function(){
+  if(localStorage.getItem(MIGRATION_KEY) === 'done'){
+    return;
+  }
+
+  try{
+    if(typeof loadCloudBackup !== 'function'){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    console.log('[Migration] Starting legacy migration');
+
+    const legacyData = localStorage.getItem('ft_family_updates_cache');
+
+    if(!legacyData){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const parsed = JSON.parse(legacyData);
+
+    if(!Array.isArray(parsed)){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const queue = getOfflineQueue();
+
+    for(const item of parsed){
+      const hash = await generateDeterministicHash(item);
+
+      const encrypted = await encryptFamilyPayload(item);
+
+      queue.push({
+        family_id: SUPABASE_CONFIG.FAMILY_ID,
+        device_id: DEVICE_ID,
+        schema_version:1,
+        payload_encrypted: encrypted.payload_encrypted,
+        iv: encrypted.iv,
+        checksum: hash,
+        update_type:'migrated_gist_update',
+        merge_status:'migrated'
+      });
+    }
+
+    saveOfflineQueue(queue);
+
+    localStorage.setItem(MIGRATION_KEY, 'done');
+
+    await uploadQueuedUpdates();
+
+    console.log('[Migration] Completed.');
+  }catch(err){
+    console.error('[Migration]', err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRY / ONLINE RECOVERY
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('online', function(){
+  uploadQueuedUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+setInterval(function(){
+  if(navigator.onLine){
+    uploadQueuedUpdates().catch(console.error);
+  }
+}, 30000);
+
+window.addEventListener('load', function(){
+  migrateLegacyGistUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SAFE OVERRIDES
+═══════════════════════════════════════════════════════════════ */
+window.createFamilyUpdate = window.uploadFamilyUpdateToSupabase;
+window.syncFamilyUpdates = window.uploadFamilyUpdateToSupabase;
+
+})();
+</script>
+
+</body>\n</html>';
 
       // ── 6. Download ──
       var d=new Date();
@@ -7975,7 +8535,567 @@ async function exportFamilyCopy(){
       cleanAppHTML+'\n'+
       '<div id="modalContainer"></div>\n'+
       '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-      '</body>\n</html>';
+      '
+<!-- ═══════════════════════════════════════════════════════════════════
+SUPABASE ENCRYPTED FAMILY UPDATES MIGRATION LAYER
+Production-grade append-only encrypted sync
+═══════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════════════════════════════ */
+window.SUPABASE_CONFIG = window.SUPABASE_CONFIG || {
+  URL: localStorage.getItem('ft_supabase_url') || '',
+  ANON_KEY: localStorage.getItem('ft_supabase_anon') || '',
+  FAMILY_ID: localStorage.getItem('ft_family_id') || 'default-family',
+  ENCRYPTION_KEY: localStorage.getItem('ft_family_enc_key') || '',
+  SCHEMA_VERSION: 1
+};
+
+const SUPABASE_TABLE = 'family_updates';
+const UPDATE_QUEUE_KEY = 'ft_supabase_queue_v1';
+const LAST_HASH_KEY = 'ft_last_family_hash_v1';
+const MIGRATION_KEY = 'ft_gist_migration_done_v1';
+const DEVICE_ID = (
+  localStorage.getItem('ft_device_id_v1') ||
+  ('dev_' + crypto.randomUUID())
+);
+
+localStorage.setItem('ft_device_id_v1', DEVICE_ID);
+
+let _supabase = null;
+
+function getSupabaseClient(){
+  if(_supabase) return _supabase;
+
+  if(!window.supabase || !SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY){
+    console.warn('[Supabase] Missing configuration.');
+    return null;
+  }
+
+  _supabase = window.supabase.createClient(
+    SUPABASE_CONFIG.URL,
+    SUPABASE_CONFIG.ANON_KEY,
+    {
+      auth:{persistSession:false},
+      global:{headers:{'X-Family-Device':DEVICE_ID}}
+    }
+  );
+
+  return _supabase;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SQL / RLS DOCUMENTATION
+═══════════════════════════════════════════════════════════════ */
+/*
+CREATE TABLE public.family_updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id text NOT NULL,
+  device_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  schema_version integer NOT NULL DEFAULT 1,
+  payload_encrypted text NOT NULL,
+  iv text NOT NULL,
+  checksum text,
+  update_type text DEFAULT 'family_update',
+  merge_status text DEFAULT 'pending',
+  metadata jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.family_updates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "family_select"
+ON public.family_updates
+FOR SELECT
+USING (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE POLICY "family_insert"
+ON public.family_updates
+FOR INSERT
+WITH CHECK (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE INDEX idx_family_updates_family_created
+ON public.family_updates(family_id, created_at DESC);
+*/
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════ */
+function showSyncToast(message, color){
+  try{
+    const toast = document.getElementById('cloudToast');
+    if(!toast) return;
+
+    toast.textContent = message;
+    toast.style.background = color || '#111827';
+    toast.style.color = '#fff';
+    toast.style.opacity = '1';
+
+    clearTimeout(showSyncToast._t);
+    showSyncToast._t = setTimeout(function(){
+      toast.style.opacity = '0';
+    }, 3500);
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+function stableStringify(obj){
+  if(obj === null || typeof obj !== 'object'){
+    return JSON.stringify(obj);
+  }
+
+  if(Array.isArray(obj)){
+    return '[' + obj.map(stableStringify).join(',') + ']';
+  }
+
+  return '{' + Object.keys(obj).sort().map(function(k){
+    return JSON.stringify(k) + ':' + stableStringify(obj[k]);
+  }).join(',') + '}';
+}
+
+async function sha256(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b=>b.toString(16).padStart(2,'0'))
+    .join('');
+}
+
+function sanitizeFamilyPayload(raw){
+  const cloned = JSON.parse(JSON.stringify(raw || {}));
+
+  [
+    'lastViewedAt',
+    'lastSyncAt',
+    'cloudSyncTimestamp',
+    'syncStatus',
+    'temporaryFlags'
+  ].forEach(function(key){
+    delete cloned[key];
+  });
+
+  return cloned;
+}
+
+async function generateDeterministicHash(data){
+  return sha256(stableStringify(sanitizeFamilyPayload(data)));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AES-GCM ENCRYPTION
+═══════════════════════════════════════════════════════════════ */
+async function deriveAesKey(password){
+  if(!password || password.length < 12){
+    throw new Error('Encryption key must be at least 12 characters.');
+  }
+
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name:'PBKDF2',
+      salt:new TextEncoder().encode(SUPABASE_CONFIG.FAMILY_ID),
+      iterations:150000,
+      hash:'SHA-256'
+    },
+    material,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+function arrayBufferToBase64(buffer){
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for(let i=0;i<bytes.byteLength;i++){
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for(let i=0;i<binary.length;i++){
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+async function encryptFamilyPayload(payload){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const plainText = stableStringify({
+    version:1,
+    payload:payload
+  });
+
+  const encrypted = await crypto.subtle.encrypt(
+    {name:'AES-GCM', iv:iv},
+    key,
+    new TextEncoder().encode(plainText)
+  );
+
+  return {
+    payload_encrypted: arrayBufferToBase64(encrypted),
+    iv: arrayBufferToBase64(iv),
+    checksum: await sha256(plainText)
+  };
+}
+
+async function decryptFamilyPayload(record){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name:'AES-GCM',
+      iv:new Uint8Array(base64ToArrayBuffer(record.iv))
+    },
+    key,
+    base64ToArrayBuffer(record.payload_encrypted)
+  );
+
+  const text = new TextDecoder().decode(decrypted);
+  const parsed = JSON.parse(text);
+
+  return parsed.payload;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UPDATE CREATION
+═══════════════════════════════════════════════════════════════ */
+async function buildFamilyUpdateRecord(){
+  const familyData = (
+    window.familyData ||
+    window.family ||
+    window.treeData ||
+    {}
+  );
+
+  const cleaned = sanitizeFamilyPayload(familyData);
+
+  if(!cleaned || !Object.keys(cleaned).length){
+    throw new Error('Empty payload rejected.');
+  }
+
+  const currentHash = await generateDeterministicHash(cleaned);
+  const lastHash = localStorage.getItem(LAST_HASH_KEY);
+
+  if(lastHash && lastHash === currentHash){
+    throw new Error('No real changes detected.');
+  }
+
+  const encrypted = await encryptFamilyPayload(cleaned);
+
+  localStorage.setItem(LAST_HASH_KEY, currentHash);
+
+  return {
+    family_id: SUPABASE_CONFIG.FAMILY_ID,
+    device_id: DEVICE_ID,
+    schema_version: SUPABASE_CONFIG.SCHEMA_VERSION,
+    payload_encrypted: encrypted.payload_encrypted,
+    iv: encrypted.iv,
+    checksum: encrypted.checksum,
+    update_type:'family_update',
+    merge_status:'pending',
+    metadata:{
+      platform:navigator.platform,
+      userAgent:navigator.userAgent.slice(0,120)
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OFFLINE QUEUE
+═══════════════════════════════════════════════════════════════ */
+function getOfflineQueue(){
+  try{
+    return JSON.parse(localStorage.getItem(UPDATE_QUEUE_KEY) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue){
+  localStorage.setItem(UPDATE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+async function uploadQueuedUpdates(){
+  const client = getSupabaseClient();
+  if(!client) return;
+
+  const queue = getOfflineQueue();
+  if(!queue.length) return;
+
+  const remaining = [];
+
+  for(const item of queue){
+    try{
+      const res = await client
+        .from(SUPABASE_TABLE)
+        .insert(item);
+
+      if(res.error){
+        throw res.error;
+      }
+    }catch(err){
+      console.warn('[Queue Upload Failed]', err);
+      remaining.push(item);
+    }
+  }
+
+  saveOfflineQueue(remaining);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN UPLOAD
+═══════════════════════════════════════════════════════════════ */
+window.uploadFamilyUpdateToSupabase = async function(){
+  try{
+    const record = await buildFamilyUpdateRecord();
+    const client = getSupabaseClient();
+
+    if(!navigator.onLine || !client){
+      const queue = getOfflineQueue();
+      queue.push(record);
+      saveOfflineQueue(queue);
+
+      showSyncToast('📦 تم حفظ التحديث محلياً بانتظار الاتصال', '#92400e');
+      return;
+    }
+
+    const result = await client
+      .from(SUPABASE_TABLE)
+      .insert(record)
+      .select('id')
+      .single();
+
+    if(result.error){
+      throw result.error;
+    }
+
+    showSyncToast('✅ تم رفع تحديث العائلة بأمان', '#065f46');
+
+    await renderFamilyUpdates();
+  }catch(err){
+    console.error(err);
+
+    if(String(err.message || '').includes('No real changes detected')){
+      showSyncToast('ℹ️ لا توجد تغييرات حقيقية للرفع', '#1d4ed8');
+      return;
+    }
+
+    showSyncToast('❌ فشل رفع التحديث — تم الاحتفاظ بالبيانات محلياً', '#991b1b');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRIEVAL
+═══════════════════════════════════════════════════════════════ */
+window.fetchFamilyUpdatesFromSupabase = async function(){
+  const client = getSupabaseClient();
+
+  if(!client){
+    return [];
+  }
+
+  const result = await client
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('family_id', SUPABASE_CONFIG.FAMILY_ID)
+    .order('created_at', {ascending:false})
+    .limit(500);
+
+  if(result.error){
+    throw result.error;
+  }
+
+  const output = [];
+
+  for(const row of (result.data || [])){
+    try{
+      const payload = await decryptFamilyPayload(row);
+
+      if(!payload || !Object.keys(payload).length){
+        continue;
+      }
+
+      output.push({
+        row:row,
+        payload:payload,
+        decrypted:true
+      });
+    }catch(err){
+      output.push({
+        row:row,
+        decrypted:false,
+        error:String(err.message || err)
+      });
+    }
+  }
+
+  return output;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   UI RENDERING
+═══════════════════════════════════════════════════════════════ */
+window.renderFamilyUpdates = async function(){
+  try{
+    const list = await fetchFamilyUpdatesFromSupabase();
+
+    let container = document.getElementById('familyUpdatesSupabaseList');
+
+    if(!container){
+      container = document.createElement('div');
+      container.id = 'familyUpdatesSupabaseList';
+      container.style.marginTop = '12px';
+
+      document.body.appendChild(container);
+    }
+
+    container.innerHTML = list.map(function(item){
+      const row = item.row;
+
+      return `
+        <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <strong>📡 ${new Date(row.created_at).toLocaleString('ar-SA')}</strong>
+            <span style="font-size:12px;color:var(--text2)">🖥️ ${row.device_id}</span>
+          </div>
+
+          <div style="margin-top:8px;font-size:12px;color:var(--text2)">
+            النوع: ${row.update_type || 'family_update'} —
+            الحالة: ${row.merge_status || 'pending'} —
+            الإصدار: ${row.schema_version}
+          </div>
+
+          <div style="margin-top:6px;font-size:12px">
+            ${
+              item.decrypted
+              ? '<span style="color:#065f46">🔓 تم فك التشفير بنجاح</span>'
+              : '<span style="color:#991b1b">⚠️ فشل فك التشفير</span>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  }catch(err){
+    console.error(err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GIST MIGRATION
+═══════════════════════════════════════════════════════════════ */
+window.migrateLegacyGistUpdates = async function(){
+  if(localStorage.getItem(MIGRATION_KEY) === 'done'){
+    return;
+  }
+
+  try{
+    if(typeof loadCloudBackup !== 'function'){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    console.log('[Migration] Starting legacy migration');
+
+    const legacyData = localStorage.getItem('ft_family_updates_cache');
+
+    if(!legacyData){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const parsed = JSON.parse(legacyData);
+
+    if(!Array.isArray(parsed)){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const queue = getOfflineQueue();
+
+    for(const item of parsed){
+      const hash = await generateDeterministicHash(item);
+
+      const encrypted = await encryptFamilyPayload(item);
+
+      queue.push({
+        family_id: SUPABASE_CONFIG.FAMILY_ID,
+        device_id: DEVICE_ID,
+        schema_version:1,
+        payload_encrypted: encrypted.payload_encrypted,
+        iv: encrypted.iv,
+        checksum: hash,
+        update_type:'migrated_gist_update',
+        merge_status:'migrated'
+      });
+    }
+
+    saveOfflineQueue(queue);
+
+    localStorage.setItem(MIGRATION_KEY, 'done');
+
+    await uploadQueuedUpdates();
+
+    console.log('[Migration] Completed.');
+  }catch(err){
+    console.error('[Migration]', err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRY / ONLINE RECOVERY
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('online', function(){
+  uploadQueuedUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+setInterval(function(){
+  if(navigator.onLine){
+    uploadQueuedUpdates().catch(console.error);
+  }
+}, 30000);
+
+window.addEventListener('load', function(){
+  migrateLegacyGistUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SAFE OVERRIDES
+═══════════════════════════════════════════════════════════════ */
+window.createFamilyUpdate = window.uploadFamilyUpdateToSupabase;
+window.syncFamilyUpdates = window.uploadFamilyUpdateToSupabase;
+
+})();
+</script>
+
+</body>\n</html>';
 
     // ════ 2. manifest.json ════
     var manifestContent=JSON.stringify({
@@ -8014,7 +9134,567 @@ self.addEventListener('fetch',e=>{
 async function networkFirst(req){
   var cache=await caches.open(SHELL_CACHE);
   try{var r=await fetch(req);if(r&&r.status===200)cache.put(req,r.clone());return r;}
-  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p></body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
+  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p>
+<!-- ═══════════════════════════════════════════════════════════════════
+SUPABASE ENCRYPTED FAMILY UPDATES MIGRATION LAYER
+Production-grade append-only encrypted sync
+═══════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════════════════════════════ */
+window.SUPABASE_CONFIG = window.SUPABASE_CONFIG || {
+  URL: localStorage.getItem('ft_supabase_url') || '',
+  ANON_KEY: localStorage.getItem('ft_supabase_anon') || '',
+  FAMILY_ID: localStorage.getItem('ft_family_id') || 'default-family',
+  ENCRYPTION_KEY: localStorage.getItem('ft_family_enc_key') || '',
+  SCHEMA_VERSION: 1
+};
+
+const SUPABASE_TABLE = 'family_updates';
+const UPDATE_QUEUE_KEY = 'ft_supabase_queue_v1';
+const LAST_HASH_KEY = 'ft_last_family_hash_v1';
+const MIGRATION_KEY = 'ft_gist_migration_done_v1';
+const DEVICE_ID = (
+  localStorage.getItem('ft_device_id_v1') ||
+  ('dev_' + crypto.randomUUID())
+);
+
+localStorage.setItem('ft_device_id_v1', DEVICE_ID);
+
+let _supabase = null;
+
+function getSupabaseClient(){
+  if(_supabase) return _supabase;
+
+  if(!window.supabase || !SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY){
+    console.warn('[Supabase] Missing configuration.');
+    return null;
+  }
+
+  _supabase = window.supabase.createClient(
+    SUPABASE_CONFIG.URL,
+    SUPABASE_CONFIG.ANON_KEY,
+    {
+      auth:{persistSession:false},
+      global:{headers:{'X-Family-Device':DEVICE_ID}}
+    }
+  );
+
+  return _supabase;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SQL / RLS DOCUMENTATION
+═══════════════════════════════════════════════════════════════ */
+/*
+CREATE TABLE public.family_updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id text NOT NULL,
+  device_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  schema_version integer NOT NULL DEFAULT 1,
+  payload_encrypted text NOT NULL,
+  iv text NOT NULL,
+  checksum text,
+  update_type text DEFAULT 'family_update',
+  merge_status text DEFAULT 'pending',
+  metadata jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.family_updates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "family_select"
+ON public.family_updates
+FOR SELECT
+USING (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE POLICY "family_insert"
+ON public.family_updates
+FOR INSERT
+WITH CHECK (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE INDEX idx_family_updates_family_created
+ON public.family_updates(family_id, created_at DESC);
+*/
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════ */
+function showSyncToast(message, color){
+  try{
+    const toast = document.getElementById('cloudToast');
+    if(!toast) return;
+
+    toast.textContent = message;
+    toast.style.background = color || '#111827';
+    toast.style.color = '#fff';
+    toast.style.opacity = '1';
+
+    clearTimeout(showSyncToast._t);
+    showSyncToast._t = setTimeout(function(){
+      toast.style.opacity = '0';
+    }, 3500);
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+function stableStringify(obj){
+  if(obj === null || typeof obj !== 'object'){
+    return JSON.stringify(obj);
+  }
+
+  if(Array.isArray(obj)){
+    return '[' + obj.map(stableStringify).join(',') + ']';
+  }
+
+  return '{' + Object.keys(obj).sort().map(function(k){
+    return JSON.stringify(k) + ':' + stableStringify(obj[k]);
+  }).join(',') + '}';
+}
+
+async function sha256(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b=>b.toString(16).padStart(2,'0'))
+    .join('');
+}
+
+function sanitizeFamilyPayload(raw){
+  const cloned = JSON.parse(JSON.stringify(raw || {}));
+
+  [
+    'lastViewedAt',
+    'lastSyncAt',
+    'cloudSyncTimestamp',
+    'syncStatus',
+    'temporaryFlags'
+  ].forEach(function(key){
+    delete cloned[key];
+  });
+
+  return cloned;
+}
+
+async function generateDeterministicHash(data){
+  return sha256(stableStringify(sanitizeFamilyPayload(data)));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AES-GCM ENCRYPTION
+═══════════════════════════════════════════════════════════════ */
+async function deriveAesKey(password){
+  if(!password || password.length < 12){
+    throw new Error('Encryption key must be at least 12 characters.');
+  }
+
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name:'PBKDF2',
+      salt:new TextEncoder().encode(SUPABASE_CONFIG.FAMILY_ID),
+      iterations:150000,
+      hash:'SHA-256'
+    },
+    material,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+function arrayBufferToBase64(buffer){
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for(let i=0;i<bytes.byteLength;i++){
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for(let i=0;i<binary.length;i++){
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+async function encryptFamilyPayload(payload){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const plainText = stableStringify({
+    version:1,
+    payload:payload
+  });
+
+  const encrypted = await crypto.subtle.encrypt(
+    {name:'AES-GCM', iv:iv},
+    key,
+    new TextEncoder().encode(plainText)
+  );
+
+  return {
+    payload_encrypted: arrayBufferToBase64(encrypted),
+    iv: arrayBufferToBase64(iv),
+    checksum: await sha256(plainText)
+  };
+}
+
+async function decryptFamilyPayload(record){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name:'AES-GCM',
+      iv:new Uint8Array(base64ToArrayBuffer(record.iv))
+    },
+    key,
+    base64ToArrayBuffer(record.payload_encrypted)
+  );
+
+  const text = new TextDecoder().decode(decrypted);
+  const parsed = JSON.parse(text);
+
+  return parsed.payload;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UPDATE CREATION
+═══════════════════════════════════════════════════════════════ */
+async function buildFamilyUpdateRecord(){
+  const familyData = (
+    window.familyData ||
+    window.family ||
+    window.treeData ||
+    {}
+  );
+
+  const cleaned = sanitizeFamilyPayload(familyData);
+
+  if(!cleaned || !Object.keys(cleaned).length){
+    throw new Error('Empty payload rejected.');
+  }
+
+  const currentHash = await generateDeterministicHash(cleaned);
+  const lastHash = localStorage.getItem(LAST_HASH_KEY);
+
+  if(lastHash && lastHash === currentHash){
+    throw new Error('No real changes detected.');
+  }
+
+  const encrypted = await encryptFamilyPayload(cleaned);
+
+  localStorage.setItem(LAST_HASH_KEY, currentHash);
+
+  return {
+    family_id: SUPABASE_CONFIG.FAMILY_ID,
+    device_id: DEVICE_ID,
+    schema_version: SUPABASE_CONFIG.SCHEMA_VERSION,
+    payload_encrypted: encrypted.payload_encrypted,
+    iv: encrypted.iv,
+    checksum: encrypted.checksum,
+    update_type:'family_update',
+    merge_status:'pending',
+    metadata:{
+      platform:navigator.platform,
+      userAgent:navigator.userAgent.slice(0,120)
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OFFLINE QUEUE
+═══════════════════════════════════════════════════════════════ */
+function getOfflineQueue(){
+  try{
+    return JSON.parse(localStorage.getItem(UPDATE_QUEUE_KEY) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue){
+  localStorage.setItem(UPDATE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+async function uploadQueuedUpdates(){
+  const client = getSupabaseClient();
+  if(!client) return;
+
+  const queue = getOfflineQueue();
+  if(!queue.length) return;
+
+  const remaining = [];
+
+  for(const item of queue){
+    try{
+      const res = await client
+        .from(SUPABASE_TABLE)
+        .insert(item);
+
+      if(res.error){
+        throw res.error;
+      }
+    }catch(err){
+      console.warn('[Queue Upload Failed]', err);
+      remaining.push(item);
+    }
+  }
+
+  saveOfflineQueue(remaining);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN UPLOAD
+═══════════════════════════════════════════════════════════════ */
+window.uploadFamilyUpdateToSupabase = async function(){
+  try{
+    const record = await buildFamilyUpdateRecord();
+    const client = getSupabaseClient();
+
+    if(!navigator.onLine || !client){
+      const queue = getOfflineQueue();
+      queue.push(record);
+      saveOfflineQueue(queue);
+
+      showSyncToast('📦 تم حفظ التحديث محلياً بانتظار الاتصال', '#92400e');
+      return;
+    }
+
+    const result = await client
+      .from(SUPABASE_TABLE)
+      .insert(record)
+      .select('id')
+      .single();
+
+    if(result.error){
+      throw result.error;
+    }
+
+    showSyncToast('✅ تم رفع تحديث العائلة بأمان', '#065f46');
+
+    await renderFamilyUpdates();
+  }catch(err){
+    console.error(err);
+
+    if(String(err.message || '').includes('No real changes detected')){
+      showSyncToast('ℹ️ لا توجد تغييرات حقيقية للرفع', '#1d4ed8');
+      return;
+    }
+
+    showSyncToast('❌ فشل رفع التحديث — تم الاحتفاظ بالبيانات محلياً', '#991b1b');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRIEVAL
+═══════════════════════════════════════════════════════════════ */
+window.fetchFamilyUpdatesFromSupabase = async function(){
+  const client = getSupabaseClient();
+
+  if(!client){
+    return [];
+  }
+
+  const result = await client
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('family_id', SUPABASE_CONFIG.FAMILY_ID)
+    .order('created_at', {ascending:false})
+    .limit(500);
+
+  if(result.error){
+    throw result.error;
+  }
+
+  const output = [];
+
+  for(const row of (result.data || [])){
+    try{
+      const payload = await decryptFamilyPayload(row);
+
+      if(!payload || !Object.keys(payload).length){
+        continue;
+      }
+
+      output.push({
+        row:row,
+        payload:payload,
+        decrypted:true
+      });
+    }catch(err){
+      output.push({
+        row:row,
+        decrypted:false,
+        error:String(err.message || err)
+      });
+    }
+  }
+
+  return output;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   UI RENDERING
+═══════════════════════════════════════════════════════════════ */
+window.renderFamilyUpdates = async function(){
+  try{
+    const list = await fetchFamilyUpdatesFromSupabase();
+
+    let container = document.getElementById('familyUpdatesSupabaseList');
+
+    if(!container){
+      container = document.createElement('div');
+      container.id = 'familyUpdatesSupabaseList';
+      container.style.marginTop = '12px';
+
+      document.body.appendChild(container);
+    }
+
+    container.innerHTML = list.map(function(item){
+      const row = item.row;
+
+      return `
+        <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <strong>📡 ${new Date(row.created_at).toLocaleString('ar-SA')}</strong>
+            <span style="font-size:12px;color:var(--text2)">🖥️ ${row.device_id}</span>
+          </div>
+
+          <div style="margin-top:8px;font-size:12px;color:var(--text2)">
+            النوع: ${row.update_type || 'family_update'} —
+            الحالة: ${row.merge_status || 'pending'} —
+            الإصدار: ${row.schema_version}
+          </div>
+
+          <div style="margin-top:6px;font-size:12px">
+            ${
+              item.decrypted
+              ? '<span style="color:#065f46">🔓 تم فك التشفير بنجاح</span>'
+              : '<span style="color:#991b1b">⚠️ فشل فك التشفير</span>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  }catch(err){
+    console.error(err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GIST MIGRATION
+═══════════════════════════════════════════════════════════════ */
+window.migrateLegacyGistUpdates = async function(){
+  if(localStorage.getItem(MIGRATION_KEY) === 'done'){
+    return;
+  }
+
+  try{
+    if(typeof loadCloudBackup !== 'function'){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    console.log('[Migration] Starting legacy migration');
+
+    const legacyData = localStorage.getItem('ft_family_updates_cache');
+
+    if(!legacyData){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const parsed = JSON.parse(legacyData);
+
+    if(!Array.isArray(parsed)){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const queue = getOfflineQueue();
+
+    for(const item of parsed){
+      const hash = await generateDeterministicHash(item);
+
+      const encrypted = await encryptFamilyPayload(item);
+
+      queue.push({
+        family_id: SUPABASE_CONFIG.FAMILY_ID,
+        device_id: DEVICE_ID,
+        schema_version:1,
+        payload_encrypted: encrypted.payload_encrypted,
+        iv: encrypted.iv,
+        checksum: hash,
+        update_type:'migrated_gist_update',
+        merge_status:'migrated'
+      });
+    }
+
+    saveOfflineQueue(queue);
+
+    localStorage.setItem(MIGRATION_KEY, 'done');
+
+    await uploadQueuedUpdates();
+
+    console.log('[Migration] Completed.');
+  }catch(err){
+    console.error('[Migration]', err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRY / ONLINE RECOVERY
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('online', function(){
+  uploadQueuedUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+setInterval(function(){
+  if(navigator.onLine){
+    uploadQueuedUpdates().catch(console.error);
+  }
+}, 30000);
+
+window.addEventListener('load', function(){
+  migrateLegacyGistUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SAFE OVERRIDES
+═══════════════════════════════════════════════════════════════ */
+window.createFamilyUpdate = window.uploadFamilyUpdateToSupabase;
+window.syncFamilyUpdates = window.uploadFamilyUpdateToSupabase;
+
+})();
+</script>
+
+</body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
 }
 async function cacheFirst(req){
   var c=await caches.match(req);if(c)return c;
@@ -8408,7 +10088,567 @@ function _buildSaveHTML(){
   }
   return '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+document.head.outerHTML+'\n<body>\n'+
     cleanAppHTML+'\n<div id="modalContainer"></div>\n'+dataTag+'\n'+
-    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
+    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n
+<!-- ═══════════════════════════════════════════════════════════════════
+SUPABASE ENCRYPTED FAMILY UPDATES MIGRATION LAYER
+Production-grade append-only encrypted sync
+═══════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════════════════════════════ */
+window.SUPABASE_CONFIG = window.SUPABASE_CONFIG || {
+  URL: localStorage.getItem('ft_supabase_url') || '',
+  ANON_KEY: localStorage.getItem('ft_supabase_anon') || '',
+  FAMILY_ID: localStorage.getItem('ft_family_id') || 'default-family',
+  ENCRYPTION_KEY: localStorage.getItem('ft_family_enc_key') || '',
+  SCHEMA_VERSION: 1
+};
+
+const SUPABASE_TABLE = 'family_updates';
+const UPDATE_QUEUE_KEY = 'ft_supabase_queue_v1';
+const LAST_HASH_KEY = 'ft_last_family_hash_v1';
+const MIGRATION_KEY = 'ft_gist_migration_done_v1';
+const DEVICE_ID = (
+  localStorage.getItem('ft_device_id_v1') ||
+  ('dev_' + crypto.randomUUID())
+);
+
+localStorage.setItem('ft_device_id_v1', DEVICE_ID);
+
+let _supabase = null;
+
+function getSupabaseClient(){
+  if(_supabase) return _supabase;
+
+  if(!window.supabase || !SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY){
+    console.warn('[Supabase] Missing configuration.');
+    return null;
+  }
+
+  _supabase = window.supabase.createClient(
+    SUPABASE_CONFIG.URL,
+    SUPABASE_CONFIG.ANON_KEY,
+    {
+      auth:{persistSession:false},
+      global:{headers:{'X-Family-Device':DEVICE_ID}}
+    }
+  );
+
+  return _supabase;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SQL / RLS DOCUMENTATION
+═══════════════════════════════════════════════════════════════ */
+/*
+CREATE TABLE public.family_updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id text NOT NULL,
+  device_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  schema_version integer NOT NULL DEFAULT 1,
+  payload_encrypted text NOT NULL,
+  iv text NOT NULL,
+  checksum text,
+  update_type text DEFAULT 'family_update',
+  merge_status text DEFAULT 'pending',
+  metadata jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.family_updates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "family_select"
+ON public.family_updates
+FOR SELECT
+USING (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE POLICY "family_insert"
+ON public.family_updates
+FOR INSERT
+WITH CHECK (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE INDEX idx_family_updates_family_created
+ON public.family_updates(family_id, created_at DESC);
+*/
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════ */
+function showSyncToast(message, color){
+  try{
+    const toast = document.getElementById('cloudToast');
+    if(!toast) return;
+
+    toast.textContent = message;
+    toast.style.background = color || '#111827';
+    toast.style.color = '#fff';
+    toast.style.opacity = '1';
+
+    clearTimeout(showSyncToast._t);
+    showSyncToast._t = setTimeout(function(){
+      toast.style.opacity = '0';
+    }, 3500);
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+function stableStringify(obj){
+  if(obj === null || typeof obj !== 'object'){
+    return JSON.stringify(obj);
+  }
+
+  if(Array.isArray(obj)){
+    return '[' + obj.map(stableStringify).join(',') + ']';
+  }
+
+  return '{' + Object.keys(obj).sort().map(function(k){
+    return JSON.stringify(k) + ':' + stableStringify(obj[k]);
+  }).join(',') + '}';
+}
+
+async function sha256(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b=>b.toString(16).padStart(2,'0'))
+    .join('');
+}
+
+function sanitizeFamilyPayload(raw){
+  const cloned = JSON.parse(JSON.stringify(raw || {}));
+
+  [
+    'lastViewedAt',
+    'lastSyncAt',
+    'cloudSyncTimestamp',
+    'syncStatus',
+    'temporaryFlags'
+  ].forEach(function(key){
+    delete cloned[key];
+  });
+
+  return cloned;
+}
+
+async function generateDeterministicHash(data){
+  return sha256(stableStringify(sanitizeFamilyPayload(data)));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AES-GCM ENCRYPTION
+═══════════════════════════════════════════════════════════════ */
+async function deriveAesKey(password){
+  if(!password || password.length < 12){
+    throw new Error('Encryption key must be at least 12 characters.');
+  }
+
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name:'PBKDF2',
+      salt:new TextEncoder().encode(SUPABASE_CONFIG.FAMILY_ID),
+      iterations:150000,
+      hash:'SHA-256'
+    },
+    material,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+function arrayBufferToBase64(buffer){
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for(let i=0;i<bytes.byteLength;i++){
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for(let i=0;i<binary.length;i++){
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+async function encryptFamilyPayload(payload){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const plainText = stableStringify({
+    version:1,
+    payload:payload
+  });
+
+  const encrypted = await crypto.subtle.encrypt(
+    {name:'AES-GCM', iv:iv},
+    key,
+    new TextEncoder().encode(plainText)
+  );
+
+  return {
+    payload_encrypted: arrayBufferToBase64(encrypted),
+    iv: arrayBufferToBase64(iv),
+    checksum: await sha256(plainText)
+  };
+}
+
+async function decryptFamilyPayload(record){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name:'AES-GCM',
+      iv:new Uint8Array(base64ToArrayBuffer(record.iv))
+    },
+    key,
+    base64ToArrayBuffer(record.payload_encrypted)
+  );
+
+  const text = new TextDecoder().decode(decrypted);
+  const parsed = JSON.parse(text);
+
+  return parsed.payload;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UPDATE CREATION
+═══════════════════════════════════════════════════════════════ */
+async function buildFamilyUpdateRecord(){
+  const familyData = (
+    window.familyData ||
+    window.family ||
+    window.treeData ||
+    {}
+  );
+
+  const cleaned = sanitizeFamilyPayload(familyData);
+
+  if(!cleaned || !Object.keys(cleaned).length){
+    throw new Error('Empty payload rejected.');
+  }
+
+  const currentHash = await generateDeterministicHash(cleaned);
+  const lastHash = localStorage.getItem(LAST_HASH_KEY);
+
+  if(lastHash && lastHash === currentHash){
+    throw new Error('No real changes detected.');
+  }
+
+  const encrypted = await encryptFamilyPayload(cleaned);
+
+  localStorage.setItem(LAST_HASH_KEY, currentHash);
+
+  return {
+    family_id: SUPABASE_CONFIG.FAMILY_ID,
+    device_id: DEVICE_ID,
+    schema_version: SUPABASE_CONFIG.SCHEMA_VERSION,
+    payload_encrypted: encrypted.payload_encrypted,
+    iv: encrypted.iv,
+    checksum: encrypted.checksum,
+    update_type:'family_update',
+    merge_status:'pending',
+    metadata:{
+      platform:navigator.platform,
+      userAgent:navigator.userAgent.slice(0,120)
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OFFLINE QUEUE
+═══════════════════════════════════════════════════════════════ */
+function getOfflineQueue(){
+  try{
+    return JSON.parse(localStorage.getItem(UPDATE_QUEUE_KEY) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue){
+  localStorage.setItem(UPDATE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+async function uploadQueuedUpdates(){
+  const client = getSupabaseClient();
+  if(!client) return;
+
+  const queue = getOfflineQueue();
+  if(!queue.length) return;
+
+  const remaining = [];
+
+  for(const item of queue){
+    try{
+      const res = await client
+        .from(SUPABASE_TABLE)
+        .insert(item);
+
+      if(res.error){
+        throw res.error;
+      }
+    }catch(err){
+      console.warn('[Queue Upload Failed]', err);
+      remaining.push(item);
+    }
+  }
+
+  saveOfflineQueue(remaining);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN UPLOAD
+═══════════════════════════════════════════════════════════════ */
+window.uploadFamilyUpdateToSupabase = async function(){
+  try{
+    const record = await buildFamilyUpdateRecord();
+    const client = getSupabaseClient();
+
+    if(!navigator.onLine || !client){
+      const queue = getOfflineQueue();
+      queue.push(record);
+      saveOfflineQueue(queue);
+
+      showSyncToast('📦 تم حفظ التحديث محلياً بانتظار الاتصال', '#92400e');
+      return;
+    }
+
+    const result = await client
+      .from(SUPABASE_TABLE)
+      .insert(record)
+      .select('id')
+      .single();
+
+    if(result.error){
+      throw result.error;
+    }
+
+    showSyncToast('✅ تم رفع تحديث العائلة بأمان', '#065f46');
+
+    await renderFamilyUpdates();
+  }catch(err){
+    console.error(err);
+
+    if(String(err.message || '').includes('No real changes detected')){
+      showSyncToast('ℹ️ لا توجد تغييرات حقيقية للرفع', '#1d4ed8');
+      return;
+    }
+
+    showSyncToast('❌ فشل رفع التحديث — تم الاحتفاظ بالبيانات محلياً', '#991b1b');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRIEVAL
+═══════════════════════════════════════════════════════════════ */
+window.fetchFamilyUpdatesFromSupabase = async function(){
+  const client = getSupabaseClient();
+
+  if(!client){
+    return [];
+  }
+
+  const result = await client
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('family_id', SUPABASE_CONFIG.FAMILY_ID)
+    .order('created_at', {ascending:false})
+    .limit(500);
+
+  if(result.error){
+    throw result.error;
+  }
+
+  const output = [];
+
+  for(const row of (result.data || [])){
+    try{
+      const payload = await decryptFamilyPayload(row);
+
+      if(!payload || !Object.keys(payload).length){
+        continue;
+      }
+
+      output.push({
+        row:row,
+        payload:payload,
+        decrypted:true
+      });
+    }catch(err){
+      output.push({
+        row:row,
+        decrypted:false,
+        error:String(err.message || err)
+      });
+    }
+  }
+
+  return output;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   UI RENDERING
+═══════════════════════════════════════════════════════════════ */
+window.renderFamilyUpdates = async function(){
+  try{
+    const list = await fetchFamilyUpdatesFromSupabase();
+
+    let container = document.getElementById('familyUpdatesSupabaseList');
+
+    if(!container){
+      container = document.createElement('div');
+      container.id = 'familyUpdatesSupabaseList';
+      container.style.marginTop = '12px';
+
+      document.body.appendChild(container);
+    }
+
+    container.innerHTML = list.map(function(item){
+      const row = item.row;
+
+      return `
+        <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <strong>📡 ${new Date(row.created_at).toLocaleString('ar-SA')}</strong>
+            <span style="font-size:12px;color:var(--text2)">🖥️ ${row.device_id}</span>
+          </div>
+
+          <div style="margin-top:8px;font-size:12px;color:var(--text2)">
+            النوع: ${row.update_type || 'family_update'} —
+            الحالة: ${row.merge_status || 'pending'} —
+            الإصدار: ${row.schema_version}
+          </div>
+
+          <div style="margin-top:6px;font-size:12px">
+            ${
+              item.decrypted
+              ? '<span style="color:#065f46">🔓 تم فك التشفير بنجاح</span>'
+              : '<span style="color:#991b1b">⚠️ فشل فك التشفير</span>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  }catch(err){
+    console.error(err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GIST MIGRATION
+═══════════════════════════════════════════════════════════════ */
+window.migrateLegacyGistUpdates = async function(){
+  if(localStorage.getItem(MIGRATION_KEY) === 'done'){
+    return;
+  }
+
+  try{
+    if(typeof loadCloudBackup !== 'function'){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    console.log('[Migration] Starting legacy migration');
+
+    const legacyData = localStorage.getItem('ft_family_updates_cache');
+
+    if(!legacyData){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const parsed = JSON.parse(legacyData);
+
+    if(!Array.isArray(parsed)){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const queue = getOfflineQueue();
+
+    for(const item of parsed){
+      const hash = await generateDeterministicHash(item);
+
+      const encrypted = await encryptFamilyPayload(item);
+
+      queue.push({
+        family_id: SUPABASE_CONFIG.FAMILY_ID,
+        device_id: DEVICE_ID,
+        schema_version:1,
+        payload_encrypted: encrypted.payload_encrypted,
+        iv: encrypted.iv,
+        checksum: hash,
+        update_type:'migrated_gist_update',
+        merge_status:'migrated'
+      });
+    }
+
+    saveOfflineQueue(queue);
+
+    localStorage.setItem(MIGRATION_KEY, 'done');
+
+    await uploadQueuedUpdates();
+
+    console.log('[Migration] Completed.');
+  }catch(err){
+    console.error('[Migration]', err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRY / ONLINE RECOVERY
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('online', function(){
+  uploadQueuedUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+setInterval(function(){
+  if(navigator.onLine){
+    uploadQueuedUpdates().catch(console.error);
+  }
+}, 30000);
+
+window.addEventListener('load', function(){
+  migrateLegacyGistUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SAFE OVERRIDES
+═══════════════════════════════════════════════════════════════ */
+window.createFamilyUpdate = window.uploadFamilyUpdateToSupabase;
+window.syncFamilyUpdates = window.uploadFamilyUpdateToSupabase;
+
+})();
+</script>
+
+</body>\n</html>';
 }
 
 async function _fsaWriteNow(){
@@ -10588,6 +12828,566 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     _showCloudButtons(true);
     try { if (window.CLOUD_CONFIG) window.CLOUD_CONFIG.KEY_HEX = initSettings.keyHex; } catch (e) {}
   }
+})();
+</script>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+SUPABASE ENCRYPTED FAMILY UPDATES MIGRATION LAYER
+Production-grade append-only encrypted sync
+═══════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════════════════════════════ */
+window.SUPABASE_CONFIG = window.SUPABASE_CONFIG || {
+  URL: localStorage.getItem('ft_supabase_url') || '',
+  ANON_KEY: localStorage.getItem('ft_supabase_anon') || '',
+  FAMILY_ID: localStorage.getItem('ft_family_id') || 'default-family',
+  ENCRYPTION_KEY: localStorage.getItem('ft_family_enc_key') || '',
+  SCHEMA_VERSION: 1
+};
+
+const SUPABASE_TABLE = 'family_updates';
+const UPDATE_QUEUE_KEY = 'ft_supabase_queue_v1';
+const LAST_HASH_KEY = 'ft_last_family_hash_v1';
+const MIGRATION_KEY = 'ft_gist_migration_done_v1';
+const DEVICE_ID = (
+  localStorage.getItem('ft_device_id_v1') ||
+  ('dev_' + crypto.randomUUID())
+);
+
+localStorage.setItem('ft_device_id_v1', DEVICE_ID);
+
+let _supabase = null;
+
+function getSupabaseClient(){
+  if(_supabase) return _supabase;
+
+  if(!window.supabase || !SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY){
+    console.warn('[Supabase] Missing configuration.');
+    return null;
+  }
+
+  _supabase = window.supabase.createClient(
+    SUPABASE_CONFIG.URL,
+    SUPABASE_CONFIG.ANON_KEY,
+    {
+      auth:{persistSession:false},
+      global:{headers:{'X-Family-Device':DEVICE_ID}}
+    }
+  );
+
+  return _supabase;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SQL / RLS DOCUMENTATION
+═══════════════════════════════════════════════════════════════ */
+/*
+CREATE TABLE public.family_updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id text NOT NULL,
+  device_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  schema_version integer NOT NULL DEFAULT 1,
+  payload_encrypted text NOT NULL,
+  iv text NOT NULL,
+  checksum text,
+  update_type text DEFAULT 'family_update',
+  merge_status text DEFAULT 'pending',
+  metadata jsonb DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.family_updates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "family_select"
+ON public.family_updates
+FOR SELECT
+USING (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE POLICY "family_insert"
+ON public.family_updates
+FOR INSERT
+WITH CHECK (family_id = current_setting('request.jwt.claim.family_id', true));
+
+CREATE INDEX idx_family_updates_family_created
+ON public.family_updates(family_id, created_at DESC);
+*/
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════ */
+function showSyncToast(message, color){
+  try{
+    const toast = document.getElementById('cloudToast');
+    if(!toast) return;
+
+    toast.textContent = message;
+    toast.style.background = color || '#111827';
+    toast.style.color = '#fff';
+    toast.style.opacity = '1';
+
+    clearTimeout(showSyncToast._t);
+    showSyncToast._t = setTimeout(function(){
+      toast.style.opacity = '0';
+    }, 3500);
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+function stableStringify(obj){
+  if(obj === null || typeof obj !== 'object'){
+    return JSON.stringify(obj);
+  }
+
+  if(Array.isArray(obj)){
+    return '[' + obj.map(stableStringify).join(',') + ']';
+  }
+
+  return '{' + Object.keys(obj).sort().map(function(k){
+    return JSON.stringify(k) + ':' + stableStringify(obj[k]);
+  }).join(',') + '}';
+}
+
+async function sha256(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b=>b.toString(16).padStart(2,'0'))
+    .join('');
+}
+
+function sanitizeFamilyPayload(raw){
+  const cloned = JSON.parse(JSON.stringify(raw || {}));
+
+  [
+    'lastViewedAt',
+    'lastSyncAt',
+    'cloudSyncTimestamp',
+    'syncStatus',
+    'temporaryFlags'
+  ].forEach(function(key){
+    delete cloned[key];
+  });
+
+  return cloned;
+}
+
+async function generateDeterministicHash(data){
+  return sha256(stableStringify(sanitizeFamilyPayload(data)));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AES-GCM ENCRYPTION
+═══════════════════════════════════════════════════════════════ */
+async function deriveAesKey(password){
+  if(!password || password.length < 12){
+    throw new Error('Encryption key must be at least 12 characters.');
+  }
+
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name:'PBKDF2',
+      salt:new TextEncoder().encode(SUPABASE_CONFIG.FAMILY_ID),
+      iterations:150000,
+      hash:'SHA-256'
+    },
+    material,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+function arrayBufferToBase64(buffer){
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for(let i=0;i<bytes.byteLength;i++){
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for(let i=0;i<binary.length;i++){
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+}
+
+async function encryptFamilyPayload(payload){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const plainText = stableStringify({
+    version:1,
+    payload:payload
+  });
+
+  const encrypted = await crypto.subtle.encrypt(
+    {name:'AES-GCM', iv:iv},
+    key,
+    new TextEncoder().encode(plainText)
+  );
+
+  return {
+    payload_encrypted: arrayBufferToBase64(encrypted),
+    iv: arrayBufferToBase64(iv),
+    checksum: await sha256(plainText)
+  };
+}
+
+async function decryptFamilyPayload(record){
+  const key = await deriveAesKey(SUPABASE_CONFIG.ENCRYPTION_KEY);
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name:'AES-GCM',
+      iv:new Uint8Array(base64ToArrayBuffer(record.iv))
+    },
+    key,
+    base64ToArrayBuffer(record.payload_encrypted)
+  );
+
+  const text = new TextDecoder().decode(decrypted);
+  const parsed = JSON.parse(text);
+
+  return parsed.payload;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UPDATE CREATION
+═══════════════════════════════════════════════════════════════ */
+async function buildFamilyUpdateRecord(){
+  const familyData = (
+    window.familyData ||
+    window.family ||
+    window.treeData ||
+    {}
+  );
+
+  const cleaned = sanitizeFamilyPayload(familyData);
+
+  if(!cleaned || !Object.keys(cleaned).length){
+    throw new Error('Empty payload rejected.');
+  }
+
+  const currentHash = await generateDeterministicHash(cleaned);
+  const lastHash = localStorage.getItem(LAST_HASH_KEY);
+
+  if(lastHash && lastHash === currentHash){
+    throw new Error('No real changes detected.');
+  }
+
+  const encrypted = await encryptFamilyPayload(cleaned);
+
+  localStorage.setItem(LAST_HASH_KEY, currentHash);
+
+  return {
+    family_id: SUPABASE_CONFIG.FAMILY_ID,
+    device_id: DEVICE_ID,
+    schema_version: SUPABASE_CONFIG.SCHEMA_VERSION,
+    payload_encrypted: encrypted.payload_encrypted,
+    iv: encrypted.iv,
+    checksum: encrypted.checksum,
+    update_type:'family_update',
+    merge_status:'pending',
+    metadata:{
+      platform:navigator.platform,
+      userAgent:navigator.userAgent.slice(0,120)
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OFFLINE QUEUE
+═══════════════════════════════════════════════════════════════ */
+function getOfflineQueue(){
+  try{
+    return JSON.parse(localStorage.getItem(UPDATE_QUEUE_KEY) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue){
+  localStorage.setItem(UPDATE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+async function uploadQueuedUpdates(){
+  const client = getSupabaseClient();
+  if(!client) return;
+
+  const queue = getOfflineQueue();
+  if(!queue.length) return;
+
+  const remaining = [];
+
+  for(const item of queue){
+    try{
+      const res = await client
+        .from(SUPABASE_TABLE)
+        .insert(item);
+
+      if(res.error){
+        throw res.error;
+      }
+    }catch(err){
+      console.warn('[Queue Upload Failed]', err);
+      remaining.push(item);
+    }
+  }
+
+  saveOfflineQueue(remaining);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN UPLOAD
+═══════════════════════════════════════════════════════════════ */
+window.uploadFamilyUpdateToSupabase = async function(){
+  try{
+    const record = await buildFamilyUpdateRecord();
+    const client = getSupabaseClient();
+
+    if(!navigator.onLine || !client){
+      const queue = getOfflineQueue();
+      queue.push(record);
+      saveOfflineQueue(queue);
+
+      showSyncToast('📦 تم حفظ التحديث محلياً بانتظار الاتصال', '#92400e');
+      return;
+    }
+
+    const result = await client
+      .from(SUPABASE_TABLE)
+      .insert(record)
+      .select('id')
+      .single();
+
+    if(result.error){
+      throw result.error;
+    }
+
+    showSyncToast('✅ تم رفع تحديث العائلة بأمان', '#065f46');
+
+    await renderFamilyUpdates();
+  }catch(err){
+    console.error(err);
+
+    if(String(err.message || '').includes('No real changes detected')){
+      showSyncToast('ℹ️ لا توجد تغييرات حقيقية للرفع', '#1d4ed8');
+      return;
+    }
+
+    showSyncToast('❌ فشل رفع التحديث — تم الاحتفاظ بالبيانات محلياً', '#991b1b');
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRIEVAL
+═══════════════════════════════════════════════════════════════ */
+window.fetchFamilyUpdatesFromSupabase = async function(){
+  const client = getSupabaseClient();
+
+  if(!client){
+    return [];
+  }
+
+  const result = await client
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('family_id', SUPABASE_CONFIG.FAMILY_ID)
+    .order('created_at', {ascending:false})
+    .limit(500);
+
+  if(result.error){
+    throw result.error;
+  }
+
+  const output = [];
+
+  for(const row of (result.data || [])){
+    try{
+      const payload = await decryptFamilyPayload(row);
+
+      if(!payload || !Object.keys(payload).length){
+        continue;
+      }
+
+      output.push({
+        row:row,
+        payload:payload,
+        decrypted:true
+      });
+    }catch(err){
+      output.push({
+        row:row,
+        decrypted:false,
+        error:String(err.message || err)
+      });
+    }
+  }
+
+  return output;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   UI RENDERING
+═══════════════════════════════════════════════════════════════ */
+window.renderFamilyUpdates = async function(){
+  try{
+    const list = await fetchFamilyUpdatesFromSupabase();
+
+    let container = document.getElementById('familyUpdatesSupabaseList');
+
+    if(!container){
+      container = document.createElement('div');
+      container.id = 'familyUpdatesSupabaseList';
+      container.style.marginTop = '12px';
+
+      document.body.appendChild(container);
+    }
+
+    container.innerHTML = list.map(function(item){
+      const row = item.row;
+
+      return `
+        <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <strong>📡 ${new Date(row.created_at).toLocaleString('ar-SA')}</strong>
+            <span style="font-size:12px;color:var(--text2)">🖥️ ${row.device_id}</span>
+          </div>
+
+          <div style="margin-top:8px;font-size:12px;color:var(--text2)">
+            النوع: ${row.update_type || 'family_update'} —
+            الحالة: ${row.merge_status || 'pending'} —
+            الإصدار: ${row.schema_version}
+          </div>
+
+          <div style="margin-top:6px;font-size:12px">
+            ${
+              item.decrypted
+              ? '<span style="color:#065f46">🔓 تم فك التشفير بنجاح</span>'
+              : '<span style="color:#991b1b">⚠️ فشل فك التشفير</span>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  }catch(err){
+    console.error(err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GIST MIGRATION
+═══════════════════════════════════════════════════════════════ */
+window.migrateLegacyGistUpdates = async function(){
+  if(localStorage.getItem(MIGRATION_KEY) === 'done'){
+    return;
+  }
+
+  try{
+    if(typeof loadCloudBackup !== 'function'){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    console.log('[Migration] Starting legacy migration');
+
+    const legacyData = localStorage.getItem('ft_family_updates_cache');
+
+    if(!legacyData){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const parsed = JSON.parse(legacyData);
+
+    if(!Array.isArray(parsed)){
+      localStorage.setItem(MIGRATION_KEY, 'done');
+      return;
+    }
+
+    const queue = getOfflineQueue();
+
+    for(const item of parsed){
+      const hash = await generateDeterministicHash(item);
+
+      const encrypted = await encryptFamilyPayload(item);
+
+      queue.push({
+        family_id: SUPABASE_CONFIG.FAMILY_ID,
+        device_id: DEVICE_ID,
+        schema_version:1,
+        payload_encrypted: encrypted.payload_encrypted,
+        iv: encrypted.iv,
+        checksum: hash,
+        update_type:'migrated_gist_update',
+        merge_status:'migrated'
+      });
+    }
+
+    saveOfflineQueue(queue);
+
+    localStorage.setItem(MIGRATION_KEY, 'done');
+
+    await uploadQueuedUpdates();
+
+    console.log('[Migration] Completed.');
+  }catch(err){
+    console.error('[Migration]', err);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   RETRY / ONLINE RECOVERY
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('online', function(){
+  uploadQueuedUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+setInterval(function(){
+  if(navigator.onLine){
+    uploadQueuedUpdates().catch(console.error);
+  }
+}, 30000);
+
+window.addEventListener('load', function(){
+  migrateLegacyGistUpdates()
+    .then(renderFamilyUpdates)
+    .catch(console.error);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SAFE OVERRIDES
+═══════════════════════════════════════════════════════════════ */
+window.createFamilyUpdate = window.uploadFamilyUpdateToSupabase;
+window.syncFamilyUpdates = window.uploadFamilyUpdateToSupabase;
+
 })();
 </script>
 
