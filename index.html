@@ -10738,8 +10738,12 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       var up2=u.summary&&u.summary.updatedPeople&&u.summary.updatedPeople.length||0;
       var uc=u.summary&&u.summary.unchangedPeople&&u.summary.unchangedPeople.length||0;
       var pc=u.data&&u.data.people&&u.data.people.length||0;
+      var isMyDevice=(u.row.device_id===fuDevId());
       var tb=u.row.update_type==='migration'
-        ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d">مُهاجَر</span>':'';
+        ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d">مُهاجَر</span>'
+        :isMyDevice
+          ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd">جهازك الحالي</span>'
+          :'';
       return '<div style="padding:12px 14px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:9px">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
         +'<div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600">📱 '+escapeHtml(u.row.device_name||u.row.device_id)+'</span>'+tb+'</div>'
@@ -10877,7 +10881,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     var mainSrc=_mainScriptEl.textContent;
     var s=fuSettings(), keyHex=fuKey();
 
-    /* تضمين مفتاح التشفير في CLOUD_CONFIG */
+    /* 1. تضمين مفتاح التشفير في CLOUD_CONFIG */
     if(keyHex){
       mainSrc=mainSrc.replace(
         /const CLOUD_CONFIG\s*=\s*\{[^}]*\}/,
@@ -10885,10 +10889,24 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       );
     }
 
-    /* مسح FAMILY_UPLOAD_CONFIG (لا يلزم بعد الآن) */
+    /* 2. مسح FAMILY_UPLOAD_CONFIG */
     mainSrc=mainSrc.replace(
       /const FAMILY_UPLOAD_CONFIG\s*=\s*\{[^}]*\}/,
       "const FAMILY_UPLOAD_CONFIG = {\n  GITHUB_PAT: '',\n  GIST_ID: '',\n  KEY_HEX: '"+keyHex+"',\n}"
+    );
+
+    /* 3. تمييز النسخة كـ "نسخة عائلة" لتفعيل _applyFamilyMetaIfNeeded */
+    mainSrc=mainSrc.replace(
+      /const IS_FAMILY_COPY\s*=\s*false/,
+      'const IS_FAMILY_COPY = true'
+    );
+
+    /* 4. Device ID فريد لكل نسخة HTML مصدَّرة */
+    var _newDid=[].slice.call(crypto.getRandomValues(new Uint8Array(3)))
+      .map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    mainSrc=mainSrc.replace(
+      /const FAMILY_DEVICE_ID\s*=\s*'[^']*'/,
+      "const FAMILY_DEVICE_ID = '"+_newDid+"'"
     );
 
     /* حقنة Supabase settings تُطبَّق تلقائياً عند أول تشغيل */
@@ -10966,6 +10984,8 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     if(m.keyHex&&window.CLOUD_CONFIG)try{window.CLOUD_CONFIG.KEY_HEX=m.keyHex;}catch(e){}
     /* مسح الهاش لإجبار رفع فوري */
     try{localStorage.removeItem('ft_fu_hash_v4');}catch(e){}
+    /* مسح device ID ليحصل المستورِد على معرّف جهاز جديد خاص به */
+    try{localStorage.removeItem('ft_family_device_id');}catch(e){}
     /* استدعاء الأصلية للتوافق */
     if(_origApplyMeta)try{_origApplyMeta(data);}catch(e){}
     log('[Import] Supabase meta applied. syncId:',m.sbSyncId||'—');
@@ -11007,7 +11027,15 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       +'</div>'
       +'<label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">👤 اسم هذا الجهاز</label>'
       +'<input id="_fuNm" type="text" value="'+escapeHtml(name)+'" placeholder="مثال: هاتف أحمد، جهاز فاطمة…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--card-border);border-radius:7px;font-size:13px;background:var(--bg-input,var(--card-bg));color:var(--text);margin-bottom:10px">'
-      +'<div style="font-size:10px;color:var(--text3)">معرّف الجهاز: <code style="background:var(--bg-secondary);padding:1px 6px;border-radius:4px">'+escapeHtml(id)+'</code></div>'
+      +'<div style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'معرّف الجهاز: <code style="background:var(--bg-secondary);padding:1px 6px;border-radius:4px" id="_fuDidLbl">'+escapeHtml(id)+'</code>'
+      +'<button class="btn" style="font-size:10px;padding:1px 7px" onclick="'
+        +"try{localStorage.removeItem('ft_family_device_id');}catch(e){}"
+        +";var nid=Array.from(crypto.getRandomValues(new Uint8Array(6))).map(function(b){return b.toString(16).padStart(2,'0')}).join('');"
+        +"try{localStorage.setItem('ft_family_device_id',nid);}catch(e){}"
+        +";var el=document.getElementById('_fuDidLbl');if(el)el.textContent=nid;"
+        +";if(typeof _showCloudToast==='function')_showCloudToast('✅ تم إنشاء معرّف جديد','success',2500);"
+      +'">🔄 معرّف جديد</button></div>'
       +'<div class="modal-footer">'
       +'<button class="btn" onclick="closeModal()">إغلاق</button>'
       +(!ok?'<button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>':'')
