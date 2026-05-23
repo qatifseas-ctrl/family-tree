@@ -1244,16 +1244,26 @@ function _markDeviceInit(){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
+// ║  Supabase Configuration — نظام الرفع الجديد المشفّر              ║
+// ║  بدل GitHub Gist — أكثر موثوقية وأماناً                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const SUPABASE_CONFIG = {
+  URL: '',           // ← Supabase project URL (مثل: https://abc123.supabase.co)
+  KEY: '',           // ← Supabase anon key (Supabase > Settings > API Keys)
+  FAMILY_ID: '',     // ← معرّف الأسرة الفريد (يُملأ تلقائياً أو يدوياً)
+};
+
+// ╔══════════════════════════════════════════════════════════════════╗
 // ║  إعدادات رفع نسخة العائلة الصامت                                 ║
 // ║  يُملأ بواسطة المالك ويُضمَّن تلقائياً في نسخة العائلة           ║
 // ╚══════════════════════════════════════════════════════════════════╝
 const FAMILY_UPLOAD_CONFIG = {
-  // توكن GitHub خاص بالرفع من أجهزة العائلة (gist scope — يمكن أن يكون حساباً ثانياً)
-  GITHUB_PAT: '',  // ← ضع التوكن هنا بعد إعداده من لوحة إعداد نسخة العائلة
-  // معرّف Gist المخصص لاستقبال تحديثات العائلة (اختياري — يُنشأ تلقائياً إذا تُرك فارغاً)
-  GIST_ID: '',     // ← يُملأ تلقائياً أو اكتبه يدوياً
-  // مفتاح التشفير (اختياري — اتركه فارغاً لرفع بدون تشفير؛ أو ضع مفتاح الأوُنر لتشفير أقوى)
-  KEY_HEX: '',     // ← اختياري
+  // Supabase بدل GitHub
+  SUPABASE_URL: '',  // ← نفس Supabase URL
+  SUPABASE_KEY: '',  // ← نفس Supabase key
+  FAMILY_ID: '',     // ← معرّف الأسرة
+  // مفتاح التشفير AES-256 (64 حرف hex)
+  KEY_HEX: '',       // ← مفتاح التشفير
 };
 // اسم ملف العائلة يعتمد على DEVICE_ID — كل نسخة لها ملفها في Gist
 const FAMILY_UPLOAD_GIST_KEY  = 'ft_family_gist_id_v1';
@@ -5976,6 +5986,202 @@ async function cloudDecrypt(b64){
   let cipher=combined.slice(12);
   let plain=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,cipher);
   return new TextDecoder().decode(plain);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Supabase Functions — الرفع المشفّر
+// ═══════════════════════════════════════════════════════════════════
+
+// دالة تشفير AES-GCM آمنة بـ IV عشوائي لكل عملية
+async function _encryptForSupabase(plaintext, keyHex) {
+  if (!keyHex) throw new Error('مفتاح التشفير مفقود');
+  
+  const keyData = new Uint8Array(keyHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+  const key = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['encrypt']);
+  
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // IV عشوائي لكل تشفير
+  const plainData = new TextEncoder().encode(plaintext);
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plainData);
+  
+  // دمج IV + ciphertext وتحويل إلى base64
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  
+  return {
+    ciphertext_b64: _bytesToBase64(combined),
+    iv_hex: Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('')
+  };
+}
+
+// دالة فك تشفير من Supabase
+async function _decryptFromSupabase(ciphertextB64, keyHex) {
+  if (!keyHex) throw new Error('مفتاح التشفير مفقود');
+  
+  const keyData = new Uint8Array(keyHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+  const key = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+  
+  const combined = _base64ToBytes(ciphertextB64);
+  const iv = combined.slice(0, 12);
+  const ciphertext = combined.slice(12);
+  
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(plaintext);
+}
+
+// هل التحديث حقيقي (تغيير فعلي في البيانات)؟
+function _isRealUpdate(prevFamilyData, newFamilyData) {
+  if (!prevFamilyData) return true; // أول مرة = حقيقي
+  
+  // مقارنة deterministic للـ people بدون timestamp/metadata
+  const normalize = (data) => {
+    const people = (data.people || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      birthDate: p.birthDate,
+      deathDate: p.deathDate,
+      gender: p.gender,
+      parents: p.parents,
+      notes: p.notes
+    }));
+    return JSON.stringify(people);
+  };
+  
+  return normalize(prevFamilyData) !== normalize(newFamilyData);
+}
+
+// رفع تحديث إلى Supabase
+async function _uploadToSupabase(familyData, keyHex, deviceId) {
+  if (!SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.KEY) {
+    throw new Error('Supabase غير مُعداً');
+  }
+  if (!SUPABASE_CONFIG.FAMILY_ID) {
+    throw new Error('معرّف الأسرة مفقود');
+  }
+  
+  // التحقق: هل هذا تحديث حقيقي؟
+  const lastUpdate = _getLastUploadedFamily();
+  if (!_isRealUpdate(lastUpdate, familyData)) {
+    return { skipped: true, reason: 'لا توجد تغييرات فعلية' };
+  }
+  
+  const payload = JSON.stringify(familyData);
+  const encrypted = await _encryptForSupabase(payload, keyHex);
+  
+  // حساب checksum للتحقق من السلامة
+  const checksum = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+  const checksumHex = Array.from(new Uint8Array(checksum)).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  const record = {
+    family_id: SUPABASE_CONFIG.FAMILY_ID,
+    device_id: deviceId,
+    created_at: new Date().toISOString(),
+    schema_version: 1,
+    payload_encrypted: encrypted.ciphertext_b64,
+    iv: encrypted.iv_hex,
+    checksum: checksumHex,
+    metadata: {
+      person_count: (familyData.people || []).length,
+      photo_count: (familyData.photos || {}) ? Object.keys(familyData.photos).length : 0
+    }
+  };
+  
+  const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/family_updates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_CONFIG.KEY,
+      'Authorization': `Bearer ${SUPABASE_CONFIG.KEY}`,
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(record)
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`خطأ Supabase: ${response.status} - ${error}`);
+  }
+  
+  const result = await response.json();
+  
+  // حفظ آخر تحديث محلياً للمقارنة لاحقاً
+  try {
+    localStorage.setItem('ft_last_upload', JSON.stringify({
+      familyData,
+      uploadedAt: new Date().toISOString(),
+      supabseId: result[0]?.id
+    }));
+  } catch (e) {}
+  
+  return result[0];
+}
+
+// جلب جميع التحديثات من Supabase
+async function _loadFromSupabase(keyHex) {
+  if (!SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.KEY) {
+    throw new Error('Supabase غير مُعداً');
+  }
+  if (!SUPABASE_CONFIG.FAMILY_ID) {
+    throw new Error('معرّف الأسرة مفقود');
+  }
+  
+  const response = await fetch(
+    `${SUPABASE_CONFIG.URL}/rest/v1/family_updates?family_id=eq.${SUPABASE_CONFIG.FAMILY_ID}&order=created_at.desc`,
+    {
+      headers: {
+        'apikey': SUPABASE_CONFIG.KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.KEY}`
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`خطأ في جلب التحديثات: ${response.status}`);
+  }
+  
+  const records = await response.json();
+  const updates = [];
+  
+  for (const record of records) {
+    try {
+      const decrypted = await _decryptFromSupabase(record.payload_encrypted, keyHex);
+      const data = JSON.parse(decrypted);
+      
+      updates.push({
+        id: record.id,
+        deviceId: record.device_id,
+        createdAt: new Date(record.created_at),
+        data,
+        metadata: record.metadata || {},
+        schemaVersion: record.schema_version,
+        checksum: record.checksum,
+        decryptionSuccess: true
+      });
+    } catch (e) {
+      updates.push({
+        id: record.id,
+        deviceId: record.device_id,
+        createdAt: new Date(record.created_at),
+        decryptionSuccess: false,
+        error: e.message
+      });
+    }
+  }
+  
+  return updates;
+}
+
+// حفظ آخر تحديث محمّل محلياً للمقارنة
+function _getLastUploadedFamily() {
+  try {
+    const saved = localStorage.getItem('ft_last_upload');
+    if (saved) {
+      const { familyData } = JSON.parse(saved);
+      return familyData;
+    }
+  } catch (e) {}
+  return null;
 }
 
 // ── GitHub Gist API ──
