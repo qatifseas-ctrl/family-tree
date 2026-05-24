@@ -3604,6 +3604,7 @@ function showRelInfo(id,pairNum){
   document.getElementById('modalContainer').innerHTML=modal;
 }
 function navigateToPerson(id){
+  _pushAndroidTreeSnapshot();
   let targetP=getPerson(id);
   if(!targetP)return;
 
@@ -3671,6 +3672,7 @@ function navigateToPerson(id){
 }
 // Navigate back to main tree and highlight a specific person (used by external tree wife-links)
 function navigateToMainForPerson(personId){
+  _pushAndroidTreeSnapshot();
   navStack=[];currentFamilyFilter=null;
   renderAll();
   setTimeout(()=>{
@@ -5337,6 +5339,7 @@ function renderNavBreadcrumb(){
   return banner+breadcrumb;
 }
 function navigateToSpouseFamily(personId){
+  _pushAndroidTreeSnapshot();
   let sp=getPerson(personId);if(!sp)return;
   // Walk up to find the root of this person's family
   let cur=sp;
@@ -5400,6 +5403,143 @@ function navigateToBreadcrumb(idx){
 }
 // ══════════════════════════════════════════════════════════
 function closeModal(){document.getElementById('modalContainer').innerHTML='';tempPhoto=null;}
+
+// Android / Browser Back Button — smart internal navigation
+let _androidBackReady=false;
+window._ftTreeBackStack=window._ftTreeBackStack||[];
+
+function _getActiveTabName(){
+  let panels=[
+    document.getElementById('treePanel'),
+    document.getElementById('listPanel'),
+    document.getElementById('kinPanel'),
+    document.getElementById('guidePanel')
+  ];
+  let names=['tree','list','kin','guide'];
+  for(let i=0;i<panels.length;i++){
+    if(panels[i] && panels[i].classList.contains('active')) return names[i];
+  }
+  return 'tree';
+}
+
+function _getTabElementByName(name){
+  let tabs=document.querySelectorAll('.tab');
+  if(name==='list') return tabs[1]||tabs[0];
+  if(name==='kin') return tabs[2]||tabs[0];
+  if(name==='guide') return tabs[3]||tabs[0];
+  return tabs[0]||null;
+}
+
+function _pushAndroidHistoryState(){
+  if(!history || !history.pushState) return;
+  try{
+    history.pushState({_ftBackGuard:true}, '', location.href);
+  }catch(e){}
+}
+
+function _restoreAndroidTreeSnapshot(){
+  let stack=window._ftTreeBackStack||[];
+  let snap=stack.pop();
+  if(!snap) return false;
+  expanded=snap.expanded||{};
+  currentFamilyFilter=snap.currentFamilyFilter||null;
+  navStack=snap.navStack||[];
+  renderAll();
+  let tabEl=_getTabElementByName(snap.tab||'tree');
+  if((snap.tab||'tree')!=='tree') switchTab(snap.tab,tabEl||_getTabElementByName('tree'));
+  setTimeout(function(){
+    window.scrollTo({top:snap.scrollY||0,behavior:'smooth'});
+  },80);
+  return true;
+}
+
+function _pushAndroidTreeSnapshot(){
+  try{
+    window._ftTreeBackStack=window._ftTreeBackStack||[];
+    window._ftTreeBackStack.push({
+      expanded:JSON.parse(JSON.stringify(expanded||{})),
+      currentFamilyFilter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,
+      navStack:JSON.parse(JSON.stringify(navStack||[])),
+      scrollY:window.scrollY||0,
+      tab:_getActiveTabName()
+    });
+    if(window._ftTreeBackStack.length>20) window._ftTreeBackStack.shift();
+  }catch(e){}
+}
+
+function _closeBackTarget(){
+  let modalContainer=document.getElementById('modalContainer');
+  if(modalContainer && modalContainer.innerHTML){
+    closeModal();
+    return true;
+  }
+
+  let mssSheet=document.getElementById('mss-sheet');
+  if(mssSheet && mssSheet.classList.contains('open')){
+    closeMobSearchSheet();
+    return true;
+  }
+
+  if(_lastSearchQ || (document.getElementById('searchBox') && document.getElementById('searchBox').value)){
+    if(document.getElementById('searchResultsPanel') && document.getElementById('searchResultsPanel').style.display!=='none'){
+      clearSearch();
+      return true;
+    }
+  }
+
+  let actionSheet=document.getElementById('mob-action-sheet');
+  if(actionSheet && actionSheet.classList.contains('open')){
+    closeMobSheet();
+    return true;
+  }
+
+  return false;
+}
+
+function _handleAndroidBack(){
+  if(_closeBackTarget()) return true;
+
+  if(_getActiveTabName()!=='tree'){
+    let treeTab=_getTabElementByName('tree');
+    if(treeTab) switchTab('tree',treeTab);
+    _pushAndroidHistoryState();
+    return true;
+  }
+
+  if(navStack.length>0 || currentFamilyFilter){
+    if(navStack.length>0) navigateBack();
+    else navigateHome();
+    _pushAndroidHistoryState();
+    return true;
+  }
+
+  if(window._ftTreeBackStack && window._ftTreeBackStack.length){
+    if(_restoreAndroidTreeSnapshot()){
+      _pushAndroidHistoryState();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function _initAndroidBackNavigation(){
+  if(_androidBackReady) return;
+  if(!history || !history.pushState) return;
+  _androidBackReady=true;
+
+  try{
+    history.replaceState({_ftBackGuard:true}, '', location.href);
+    history.pushState({_ftBackGuard:true}, '', location.href);
+  }catch(e){}
+
+  window.addEventListener('popstate', function(){
+    if(_handleAndroidBack()){
+      _pushAndroidHistoryState();
+    }
+  });
+}
+
 // ── My Person (منظوري أنا) ──
 let myPersonId=null;
 const MY_KEY='family_tree_myPerson';
@@ -8512,6 +8652,7 @@ deletePerson=function(id){
   // ── تهيئة وضع الجوال ──
   initMobileMode();
   renderAll();
+  _initAndroidBackNavigation();
   // تهيئة الحفظ السحابي
   await initCloud();
   // ── إظهار بانر الجهاز الجديد إذا كانت السحابة مُعدَّة ──
