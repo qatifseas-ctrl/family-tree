@@ -8784,16 +8784,20 @@ function dismissInstallBanner(){
 //  زر "للأعلى" العائم + زر إضافة سريع (للجوال)
 // ══════════════════════════════════════════════════════════
 (function(){
-  // أنشئ الزر العائم
   let fab=document.createElement('div');
   fab.id='mob-fab';
   fab.innerHTML=`
     <style>
     #mob-fab {
-      position:fixed;bottom:24px;left:16px;
-      display:flex;flex-direction:column;gap:10px;
+      position:fixed;
+      bottom:24px;
+      left:16px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
       z-index:400;
-      opacity:0;pointer-events:none;
+      opacity:0;
+      pointer-events:none;
       transition:opacity .25s;
     }
     #mob-fab.visible { opacity:1;pointer-events:auto; }
@@ -8810,14 +8814,75 @@ function dismissInstallBanner(){
     .mob-fab-search { background:#1e40af;color:#fff; font-size:18px; }
     </style>
     <button id="mob-fab-search-btn" class="mob-fab-btn mob-fab-search" onclick="openSearchPanel()" title="بحث سريع">🔍</button>
-    <button class="mob-fab-btn mob-fab-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="للأعلى">↑</button>
+    <button class="mob-fab-btn mob-fab-top" onclick="window._mobFabGoTopInstant()" title="للأعلى">↑</button>
   `;
   document.body.appendChild(fab);
 
-  // أظهر الزر عند التمرير للأسفل في وضع الجوال
-  let _fabT=null;
-  function _showFabBriefly(){if(window.scrollY<80){fab.classList.remove('visible');return;}fab.classList.add('visible');clearTimeout(_fabT);_fabT=setTimeout(()=>fab.classList.remove('visible'),2500);}
-  window.addEventListener('scroll',function(){if(document.body.classList.contains('mobile-mode'))_showFabBriefly();},{passive:true});
+  const SHOW_MS = 2000;
+  const TOP_THRESHOLD = 88;
+  const UP_THRESHOLD = 18;
+  let hideTimer = null;
+  let lastY = window.scrollY || 0;
+  let lastRevealAt = 0;
+
+  function hideFab(){
+    fab.classList.remove('visible');
+    if(hideTimer){ clearTimeout(hideTimer); hideTimer = null; }
+  }
+
+  function showFab(){
+    if(!document.body.classList.contains('mobile-mode')) return;
+    if((window.scrollY || 0) < TOP_THRESHOLD) return;
+    fab.classList.add('visible');
+    if(hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideFab, SHOW_MS);
+    lastRevealAt = Date.now();
+  }
+
+  window._mobFabGoTopInstant = function(){
+    try{ window.scrollTo({top:0,behavior:'auto'}); }catch(e){ window.scrollTo(0,0); }
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    hideFab();
+  };
+
+  function onScroll(){
+    if(!document.body.classList.contains('mobile-mode')){
+      hideFab();
+      lastY = window.scrollY || 0;
+      return;
+    }
+
+    const y = window.scrollY || 0;
+    const dy = y - lastY;
+
+    if(y < TOP_THRESHOLD){
+      hideFab();
+      lastY = y;
+      return;
+    }
+
+    // يظهر فقط عند السحب للأعلى بعد وجود حركة فعلية في الصفحة
+    if(dy < -UP_THRESHOLD){
+      showFab();
+    }
+
+    // إذا عاد المستخدم للأسفل بينما الزر ظاهر، اتركه يختفي تلقائياً سريعاً
+    if(dy > UP_THRESHOLD && fab.classList.contains('visible') && Date.now() - lastRevealAt > 250){
+      if(hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideFab, SHOW_MS);
+    }
+
+    lastY = y;
+  }
+
+  document.addEventListener('touchstart', function(){
+    if(!document.body.classList.contains('mobile-mode')) return;
+    lastY = window.scrollY || 0;
+  }, {passive:true});
+
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
 })();
 
 (function(){
