@@ -11056,8 +11056,10 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         +"try{localStorage.removeItem('ft_family_device_id');}catch(e){}"
         +";var nid=Array.from(crypto.getRandomValues(new Uint8Array(6))).map(function(b){return b.toString(16).padStart(2,'0')}).join('');"
         +"try{localStorage.setItem('ft_family_device_id',nid);}catch(e){}"
+        +"try{localStorage.removeItem('ft_fu_hash_v4');}catch(e){}"
+        +"try{localStorage.removeItem('ft_fu_last_ts_v4');}catch(e){}"
         +";var el=document.getElementById('_fuDidLbl');if(el)el.textContent=nid;"
-        +";if(typeof _showCloudToast==='function')_showCloudToast('✅ تم إنشاء معرّف جديد','success',2500);"
+        +";if(typeof _showCloudToast==='function')_showCloudToast('✅ معرّف جديد — سيُرفع تحديث خلال 90 ث','success',2800);"
       +'">🔄 معرّف جديد</button></div>'
       +'<div class="modal-footer">'
       +'<button class="btn" onclick="closeModal()">إغلاق</button>'
@@ -11105,14 +11107,43 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   window.fuDeleteRecord = function(rowId) {
     if (!rowId) return;
     if (!confirm('🗑️ حذف هذا السجل نهائياً من Supabase؟')) return;
-    fuClient().then(function(c) {
-      return c.from(FU_TABLE).delete().eq('id', rowId);
-    }).then(function(res) {
-      if (res.error) throw new Error(res.error.message);
-      if (typeof _showCloudToast === 'function') _showCloudToast('🗑️ تم الحذف', 'success', 2000);
-      openFamilyUpdatesModal();
-    }).catch(function(e) {
-      alert('❌ فشل الحذف: ' + (e.message || e));
+    var s = fuSettings();
+    /* استخدام REST API مباشرة مع DELETE — أكثر موثوقية من supabase-js */
+    var doDelete = function(token) {
+      return fetch(s.url + '/rest/v1/' + FU_TABLE + '?id=eq.' + encodeURIComponent(rowId), {
+        method: 'DELETE',
+        headers: {
+          'apikey':        s.anonKey,
+          'Authorization': 'Bearer ' + token,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=representation'
+        }
+      }).then(function(res) {
+        if (!res.ok) {
+          return res.json().catch(function(){return{};}).then(function(e){
+            throw new Error('HTTP ' + res.status + ': ' + (e.message || e.hint || 'فشل الحذف — تحقق من سياسات RLS'));
+          });
+        }
+        return res.json().catch(function(){return[];});
+      }).then(function(deleted) {
+        if (!Array.isArray(deleted) || deleted.length === 0) {
+          throw new Error('السجل لم يُحذف — ربما سياسة RLS تمنع الحذف. شغّل family_updates_rls_update.sql');
+        }
+        if (typeof _showCloudToast === 'function') _showCloudToast('🗑️ تم الحذف', 'success', 2000);
+        openFamilyUpdatesModal();
+      });
+    };
+    /* الحصول على token ثم الحذف */
+    var s2 = fuSettings();
+    fetch(s2.url + '/auth/v1/token?grant_type=anonymous', {
+      method: 'POST',
+      headers: {'apikey': s2.anonKey, 'Content-Type': 'application/json'},
+      body: '{}'
+    }).then(function(r){return r.ok?r.json():Promise.reject();})
+    .then(function(d){ return doDelete(d.access_token || s2.anonKey); })
+    .catch(function(){ return doDelete(s2.anonKey); }) /* fallback: anon key مباشرة */
+    .catch(function(e) {
+      alert('❌ ' + (e.message || 'فشل الحذف'));
     });
   };
 
