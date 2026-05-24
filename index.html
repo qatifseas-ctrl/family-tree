@@ -10455,7 +10455,9 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   var FU_TABLE      = 'family_updates';
   var FU_SCHEMA_VER = 1;
   var FU_HASH_KEY   = 'ft_fu_hash_v4';
-  var FU_DEBOUNCE   = 5000;
+  var FU_DEBOUNCE   = 90000;   /* 90 ثانية */
+  var FU_MIN_INTERVAL = 5*60*1000;
+  var FU_LAST_TS_KEY  = 'ft_fu_last_ts_v4';
   var FU_MAX_ROWS   = 500;
   var FU_PAGE_SIZE  = 50;
 
@@ -10628,6 +10630,11 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     _uploading=true;
     var keyHex=fuKey();
     if(!keyHex){log('لا مفتاح تشفير');_uploading=false;return;}
+    /* فحص الحد الأدنى بين الرفعات (5 دقائق) */
+    try{
+      var lastTs=parseInt(localStorage.getItem(FU_LAST_TS_KEY)||'0',10);
+      if(Date.now()-lastTs < FU_MIN_INTERVAL){log('أقل من 5 دقائق منذ آخر رفع — تم التخطي');_uploading=false;return;}
+    }catch(e){}
     fuHasChanges().then(function(changed){
       if(!changed){log('لا تغيير');_uploading=false;return;}
       var arr=Array.isArray(people)?people:[];
@@ -10649,6 +10656,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       }).then(function(){
         return fuContentHash().then(function(h){
           try{localStorage.setItem(FU_HASH_KEY,h);}catch(e){}
+          try{localStorage.setItem(FU_LAST_TS_KEY,String(Date.now()));}catch(e){}
           log('✓ رُفع بنجاح family:',fuFamilyId(),'device:',fuDevId());
         });
       });
@@ -10753,6 +10761,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         +'<button class="btn" style="font-size:11px;padding:3px 9px;background:#dbeafe;border-color:#3b82f6;color:#1d4ed8" onclick="openFamilyUpdateDetails('+idx+')">🔍</button>'
         +'<button class="btn" style="font-size:11px;padding:3px 9px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="confirmFamilyMerge('+idx+')">➕ دمج</button>'
         +'<button class="btn" style="font-size:11px;padding:3px 9px" onclick="_familyDownloadOne('+idx+')">⬇️</button>'
+        +(!isMyDevice?'<button class="btn" style="font-size:11px;padding:3px 9px;background:#fee2e2;border-color:#fca5a5;color:#991b1b" onclick="fuDeleteRecord(\''+u.row.id+'\')">🗑️</button>':'')
         +'</div></div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:7px;border-top:1px dashed var(--card-border)">'
         +'<span class="kin-stat">👨 '+(st.males||0)+'</span>'
@@ -11058,7 +11067,56 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   }
 
   /* ── حقن على window ─────────────────────────────────────────────── */
-  window.openFamilyUpdatesModal    = openFamilyUpdatesModal;
+
+  /* ── حذف سجل (للمالك فقط) ──────────────────────────────────────────── */
+  function fuDeleteRecord(rowId) {
+    if (!rowId) return;
+    var s = fuSettings();
+    fvGetToken && fvGetToken().catch && console.debug; // ignore
+    // استخدم نفس آلية الـ token
+    (function getToken() {
+      // إعادة استخدام fvGetToken إن وجدت، وإلا أنشئ token
+      if (typeof window._ftGetSupabaseClient === 'function') {
+        return window._ftGetSupabaseClient().then(function(client) {
+          return client.from(FU_TABLE).delete().eq('id', rowId);
+        }).then(function(res) {
+          if (res.error) throw new Error(res.error.message);
+          return true;
+        });
+      }
+      // fallback: REST API مباشر
+      return fuClient().then(function(c) {
+        return c.from(FU_TABLE).delete().eq('id', rowId);
+      }).then(function(res) {
+        if (res.error) throw new Error(res.error.message);
+        return true;
+      });
+    })().then(function() {
+      if (typeof _showCloudToast === 'function') _showCloudToast('🗑️ تم حذف السجل', 'success', 2000);
+      openFamilyUpdatesModal(); // إعادة تحميل
+    }).catch(function(e) {
+      alert('❌ فشل الحذف: ' + (e.message || e));
+    });
+  }
+  window.fuDeleteRecord = fuDeleteRecord;
+
+  
+  /* ── حذف سجل من Supabase (للمالك فقط) ─────────────────────────────── */
+  window.fuDeleteRecord = function(rowId) {
+    if (!rowId) return;
+    if (!confirm('🗑️ حذف هذا السجل نهائياً من Supabase؟')) return;
+    fuClient().then(function(c) {
+      return c.from(FU_TABLE).delete().eq('id', rowId);
+    }).then(function(res) {
+      if (res.error) throw new Error(res.error.message);
+      if (typeof _showCloudToast === 'function') _showCloudToast('🗑️ تم الحذف', 'success', 2000);
+      openFamilyUpdatesModal();
+    }).catch(function(e) {
+      alert('❌ فشل الحذف: ' + (e.message || e));
+    });
+  };
+
+    window.openFamilyUpdatesModal    = openFamilyUpdatesModal;
   window.openFamilyUploadSetup     = openFamilyUploadSetup;
   window.triggerFamilyUpload       = triggerFamilyUpload;
   window._doSilentFamilyUpload     = _doSilentFamilyUpload;
