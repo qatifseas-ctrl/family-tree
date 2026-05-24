@@ -3247,6 +3247,10 @@ function doExportJSONFamily(withPhotos){
       gistId:fuGid,
       pat:fuPat,
       keyHex:fuKey,
+      sbUrl:(localStorage.getItem('ft_supabase_url_v1')||'').trim(),
+      sbAnonKey:(localStorage.getItem('ft_supabase_anon_v1')||'').trim(),
+      sbSyncId:(localStorage.getItem('ft_supabase_sync_id_v1')||'family-sync').trim(),
+      sbBucket:(localStorage.getItem('ft_supabase_bucket_v1')||'family-tree').trim(),
       exportedAt:new Date().toISOString(),
       exportedBy:'owner'
     }
