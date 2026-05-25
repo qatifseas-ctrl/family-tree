@@ -358,6 +358,25 @@
   --male:   var(--clr-male);
   --female: var(--clr-female);
   --color-background-secondary: var(--bg-secondary);
+
+  /* ── Review modal aliases for family update diff UI ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #059669;
+  --color-text-warning:    #92400e;
+  --color-text-info:       #1d4ed8;
+  --color-text-danger:     #dc2626;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #d1fae5;
+  --color-background-warning: #fef3c7;
+  --color-background-info:    #dbeafe;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
 }
 
 /* ── Dark Theme ── */
@@ -393,6 +412,25 @@
   --shadow-sm:  0 1px 4px rgba(0,0,0,.25);
   --shadow-md:  0 4px 16px rgba(0,0,0,.4);
   --shadow-lg:  0 8px 32px rgba(0,0,0,.5);
+
+  /* ── Review modal aliases for family update diff UI ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #6ee7b7;
+  --color-text-warning:    #fcd34d;
+  --color-text-info:       #93c5fd;
+  --color-text-danger:     #fca5a5;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #064e3b;
+  --color-background-warning: #451a03;
+  --color-background-info:    #1e3a5f;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
 }
 
 /* ── Auto mode: follows OS preference unless explicitly set ── */
@@ -429,6 +467,25 @@
     --shadow-sm:  0 1px 4px rgba(0,0,0,.25);
     --shadow-md:  0 4px 16px rgba(0,0,0,.4);
     --shadow-lg:  0 8px 32px rgba(0,0,0,.5);
+
+  /* ── Review modal aliases for family update diff UI ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #6ee7b7;
+  --color-text-warning:    #fcd34d;
+  --color-text-info:       #93c5fd;
+  --color-text-danger:     #fca5a5;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #064e3b;
+  --color-background-warning: #451a03;
+  --color-background-info:    #1e3a5f;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
   }
 }
 
@@ -6950,78 +7007,443 @@ function renameFamilyDevice(idx, evt){
   openFamilyUpdatesModal();
 }
 
-function openFamilyUpdateDetails(idx){
-  let u=window._familyUpdates&&window._familyUpdates[idx];
-  if(!u||!u.data)return;
-  let incomingMap=(u.summary&&u.summary.incomingMap)||(_familyIncomingMap? _familyIncomingMap(u.data):new Map());
-  let newHtml=(u.summary.newPeople||[]).map(p=>{
-    let father=p.fatherId!=null?incomingMap.get(p.fatherId):null;
-    let fatherName=father?_familyDisplayName(father):'—';
-    return `<div class="sub-item" style="align-items:flex-start">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--text)">${_familyDisplayName(p)}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px">الأب: ${fatherName}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text2);white-space:nowrap">#${p.id}</div>
-    </div>`;
-  }).join('') || '<div class="no-results">لا يوجد أفراد جدد</div>';
 
-  let updatedHtml=(u.summary.updatedPeople||[]).map(x=>{
-    return `<div class="sub-item" style="align-items:flex-start">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--text)">${_familyDisplayName(x.remote)}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.7">${x.desc||'تغيير غير محدد'}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text2);white-space:nowrap">#${x.remote.id}</div>
-    </div>`;
-  }).join('') || '<div class="no-results">لا يوجد تحديثات</div>';
+// ══════════════════════════════════════════════════════════════════════════
+// نظام مراجعة تحديثات العائلة المحسَّن — مراجعة قبل الدمج الانتقائي
+// ══════════════════════════════════════════════════════════════════════════
 
-  let st=u.summary.stats;
-  document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:760px;width:min(760px,96vw)">
-    <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">🔍 تفاصيل التحديث — <span>${u.devName||u.devId}</span><span style="font-size:11px;font-family:monospace;font-weight:400;color:var(--text2)">${u.devName?'('+u.devId+')&nbsp;':''}</span><button onclick="renameFamilyDevice(${idx},event)" style="font-size:11px;background:none;border:1px solid var(--card-border);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--text2)">✏️ تسمية</button></h3>
-    <div class="kin-stats" style="margin-bottom:12px">
-      <div class="kin-stat">👨 ${st.males}</div>
-      <div class="kin-stat">👩 ${st.females}</div>
-      <div class="kin-stat">⚰️ ${st.deceased}</div>
-      <div class="kin-stat">🖼 ${st.photos}</div>
-      <div class="kin-stat">💍 ${st.marriages}</div>
-      <div class="kin-stat">➕ ${u.summary.newPeople.length}</div>
-      <div class="kin-stat">🔄 ${u.summary.updatedPeople.length}</div>
-      <div class="kin-stat">⏭ ${u.summary.unchangedPeople.length}</div>
-    </div>
-    ${u.summary.newPeople.length>0?`
-    <div class="section-title">➕ الأفراد الجدد (${u.summary.newPeople.length})</div>
-    <div class="person-list" style="max-height:33vh;overflow:auto">${newHtml}</div>`:''}
-    ${u.summary.updatedPeople.length>0?`
-    <div class="section-title">🔄 الأفراد المحدَّثون (${u.summary.updatedPeople.length})</div>
-    <div class="person-list" style="max-height:33vh;overflow:auto">${updatedHtml}</div>`:''}
-    ${u.summary.newPeople.length===0&&u.summary.updatedPeople.length===0?`
-    <div style="text-align:center;color:var(--text2);padding:18px 0;font-size:13px">
-      ✅ بيانات هذا الجهاز متطابقة تماماً مع نسختك المحلية — لا يوجد شيء للدمج
-    </div>`:''}
-    <div class="modal-footer">
-      <button class="btn primary" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
-      <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">رجوع</button>
-    </div>
-  </div></div>`;
+const _FIELD_LABELS_AR = {
+  name: 'الاسم',
+  familyName: 'اللقب / العائلة',
+  title: 'اللقب الشرفي',
+  gender: 'الجنس',
+  dob: 'تاريخ الميلاد',
+  dod: 'تاريخ الوفاة',
+  deceased: 'الحالة (متوفى)',
+  parentId: 'الوالد (ID)',
+  fatherId: 'الأب (ID)',
+  motherId: 'الأم (ID)',
+  fatherName: 'اسم الأب',
+  motherName: 'اسم الأم',
+  notes: 'ملاحظات',
+  spouses: 'الأزواج',
+  sortOrder: 'الترتيب',
+  childrenFamilyName: 'لقب الأبناء',
+  isExternal: 'خارجي',
+};
+
+function _fvFormatVal(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'نعم' : 'لا';
+  if (Array.isArray(v)) {
+    if (!v.length) return '—';
+    return v.map(s => (s && s.name) ? s.name : JSON.stringify(s)).join('، ');
+  }
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+  return String(v);
 }
 
-function confirmFamilyMerge(idx){
-  let u=window._familyUpdates&&window._familyUpdates[idx];
-  if(!u||!u.data)return;
-  let st=u.summary||_familySummarizeUpdate(u.data);
-  document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:520px">
-    <h3>⚠️ تأكيد الدمج</h3>
-    <div style="line-height:2;font-size:14px;color:var(--text)">
-      ➕ ${st.newPeople.length} أشخاص جدد سيُضافون<br>
-      🔄 ${st.updatedPeople.length} أشخاص ستُحدَّث بياناتهم<br>
-      ⏭ ${st.unchangedPeople.length} أشخاص موجودون بدون تغيير
+function _fvDiffPerson(local, remote) {
+  const IGNORE = new Set(['id', 'photo', 'isExternal', 'sortOrder', '_meta', 'uploadedAt', 'updatedAt', 'createdAt', '__meta']);
+  const diffs = [];
+  const allKeys = new Set([...(Object.keys(local || {})), ...(Object.keys(remote || {}))]);
+
+  allKeys.forEach(k => {
+    if (IGNORE.has(k)) return;
+
+    if (k === 'spouses') {
+      const la = (local.spouses || []).map(s => s && s.name ? s.name : '').filter(Boolean).sort().join('، ');
+      const ra = (remote.spouses || []).map(s => s && s.name ? s.name : '').filter(Boolean).sort().join('، ');
+      if (la !== ra) diffs.push({ field: k, label: 'الأزواج', old: la || '—', new_: ra || '—' });
+      return;
+    }
+
+    const lv = (local || {})[k];
+    const rv = (remote || {})[k];
+    if (JSON.stringify(lv) !== JSON.stringify(rv)) {
+      diffs.push({
+        field: k,
+        label: _FIELD_LABELS_AR[k] || k,
+        old: _fvFormatVal(lv),
+        new_: _fvFormatVal(rv),
+      });
+    }
+  });
+
+  return diffs;
+}
+
+function _fvBuildDiffTable(diffs) {
+  if (!diffs.length) {
+    return '<div style="font-size:12px;color:var(--color-text-secondary);padding:8px 0">لا توجد فروقات محددة</div>';
+  }
+
+  const rows = diffs.map(d => `
+    <tr>
+      <td style="padding:5px 8px;font-size:12px;color:var(--color-text-secondary);white-space:nowrap;border-bottom:0.5px solid var(--color-border-tertiary)">${d.label}</td>
+      <td style="padding:5px 8px;font-size:12px;color:var(--color-text-danger);border-bottom:0.5px solid var(--color-border-tertiary);max-width:120px;word-break:break-word">
+        <span style="text-decoration:line-through;opacity:0.7">${d.old}</span>
+      </td>
+      <td style="padding:5px 8px;font-size:13px;font-weight:500;color:var(--color-text-success);border-bottom:0.5px solid var(--color-border-tertiary);max-width:140px;word-break:break-word">${d.new_}</td>
+    </tr>`).join('');
+
+  return `<table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr>
+        <th style="padding:4px 8px;font-size:11px;font-weight:500;color:var(--color-text-secondary);text-align:right;border-bottom:0.5px solid var(--color-border-tertiary)">الحقل</th>
+        <th style="padding:4px 8px;font-size:11px;font-weight:500;color:var(--color-text-danger);text-align:right;border-bottom:0.5px solid var(--color-border-tertiary)">قبل</th>
+        <th style="padding:4px 8px;font-size:11px;font-weight:500;color:var(--color-text-success);text-align:right;border-bottom:0.5px solid var(--color-border-tertiary)">بعد</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function _fvSwitchTab(tab, idx) {
+  const newPanel = document.getElementById('fvpanel_new');
+  const updPanel = document.getElementById('fvpanel_upd');
+  const tabNew = document.getElementById('fvtab_new');
+  const tabUpd = document.getElementById('fvtab_upd');
+  if (newPanel) newPanel.style.display = tab === 'new' ? 'block' : 'none';
+  if (updPanel) updPanel.style.display = tab === 'upd' ? 'block' : 'none';
+  if (tabNew) {
+    tabNew.style.color = tab === 'new' ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
+    tabNew.style.borderBottom = tab === 'new' ? '2px solid var(--color-border-info)' : 'none';
+  }
+  if (tabUpd) {
+    tabUpd.style.color = tab === 'upd' ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
+    tabUpd.style.borderBottom = tab === 'upd' ? '2px solid var(--color-border-info)' : 'none';
+  }
+}
+
+function _fvSelectAll(idx, val) {
+  window._fvSelections = window._fvSelections || {};
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  (u.summary.newPeople || []).forEach(p => { sel[`new_${p.id}`] = !!val; });
+  (u.summary.updatedPeople || []).forEach(x => { sel[`upd_${x.remote.id}`] = !!val; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_"]`).forEach(cb => { cb.checked = !!val; });
+  _fvUpdateMergeSummary(idx);
+}
+
+function _fvSelectNewOnly(idx) {
+  window._fvSelections = window._fvSelections || {};
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  (u.summary.newPeople || []).forEach(p => { sel[`new_${p.id}`] = true; });
+  (u.summary.updatedPeople || []).forEach(x => { sel[`upd_${x.remote.id}`] = false; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_new_"]`).forEach(cb => { cb.checked = true; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_upd_"]`).forEach(cb => { cb.checked = false; });
+  _fvUpdateMergeSummary(idx);
+}
+
+function _fvSelectUpdOnly(idx) {
+  window._fvSelections = window._fvSelections || {};
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  (u.summary.newPeople || []).forEach(p => { sel[`new_${p.id}`] = false; });
+  (u.summary.updatedPeople || []).forEach(x => { sel[`upd_${x.remote.id}`] = true; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_new_"]`).forEach(cb => { cb.checked = false; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_upd_"]`).forEach(cb => { cb.checked = true; });
+  _fvUpdateMergeSummary(idx);
+}
+
+function _fvUpdateMergeSummary(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+
+  const sel = (window._fvSelections && window._fvSelections[idx]) || {};
+  const acceptedNew = (u.summary.newPeople || []).filter(p => sel[`new_${p.id}`]).length;
+  const acceptedUpd = (u.summary.updatedPeople || []).filter(x => sel[`upd_${x.remote.id}`]).length;
+  const el = document.getElementById(`fv_merge_summary_${idx}`);
+  if (!el) return;
+
+  if (acceptedNew + acceptedUpd === 0) {
+    el.innerHTML = '<span style="color:var(--color-text-warning)">⚠️ لم تُحدد أي عناصر للدمج</span>';
+    return;
+  }
+
+  el.innerHTML = `سيُدمج: <strong style="color:var(--color-text-success)">${acceptedNew} جديد</strong> + <strong style="color:var(--color-text-info)">${acceptedUpd} تحديث</strong>`;
+}
+
+function _fvExecuteSelectiveMerge(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+
+  window._fvSelections = window._fvSelections || {};
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  const summary = u.summary || _familySummarizeUpdate(u.data);
+
+  const newToAdd = (summary.newPeople || []).filter(p => sel[`new_${p.id}`]);
+  const updToApply = (summary.updatedPeople || []).filter(x => sel[`upd_${x.remote.id}`]);
+  const total = newToAdd.length + updToApply.length;
+
+  if (!total) {
+    alert('لم تُحدد أي عناصر للدمج');
+    return;
+  }
+
+  if (!confirm(
+    `تأكيد الدمج الانتقائي:\n` +
+    `➕ ${newToAdd.length} شخص جديد سيُضاف\n` +
+    `🔄 ${updToApply.length} شخص ستُحدَّث بياناته\n\n` +
+    `هل أنت متأكد؟`
+  )) return;
+
+  const incoming = Array.isArray(u.data.people) ? u.data.people : [];
+  const incomingMap = summary.incomingMap || _familyIncomingMap(u.data);
+  const localIds = new Set((people || []).map(p => p && p.id).filter(v => v != null));
+  const selectedIds = new Set();
+  const selectedPeople = [];
+
+  const addSelected = (p) => {
+    if (!p || p.id == null || selectedIds.has(p.id)) return;
+    selectedIds.add(p.id);
+    selectedPeople.push(p);
+  };
+
+  newToAdd.forEach(p => addSelected(p));
+  updToApply.forEach(x => addSelected(x.remote));
+
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const p of selectedPeople.slice()) {
+      const depIds = [];
+      const pushDep = (id) => {
+        if (id == null) return;
+        if (selectedIds.has(id)) return;
+        if (localIds.has(id)) return;
+        depIds.push(id);
+      };
+
+      pushDep(p.parentId);
+      pushDep(p.fatherId);
+      pushDep(p.motherId);
+
+      if (Array.isArray(p.spouses)) {
+        p.spouses.forEach(sp => {
+          if (!sp || typeof sp !== 'object') return;
+          pushDep(sp.personId);
+          pushDep(sp.relativeId);
+          pushDep(sp.spouseId);
+          pushDep(sp.id);
+        });
+      }
+
+      depIds.forEach(id => {
+        const dep = incomingMap.get(id);
+        if (dep) {
+          addSelected(dep);
+          grew = true;
+        }
+      });
+    }
+  }
+
+  const selectedSet = new Set(selectedIds);
+  const partialData = {
+    people: incoming.filter(p => selectedSet.has(p.id)),
+    relPairs: Array.isArray(u.data.relPairs)
+      ? u.data.relPairs.filter(pair => Array.isArray(pair) && selectedSet.has(pair[0]) && selectedSet.has(pair[1]))
+      : [],
+    nextId: u.data.nextId || nextId,
+  };
+
+  const backup = _cloneMergeState();
+  const result = _cloudSmartMerge(partialData, { mode: 'family' });
+  _recordMergeHistory({
+    source: 'family-update-selective',
+    kind: 'selective',
+    devId: u.devId,
+    added: result.added || 0,
+    updated: result.updated || 0,
+    note: `دمج انتقائي: ${newToAdd.length} جديد + ${updToApply.length} تحديث`,
+    mergeMode: 'family',
+  }, backup);
+
+  try { migrateExternalSpouses(); } catch (e) {}
+  try { _invalidateAll(); } catch (e) {}
+  try { saveData(); } catch (e) {}
+  try { renderAll(); } catch (e) {}
+  try { updateMyPersonBtn(); } catch (e) {}
+
+  closeModal();
+  _showCloudToast(`✅ ${u.devId}: ➕${result.added || 0} جديد · 🔄${result.updated || 0} تحديث`, 'success', 3500);
+}
+
+function _fvMergeAll(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+  const res = _applyFamilyMergeWithHistory(u.data, {
+    devId: u.devId,
+    kind: 'single',
+    note: 'دمج كامل نسخة تحديث عائلة',
+    mergeMode: 'family',
+  });
+  _showCloudToast(`✅ ${u.devId}: +${res.added || 0} جديد، تحديث ${res.updated || 0}`, 'success', 3000);
+  closeModal();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// openFamilyUpdateDetails — عرض التفاصيل مع المقارنة والدمج الانتقائي
+// ══════════════════════════════════════════════════════════════════════════
+function openFamilyUpdateDetails(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+
+  const summary = u.summary || _familySummarizeUpdate(u.data);
+  const incomingMap = summary.incomingMap || _familyIncomingMap(u.data);
+
+  window._fvSelections = window._fvSelections || {};
+  window._fvSelections[idx] = window._fvSelections[idx] || {};
+
+  const newPeople = summary.newPeople || [];
+  const updatedPeople = summary.updatedPeople || [];
+  const unchangedCount = (summary.unchangedPeople || []).length;
+
+  newPeople.forEach(p => {
+    const key = `new_${p.id}`;
+    if (window._fvSelections[idx][key] === undefined) window._fvSelections[idx][key] = true;
+  });
+  updatedPeople.forEach(x => {
+    const key = `upd_${x.remote.id}`;
+    if (window._fvSelections[idx][key] === undefined) window._fvSelections[idx][key] = true;
+  });
+
+  const newHtml = newPeople.length ? newPeople.map((p, i) => {
+    const father = p.fatherId != null ? incomingMap.get(p.fatherId) : null;
+    const mother = p.motherId != null ? incomingMap.get(p.motherId) : null;
+    const fatherName = father ? _familyDisplayName(father) : '—';
+    const motherName = mother ? _familyDisplayName(mother) : '—';
+    const selKey = `new_${p.id}`;
+
+    return `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:6px;background:var(--color-background-success)">
+        <input type="checkbox" id="fvsel_${idx}_new_${i}" ${window._fvSelections[idx][selKey] ? 'checked' : ''}
+          onchange="window._fvSelections[${idx}]['new_${p.id}']=this.checked;_fvUpdateMergeSummary(${idx})"
+          style="margin-top:2px;accent-color:#3b82f6;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${_familyDisplayName(p)}</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;line-height:1.7">الأب: ${fatherName} · الأم: ${motherName} · ${p.gender === 'male' ? 'ذكر' : 'أنثى'}${p.deceased ? ' · متوفى' : ''}</div>
+        </div>
+        <span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success);white-space:nowrap">جديد</span>
+      </div>`;
+  }).join('') : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا يوجد أفراد جدد</div>';
+
+  const updHtml = updatedPeople.length ? updatedPeople.map((x, i) => {
+    const diffs = _fvDiffPerson(x.local, x.remote);
+    const selKey = `upd_${x.remote.id}`;
+    const riskLevel = diffs.some(d => ['name', 'parentId', 'fatherId', 'motherId', 'gender'].includes(d.field)) ? 'high' : 'low';
+    const riskBadge = riskLevel === 'high'
+      ? '<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-warning);white-space:nowrap">راجع بعناية</span>'
+      : '<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);white-space:nowrap">تحديث عادي</span>';
+
+    return `
+      <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--color-background-secondary)">
+          <input type="checkbox" id="fvsel_${idx}_upd_${i}" ${window._fvSelections[idx][selKey] ? 'checked' : ''}
+            onchange="window._fvSelections[${idx}]['upd_${x.remote.id}']=this.checked;_fvUpdateMergeSummary(${idx})"
+            style="margin-top:1px;accent-color:#3b82f6;flex-shrink:0">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${_familyDisplayName(x.remote)}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">${diffs.length} حقل متغير</div>
+          </div>
+          ${riskBadge}
+        </div>
+        <div style="padding:8px 12px">
+          ${_fvBuildDiffTable(diffs)}
+        </div>
+      </div>`;
+  }).join('') : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا يوجد تحديثات على أفراد موجودين</div>';
+
+  const totalNew = newPeople.length;
+  const totalUpd = updatedPeople.length;
+
+  document.getElementById('modalContainer').innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:760px;width:min(760px,96vw)">
+    <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+      🔍 مراجعة تفاصيل التحديث
+      <span style="font-size:12px;font-weight:400;color:var(--color-text-secondary);font-family:monospace">${u.devName || u.devId}</span>
+    </h3>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+      <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success)">➕ ${totalNew} جديد</span>
+      <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info)">🔄 ${totalUpd} تحديث</span>
+      <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)">⏭ ${unchangedCount} بدون تغيير</span>
     </div>
-    <div class="modal-footer">
-      <button class="btn primary" onclick="_familyMergeOne(${idx})">✔ تأكيد الدمج</button>
+
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_fvSelectAll(${idx},true)">✅ قبول الكل</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_fvSelectAll(${idx},false)">❌ رفض الكل</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="_fvSelectNewOnly(${idx})">➕ الجدد فقط (آمن)</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px;background:#dbeafe;border-color:#3b82f6;color:#1e40af" onclick="_fvSelectUpdOnly(${idx})">🔄 التحديثات فقط</button>
+    </div>
+
+    <div style="display:flex;gap:0;margin-bottom:10px;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <button id="fvtab_new" onclick="_fvSwitchTab('new',${idx})"
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--color-text-info);border-bottom:2px solid currentColor;cursor:pointer">
+        ➕ جدد (${totalNew})
+      </button>
+      <button id="fvtab_upd" onclick="_fvSwitchTab('upd',${idx})"
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--color-text-secondary);cursor:pointer">
+        🔄 تحديثات (${totalUpd})
+      </button>
+    </div>
+
+    <div id="fvpanel_new" style="max-height:44vh;overflow-y:auto">${newHtml}</div>
+    <div id="fvpanel_upd" style="display:none;max-height:44vh;overflow-y:auto">${updHtml}</div>
+
+    <div id="fv_merge_summary_${idx}" style="margin-top:10px;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);font-size:13px;color:var(--color-text-primary)">
+      سيُدمج: <strong>${totalNew}</strong> جديد + <strong>${totalUpd}</strong> تحديث
+    </div>
+
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px;margin-top:10px">
+      <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">◀ رجوع</button>
+      <button class="btn primary" style="background:#059669;border-color:#059669" onclick="_fvExecuteSelectiveMerge(${idx})">✔ دمج المحدَّد</button>
+    </div>
+  </div>
+  </div>`;
+
+  _fvSwitchTab('new', idx);
+  _fvUpdateMergeSummary(idx);
+}
+
+function confirmFamilyMerge(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+  const st = u.summary || _familySummarizeUpdate(u.data);
+  const hasUpdates = (st.updatedPeople || []).length > 0;
+
+  const warningHtml = hasUpdates ? `
+    <div style="padding:10px 12px;background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-warning);margin-bottom:12px;line-height:1.7">
+      ⚠️ يوجد <strong>${st.updatedPeople.length}</strong> شخص محدَّث — يُنصح بمراجعة التفاصيل قبل الدمج لضمان دقة البيانات.
+    </div>` : '';
+
+  document.getElementById('modalContainer').innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:480px">
+    <h3 style="margin-bottom:4px">تأكيد الدمج</h3>
+    <div style="color:var(--color-text-secondary);font-size:12px;margin-bottom:12px">الجهاز: ${u.devName || u.devId}</div>
+    ${warningHtml}
+    <div style="line-height:2;font-size:14px;color:var(--color-text-primary);margin-bottom:12px">
+      ➕ <strong style="color:var(--color-text-success)">${st.newPeople.length}</strong> أشخاص جدد سيُضافون<br>
+      🔄 <strong style="color:var(--color-text-info)">${st.updatedPeople.length}</strong> أشخاص ستُحدَّث بياناتهم<br>
+      ⏭ <strong>${st.unchangedPeople.length}</strong> أشخاص موجودون بدون تغيير
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">إلغاء</button>
+      ${hasUpdates ? `<button class="btn" style="background:#dbeafe;border-color:#3b82f6;color:#1e40af" onclick="closeModal();openFamilyUpdateDetails(${idx})">🔍 مراجعة التفاصيل أولاً</button>` : ''}
+      <button class="btn primary" onclick="_fvMergeAll(${idx})">✔ دمج كل شيء</button>
     </div>
-  </div></div>`;
+  </div>
+  </div>`;
 }
 
 function confirmFamilyMergeAll(){
