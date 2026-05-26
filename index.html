@@ -1387,6 +1387,13 @@ let people=[],expanded={},nextId=1,relPairs=[],currentAddParentId=null,currentEd
 // ── Navigation State (Two-layer family system) ──
 let navStack=[];           // [{label, filter, scrollY}]
 let currentFamilyFilter=null; // null=show all, {rootId, label}=filter to one family
+
+// ══════════════════════════════════════════════════════════════
+// ═══ SIDE FAMILY BRANCH SYSTEM (العائلات الجانبية) ════════════
+// ══════════════════════════════════════════════════════════════
+let sideFamilies=[];        // [{id, title, rootPersonIds:[…], relationType, color, members:[…]}]
+let currentContextFamily=null; // {familyId, breadcrumb, title}
+let contextNavigationStack=[]; // track navigation history
 function uid(){return nextId++;}
 function crescent(c){return `<svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:13px;height:13px;display:inline-block"><path d="M7 1.5A5.5 5.5 0 1 0 12.5 7 5.508 5.508 0 0 1 7 1.5z" fill="${c||'#2e7d32'}"/></svg>`;}
 
@@ -1432,6 +1439,97 @@ function _rebuildRelNums(){
 }
 function _invalidateKinCache(){_myKinCache.clear();_ancestorMapCache.clear();}
 function _invalidateAll(){_rebuildIndexes();}
+
+// ══════════════════════════════════════════════════════════════
+// ═══ SIDE FAMILY UTILITY FUNCTIONS ═════════════════════════════
+// ══════════════════════════════════════════════════════════════
+function createSideFamily(rootPersonIds,title,relationType='paternal'){
+  let fam={
+    id:'sf_'+Date.now()+'_'+Math.random().toString(36).substr(2,9),
+    title:title||'عائلة جانبية',
+    rootPersonIds:Array.isArray(rootPersonIds)?rootPersonIds:[rootPersonIds],
+    relationType:relationType, // 'paternal','maternal','sibling'
+    color:['#8B5CF6','#D97706','#06B6D4'][Math.floor(Math.random()*3)], // purple, amber, cyan
+    members:[]
+  };
+  sideFamilies.push(fam);
+  _updateSideFamilyMembers(fam.id);
+  return fam;
+}
+
+function _updateSideFamilyMembers(familyId){
+  let fam=sideFamilies.find(f=>f.id===familyId);
+  if(!fam)return;
+  let members=new Set();
+  fam.rootPersonIds.forEach(rootId=>{
+    members.add(rootId);
+    _collectSideFamilyDescendants(rootId,members);
+    _collectSideFamilyRelatives(rootId,members);
+  });
+  fam.members=Array.from(members);
+}
+
+function _collectSideFamilyDescendants(personId,members){
+  let children=_childrenMap.get(personId)||[];
+  children.forEach(ch=>{
+    if(!members.has(ch.id)){
+      members.add(ch.id);
+      _collectSideFamilyDescendants(ch.id,members);
+    }
+  });
+}
+
+function _collectSideFamilyRelatives(personId,members){
+  let p=getPerson(personId);
+  if(!p)return;
+  if(p.parentId && !members.has(p.parentId)){
+    members.add(p.parentId);
+    _collectSideFamilyRelatives(p.parentId,members);
+  }
+  p.spouses&&p.spouses.forEach(spId=>{
+    if(!members.has(spId)){
+      members.add(spId);
+    }
+  });
+}
+
+function getSideFamilyById(familyId){
+  return sideFamilies.find(f=>f.id===familyId)||null;
+}
+
+function getPersonSideFamilyId(personId){
+  for(let fam of sideFamilies){
+    if(fam.members.includes(personId)){
+      return fam.id;
+    }
+  }
+  return null;
+}
+
+function enterContextNavigation(familyId){
+  contextNavigationStack.push(currentContextFamily);
+  currentContextFamily={familyId,breadcrumb:[],title:getSideFamilyById(familyId)?.title||''};
+  _rebuildIndexes();
+}
+
+function exitContextNavigation(){
+  if(contextNavigationStack.length>0){
+    currentContextFamily=contextNavigationStack.pop();
+  }else{
+    currentContextFamily=null;
+  }
+  _rebuildIndexes();
+}
+
+function isInContextNavigation(){
+  return currentContextFamily!==null;
+}
+
+function getContextFamilyMembers(){
+  if(!currentContextFamily)return people;
+  let fam=getSideFamilyById(currentContextFamily.familyId);
+  return fam?people.filter(p=>fam.members.includes(p.id)):people;
+}
 
 // ── دوال الفهرس العام (تُستخدم بديلاً عن find/filter المتكررة) ──
 function getRelNums(id){return _relNumsMap.get(id)||[];}
@@ -3123,7 +3221,7 @@ function exportData(){
   setTimeout(function(){
     try{
       // ── 1. Build data payload ──
-      var payload=JSON.stringify({people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null});
+      var payload=JSON.stringify({people:people,relPairs:relPairs,nextId:nextId,myPersonId:myPersonId||null,sideFamilies:sideFamilies});
       var bytes=new TextEncoder().encode(payload);
       var bin='';bytes.forEach(function(b){bin+=String.fromCharCode(b);});
       var b64=btoa(bin);
@@ -3525,8 +3623,14 @@ function _renderTreeNow(){
   let matchIds=new Set(_searchResultIds);
   let contextIds=new Set(); // لا نحتاج سياق — الشجرة منهارة بالفعل
 
+  // ═══ SIDE FAMILY FILTERING ═══
+  let visiblePeople=currentContextFamily?getContextFamilyMembers():people;
+  
   let includeExternal=!!q||(currentFamilyFilter&&getPerson(currentFamilyFilter.rootId)&&getPerson(currentFamilyFilter.rootId).isExternal);
-  let roots=getRoots(includeExternal);
+  let roots=visiblePeople
+    .filter(p=>!p.parentId||!visiblePeople.some(x=>x.id===p.parentId))
+    .sort((a,b)=>(a.sortOrder||9999)-(b.sortOrder||9999));
+  
   if(currentFamilyFilter){roots=roots.filter(r=>r.id===currentFamilyFilter.rootId);}
   let html='';roots.forEach(r=>{html+=renderNode(r,q,matchIds,contextIds);});
   let navHtml=renderNavBreadcrumb();
@@ -4247,6 +4351,20 @@ function showPersonDetail(id){
       </div>`;
     })()}
     ${myPersonId===p.id?`<div class="kin-mini-tree"><div class="kmt-title">👤 هذا أنت في الشجرة</div></div>`:''}
+    ${(()=>{
+      let sfId=getPersonSideFamilyId(p.id);
+      if(!sfId)return '';
+      let sfam=getSideFamilyById(sfId);
+      if(!sfam)return '';
+      return `<div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,#f0e7ff,#faf5ff);border:1.5px solid ${sfam.color};border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;" onclick="closeModal();enterContextNavigation('${sfam.id}');renderTree()" title="اضغط لعرض العائلة الجانبية">
+        <span style="font-size:20px;flex-shrink:0">🌿</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;font-weight:600;color:#6b21b6">عائلة مرتبطة</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px">${sfam.title}</div>
+        </div>
+        <span style="font-size:12px;color:#7c3aed;background:#fff;border:1px solid ${sfam.color};border-radius:6px;padding:2px 8px;flex-shrink:0">↗ عرض</span>
+      </div>`;
+    })()}
     <div class="modal-footer" style="flex-wrap:wrap;gap:6px;">
       <button class="btn" onclick="closeModal()">إغلاق</button>
       <button class="btn" onclick="closeModal();navigateToPerson(${p.id})">🌳 الشجرة</button>
@@ -5363,8 +5481,28 @@ function saveModal(editId,parentId){
 // نظام التنقل بين العائلات (Two-layer navigation)
 // ══════════════════════════════════════════════════════════
 function renderNavBreadcrumb(){
-  if(!currentFamilyFilter&&navStack.length===0)return'';
-  // ── Context Banner (top) ──
+  if(!currentFamilyFilter&&navStack.length===0&&!currentContextFamily)return'';
+  // ── Context Family Navigation (Side Family Branch System) ──
+  if(currentContextFamily){
+    let fam=getSideFamilyById(currentContextFamily.familyId);
+    if(fam){
+      let contextBanner=`
+  <div class="ctx-nav-banner" style="background:linear-gradient(135deg,${fam.color}44,${fam.color}22);border-color:${fam.color};">
+    <span class="ctx-icon">🌿</span>
+    <div class="ctx-body">
+      <div class="ctx-title">${fam.title}</div>
+      <div class="ctx-sub" style="color:var(--text2);font-size:12px;">عائلة جانبية متصلة بالشجرة الأساسية</div>
+    </div>
+    <button class="ctx-back-btn" onclick="exitContextNavigation();renderTree()">◀ رجوع</button>
+  </div>`;
+      let crumbs=`<span class="ctx-crumb" onclick="exitContextNavigation();renderTree()" title="العودة للشجرة الأساسية">🏠 الرئيسية</span>`;
+      crumbs+=`<span class="ctx-crumb-sep">◀</span>`;
+      crumbs+=`<span class="ctx-crumb active" style="color:${fam.color};border-color:${fam.color}">🌿 ${fam.title}</span>`;
+      let breadcrumb=`<div class="ctx-breadcrumb">${crumbs}</div>`;
+      return contextBanner+breadcrumb;
+    }
+  }
+  // ── Regular Spouse Navigation ──
   let rootPerson=currentFamilyFilter?getPerson(currentFamilyFilter.rootId):null;
   let connectedVia='';
   if(currentFamilyFilter&&navStack.length>0){
@@ -9040,12 +9178,13 @@ deletePerson=function(id){
           var d=JSON.parse(new TextDecoder().decode(bytes));
           if(d.people&&d.people.length){
             people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+            sideFamilies=d.sideFamilies||[];
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
-            _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
-            _lsSave({people:people,relPairs:relPairs,nextId:nextId});
+            _idbSave({people:people,relPairs:relPairs,nextId:nextId,sideFamilies:sideFamilies}).catch(function(){});
+            _lsSave({people:people,relPairs:relPairs,nextId:nextId,sideFamilies:sideFamilies});
             dataLoaded=true;
             console.log('[Init] Loaded from embedded tag:',people.length,'persons');
           }
