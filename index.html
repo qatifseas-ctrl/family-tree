@@ -3188,58 +3188,7 @@ function exportData(){
         '<div id="modalContainer"></div>\n'+
         dataTag+'\n'+
         '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-        '
-<style id="side-family-style">
-.side-family-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #a855f7;border-radius:8px;background:#f3e8ff;color:#6b21a8;font-size:11px;cursor:pointer;margin-inline-start:6px;}
-.side-family-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;margin-bottom:12px;}
-</style>
-<script id="side-family-system">
-(function(){
-function boot(){
-window.sideFamilies=window.sideFamilies||{};
-if(window.__sideFamilyBooted)return;
-window.__sideFamilyBooted=true;
-const origRenderNode=window.renderNode;
-if(typeof origRenderNode==='function'){
-window.renderNode=function(person,...args){
-let html=origRenderNode.call(this,person,...args);
-try{
-if(person&&person.sideFamilyId&&window.sideFamilies[person.sideFamilyId]){
-const btn=`<button class="side-family-btn" onclick="event.stopPropagation();openSideFamily('${person.sideFamilyId}','${person.id}')">🌿 عائلة مرتبطة</button>`;
-html=html.replace('</div></div>',btn+'</div></div>');
-}
-}catch(e){}
-return html;
-}
-}
-window.openSideFamily=function(familyId,personId){
-const fam=window.sideFamilies&&window.sideFamilies[familyId];
-if(!fam)return;
-window.__mainTreeSnapshot={filter:window.currentFamilyFilter||null};
-window.currentFamilyFilter={rootId:(fam.rootPersons||[])[0]||null,isSideFamily:true,sideFamilyId:familyId};
-let app=document.getElementById('treePanel')||document.getElementById('panelTree')||document.getElementById('treeContainer');
-let holder=document.getElementById('sideFamilyBanner');
-if(!holder){
-holder=document.createElement('div');
-holder.id='sideFamilyBanner';
-holder.className='side-family-banner';
-(holder.parentNode||document.getElementById('app')).prepend(holder);
-}
-holder.innerHTML=`<div style="font-size:24px">🌿</div><div style="flex:1"><div style="font-weight:700">${fam.title||'عائلة مرتبطة'}</div><div style="font-size:12px;opacity:.9">فرع جانبي مرتبط بالشجرة الرئيسية</div></div><button onclick="closeSideFamily()" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;color:#5b21b6;cursor:pointer">⬅ رجوع</button>`;
-holder.style.display='flex';
-if(typeof renderTree==='function')renderTree();
-}
-window.closeSideFamily=function(){
-window.currentFamilyFilter=window.__mainTreeSnapshot?window.__mainTreeSnapshot.filter:null;
-let holder=document.getElementById('sideFamilyBanner');if(holder)holder.style.display='none';
-if(typeof renderTree==='function')renderTree();
-}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-})();
-</script>
-
-</body>\n</html>';
+        '</body>\n</html>';
 
       // ── 6. Download ──
       var d=new Date();
@@ -8437,58 +8386,7 @@ async function exportFamilyCopy(){
       cleanAppHTML+'\n'+
       '<div id="modalContainer"></div>\n'+
       '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n'+
-      '
-<style id="side-family-style">
-.side-family-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #a855f7;border-radius:8px;background:#f3e8ff;color:#6b21a8;font-size:11px;cursor:pointer;margin-inline-start:6px;}
-.side-family-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;margin-bottom:12px;}
-</style>
-<script id="side-family-system">
-(function(){
-function boot(){
-window.sideFamilies=window.sideFamilies||{};
-if(window.__sideFamilyBooted)return;
-window.__sideFamilyBooted=true;
-const origRenderNode=window.renderNode;
-if(typeof origRenderNode==='function'){
-window.renderNode=function(person,...args){
-let html=origRenderNode.call(this,person,...args);
-try{
-if(person&&person.sideFamilyId&&window.sideFamilies[person.sideFamilyId]){
-const btn=`<button class="side-family-btn" onclick="event.stopPropagation();openSideFamily('${person.sideFamilyId}','${person.id}')">🌿 عائلة مرتبطة</button>`;
-html=html.replace('</div></div>',btn+'</div></div>');
-}
-}catch(e){}
-return html;
-}
-}
-window.openSideFamily=function(familyId,personId){
-const fam=window.sideFamilies&&window.sideFamilies[familyId];
-if(!fam)return;
-window.__mainTreeSnapshot={filter:window.currentFamilyFilter||null};
-window.currentFamilyFilter={rootId:(fam.rootPersons||[])[0]||null,isSideFamily:true,sideFamilyId:familyId};
-let app=document.getElementById('treePanel')||document.getElementById('panelTree')||document.getElementById('treeContainer');
-let holder=document.getElementById('sideFamilyBanner');
-if(!holder){
-holder=document.createElement('div');
-holder.id='sideFamilyBanner';
-holder.className='side-family-banner';
-(holder.parentNode||document.getElementById('app')).prepend(holder);
-}
-holder.innerHTML=`<div style="font-size:24px">🌿</div><div style="flex:1"><div style="font-weight:700">${fam.title||'عائلة مرتبطة'}</div><div style="font-size:12px;opacity:.9">فرع جانبي مرتبط بالشجرة الرئيسية</div></div><button onclick="closeSideFamily()" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;color:#5b21b6;cursor:pointer">⬅ رجوع</button>`;
-holder.style.display='flex';
-if(typeof renderTree==='function')renderTree();
-}
-window.closeSideFamily=function(){
-window.currentFamilyFilter=window.__mainTreeSnapshot?window.__mainTreeSnapshot.filter:null;
-let holder=document.getElementById('sideFamilyBanner');if(holder)holder.style.display='none';
-if(typeof renderTree==='function')renderTree();
-}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-})();
-</script>
-
-</body>\n</html>';
+      '</body>\n</html>';
 
     // ════ 2. manifest.json ════
     var manifestContent=JSON.stringify({
@@ -8527,58 +8425,7 @@ self.addEventListener('fetch',e=>{
 async function networkFirst(req){
   var cache=await caches.open(SHELL_CACHE);
   try{var r=await fetch(req);if(r&&r.status===200)cache.put(req,r.clone());return r;}
-  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p>
-<style id="side-family-style">
-.side-family-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #a855f7;border-radius:8px;background:#f3e8ff;color:#6b21a8;font-size:11px;cursor:pointer;margin-inline-start:6px;}
-.side-family-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;margin-bottom:12px;}
-</style>
-<script id="side-family-system">
-(function(){
-function boot(){
-window.sideFamilies=window.sideFamilies||{};
-if(window.__sideFamilyBooted)return;
-window.__sideFamilyBooted=true;
-const origRenderNode=window.renderNode;
-if(typeof origRenderNode==='function'){
-window.renderNode=function(person,...args){
-let html=origRenderNode.call(this,person,...args);
-try{
-if(person&&person.sideFamilyId&&window.sideFamilies[person.sideFamilyId]){
-const btn=`<button class="side-family-btn" onclick="event.stopPropagation();openSideFamily('${person.sideFamilyId}','${person.id}')">🌿 عائلة مرتبطة</button>`;
-html=html.replace('</div></div>',btn+'</div></div>');
-}
-}catch(e){}
-return html;
-}
-}
-window.openSideFamily=function(familyId,personId){
-const fam=window.sideFamilies&&window.sideFamilies[familyId];
-if(!fam)return;
-window.__mainTreeSnapshot={filter:window.currentFamilyFilter||null};
-window.currentFamilyFilter={rootId:(fam.rootPersons||[])[0]||null,isSideFamily:true,sideFamilyId:familyId};
-let app=document.getElementById('treePanel')||document.getElementById('panelTree')||document.getElementById('treeContainer');
-let holder=document.getElementById('sideFamilyBanner');
-if(!holder){
-holder=document.createElement('div');
-holder.id='sideFamilyBanner';
-holder.className='side-family-banner';
-(holder.parentNode||document.getElementById('app')).prepend(holder);
-}
-holder.innerHTML=`<div style="font-size:24px">🌿</div><div style="flex:1"><div style="font-weight:700">${fam.title||'عائلة مرتبطة'}</div><div style="font-size:12px;opacity:.9">فرع جانبي مرتبط بالشجرة الرئيسية</div></div><button onclick="closeSideFamily()" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;color:#5b21b6;cursor:pointer">⬅ رجوع</button>`;
-holder.style.display='flex';
-if(typeof renderTree==='function')renderTree();
-}
-window.closeSideFamily=function(){
-window.currentFamilyFilter=window.__mainTreeSnapshot?window.__mainTreeSnapshot.filter:null;
-let holder=document.getElementById('sideFamilyBanner');if(holder)holder.style.display='none';
-if(typeof renderTree==='function')renderTree();
-}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-})();
-</script>
-
-</body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
+  catch{var c=await cache.match(req);return c||new Response(\`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>غير متصل</title><style>body{font-family:system-ui;text-align:center;padding:60px;color:#374151}h1{font-size:3rem}</style></head><body><h1>🌳</h1><h2>أنت غير متصل</h2><p>تحقق من اتصالك وأعد المحاولة</p></body></html>\`,{headers:{'Content-Type':'text/html;charset=utf-8'}});}
 }
 async function cacheFirst(req){
   var c=await caches.match(req);if(c)return c;
@@ -8972,58 +8819,7 @@ function _buildSaveHTML(){
   }
   return '<!DOCTYPE html>\n<html'+htmlAttrs+'>\n'+document.head.outerHTML+'\n<body>\n'+
     cleanAppHTML+'\n<div id="modalContainer"></div>\n'+dataTag+'\n'+
-    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n
-<style id="side-family-style">
-.side-family-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #a855f7;border-radius:8px;background:#f3e8ff;color:#6b21a8;font-size:11px;cursor:pointer;margin-inline-start:6px;}
-.side-family-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;margin-bottom:12px;}
-</style>
-<script id="side-family-system">
-(function(){
-function boot(){
-window.sideFamilies=window.sideFamilies||{};
-if(window.__sideFamilyBooted)return;
-window.__sideFamilyBooted=true;
-const origRenderNode=window.renderNode;
-if(typeof origRenderNode==='function'){
-window.renderNode=function(person,...args){
-let html=origRenderNode.call(this,person,...args);
-try{
-if(person&&person.sideFamilyId&&window.sideFamilies[person.sideFamilyId]){
-const btn=`<button class="side-family-btn" onclick="event.stopPropagation();openSideFamily('${person.sideFamilyId}','${person.id}')">🌿 عائلة مرتبطة</button>`;
-html=html.replace('</div></div>',btn+'</div></div>');
-}
-}catch(e){}
-return html;
-}
-}
-window.openSideFamily=function(familyId,personId){
-const fam=window.sideFamilies&&window.sideFamilies[familyId];
-if(!fam)return;
-window.__mainTreeSnapshot={filter:window.currentFamilyFilter||null};
-window.currentFamilyFilter={rootId:(fam.rootPersons||[])[0]||null,isSideFamily:true,sideFamilyId:familyId};
-let app=document.getElementById('treePanel')||document.getElementById('panelTree')||document.getElementById('treeContainer');
-let holder=document.getElementById('sideFamilyBanner');
-if(!holder){
-holder=document.createElement('div');
-holder.id='sideFamilyBanner';
-holder.className='side-family-banner';
-(holder.parentNode||document.getElementById('app')).prepend(holder);
-}
-holder.innerHTML=`<div style="font-size:24px">🌿</div><div style="flex:1"><div style="font-weight:700">${fam.title||'عائلة مرتبطة'}</div><div style="font-size:12px;opacity:.9">فرع جانبي مرتبط بالشجرة الرئيسية</div></div><button onclick="closeSideFamily()" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;color:#5b21b6;cursor:pointer">⬅ رجوع</button>`;
-holder.style.display='flex';
-if(typeof renderTree==='function')renderTree();
-}
-window.closeSideFamily=function(){
-window.currentFamilyFilter=window.__mainTreeSnapshot?window.__mainTreeSnapshot.filter:null;
-let holder=document.getElementById('sideFamilyBanner');if(holder)holder.style.display='none';
-if(typeof renderTree==='function')renderTree();
-}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-})();
-</script>
-
-</body>\n</html>';
+    '<scr'+'ipt>\n'+mainSrc+'\n<\/sc'+'ript>\n</body>\n</html>';
 }
 
 async function _fsaWriteNow(){
@@ -9414,11 +9210,11 @@ function dismissInstallBanner(){
   fab.id='mob-fab';
   fab.innerHTML=`
     <style>
-    #mob-fab {
+    #mob-fab{
       position:fixed;
       bottom:24px;
       left:16px;
-      display:flex;
+      display:none;
       flex-direction:column;
       gap:10px;
       z-index:400;
@@ -9426,89 +9222,103 @@ function dismissInstallBanner(){
       pointer-events:none;
       transition:opacity .25s;
     }
-    #mob-fab.visible { opacity:1;pointer-events:auto; }
-    .mob-fab-btn {
+    body.mobile-mode #mob-fab{display:flex;}
+    #mob-fab.visible{opacity:1;pointer-events:auto;}
+    .mob-fab-btn{
       width:46px;height:46px;border-radius:50%;
       display:flex;align-items:center;justify-content:center;
       font-size:20px;cursor:pointer;
       box-shadow:0 4px 16px rgba(0,0,0,.2);
       border:none;transition:transform .15s,box-shadow .15s;
     }
-    .mob-fab-btn:active { transform:scale(.92); }
-    .mob-fab-top { background:#fff;color:#374151;border:1px solid #e5e7eb; }
-    [data-theme="dark"] .mob-fab-top { background:#1f2937;color:#f9fafb;border-color:#374151; }
-    .mob-fab-search { background:#1e40af;color:#fff; font-size:18px; }
+    .mob-fab-btn:active{transform:scale(.92);}
+    .mob-fab-top{background:#fff;color:#374151;border:1px solid #e5e7eb;}
+    [data-theme="dark"] .mob-fab-top{background:#1f2937;color:#f9fafb;border-color:#374151;}
+    .mob-fab-search{background:#1e40af;color:#fff;font-size:18px;}
     </style>
     <button id="mob-fab-search-btn" class="mob-fab-btn mob-fab-search" onclick="openSearchPanel()" title="بحث سريع">🔍</button>
     <button class="mob-fab-btn mob-fab-top" onclick="window._mobFabGoTopInstant()" title="للأعلى">↑</button>
   `;
   document.body.appendChild(fab);
 
-  const SHOW_MS = 2000;
   const TOP_THRESHOLD = 88;
-  const UP_THRESHOLD = 18;
-  let hideTimer = null;
-  let lastY = window.scrollY || 0;
-  let lastRevealAt = 0;
+  const UP_THRESHOLD = 14;
+  let lastY = window.scrollY || document.documentElement.scrollTop || 0;
+
+  function isMobileMode(){
+    return document.body.classList.contains('mobile-mode');
+  }
+
+  function hasActiveOverlay(){
+    return !!document.querySelector(
+      '.modal-overlay,[role="dialog"],dialog[open],.modal-window,.popup,.popup-open,.dialog,.swal2-container,.tingle-modal--visible'
+    );
+  }
 
   function hideFab(){
     fab.classList.remove('visible');
-    if(hideTimer){ clearTimeout(hideTimer); hideTimer = null; }
   }
 
   function showFab(){
-    if(!document.body.classList.contains('mobile-mode')) return;
-    if((window.scrollY || 0) < TOP_THRESHOLD) return;
+    if(!isMobileMode()) return;
+    if(hasActiveOverlay()) return;
+    if((window.scrollY || document.documentElement.scrollTop || 0) < TOP_THRESHOLD) return;
     fab.classList.add('visible');
-    if(hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(hideFab, SHOW_MS);
-    lastRevealAt = Date.now();
   }
 
   window._mobFabGoTopInstant = function(){
-    try{ window.scrollTo({top:0,behavior:'auto'}); }catch(e){ window.scrollTo(0,0); }
+    try{ window.scrollTo({top:0,behavior:'instant'}); }
+    catch(e){ window.scrollTo(0,0); }
+
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
     hideFab();
   };
 
-  function onScroll(){
-    if(!document.body.classList.contains('mobile-mode')){
+  function updateFabVisibility(){
+    if(!isMobileMode() || hasActiveOverlay()){
       hideFab();
-      lastY = window.scrollY || 0;
+      lastY = window.scrollY || document.documentElement.scrollTop || 0;
       return;
     }
 
-    const y = window.scrollY || 0;
-    const dy = y - lastY;
+    const currentY = window.scrollY || document.documentElement.scrollTop || 0;
+    const delta = currentY - lastY;
 
-    if(y < TOP_THRESHOLD){
+    if(currentY < TOP_THRESHOLD){
       hideFab();
-      lastY = y;
+      lastY = currentY;
       return;
     }
 
-    // يظهر فقط عند السحب للأعلى بعد وجود حركة فعلية في الصفحة
-    if(dy < -UP_THRESHOLD){
+    if(delta < -UP_THRESHOLD){
       showFab();
+    }else if(delta > UP_THRESHOLD){
+      hideFab();
     }
 
-    // إذا عاد المستخدم للأسفل بينما الزر ظاهر، اتركه يختفي تلقائياً سريعاً
-    if(dy > UP_THRESHOLD && fab.classList.contains('visible') && Date.now() - lastRevealAt > 250){
-      if(hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(hideFab, SHOW_MS);
-    }
-
-    lastY = y;
+    lastY = currentY;
   }
 
-  document.addEventListener('touchstart', function(){
-    if(!document.body.classList.contains('mobile-mode')) return;
-    lastY = window.scrollY || 0;
-  }, {passive:true});
+  window.addEventListener('scroll', updateFabVisibility, { passive:true });
 
-  window.addEventListener('scroll', onScroll, {passive:true});
-  onScroll();
+  document.addEventListener('touchstart', function(){
+    lastY = window.scrollY || document.documentElement.scrollTop || 0;
+  }, { passive:true });
+
+  document.addEventListener('click', function(){
+    if(hasActiveOverlay()){
+      hideFab();
+    }
+  }, { passive:true });
+
+  window._updateFabMobileMode = function(){
+    lastY = window.scrollY || document.documentElement.scrollTop || 0;
+    updateFabVisibility();
+  };
+
+  hideFab();
+  updateFabVisibility();
 })();
 
 (function(){
@@ -11809,58 +11619,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       +sbInject+'\n'
       +dataTag+'\n'
       +'<scr'+'ipt>\n'+mainSrc+'\n<\/scr'+'ipt>\n'
-      +'
-<style id="side-family-style">
-.side-family-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #a855f7;border-radius:8px;background:#f3e8ff;color:#6b21a8;font-size:11px;cursor:pointer;margin-inline-start:6px;}
-.side-family-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;margin-bottom:12px;}
-</style>
-<script id="side-family-system">
-(function(){
-function boot(){
-window.sideFamilies=window.sideFamilies||{};
-if(window.__sideFamilyBooted)return;
-window.__sideFamilyBooted=true;
-const origRenderNode=window.renderNode;
-if(typeof origRenderNode==='function'){
-window.renderNode=function(person,...args){
-let html=origRenderNode.call(this,person,...args);
-try{
-if(person&&person.sideFamilyId&&window.sideFamilies[person.sideFamilyId]){
-const btn=`<button class="side-family-btn" onclick="event.stopPropagation();openSideFamily('${person.sideFamilyId}','${person.id}')">🌿 عائلة مرتبطة</button>`;
-html=html.replace('</div></div>',btn+'</div></div>');
-}
-}catch(e){}
-return html;
-}
-}
-window.openSideFamily=function(familyId,personId){
-const fam=window.sideFamilies&&window.sideFamilies[familyId];
-if(!fam)return;
-window.__mainTreeSnapshot={filter:window.currentFamilyFilter||null};
-window.currentFamilyFilter={rootId:(fam.rootPersons||[])[0]||null,isSideFamily:true,sideFamilyId:familyId};
-let app=document.getElementById('treePanel')||document.getElementById('panelTree')||document.getElementById('treeContainer');
-let holder=document.getElementById('sideFamilyBanner');
-if(!holder){
-holder=document.createElement('div');
-holder.id='sideFamilyBanner';
-holder.className='side-family-banner';
-(holder.parentNode||document.getElementById('app')).prepend(holder);
-}
-holder.innerHTML=`<div style="font-size:24px">🌿</div><div style="flex:1"><div style="font-weight:700">${fam.title||'عائلة مرتبطة'}</div><div style="font-size:12px;opacity:.9">فرع جانبي مرتبط بالشجرة الرئيسية</div></div><button onclick="closeSideFamily()" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;color:#5b21b6;cursor:pointer">⬅ رجوع</button>`;
-holder.style.display='flex';
-if(typeof renderTree==='function')renderTree();
-}
-window.closeSideFamily=function(){
-window.currentFamilyFilter=window.__mainTreeSnapshot?window.__mainTreeSnapshot.filter:null;
-let holder=document.getElementById('sideFamilyBanner');if(holder)holder.style.display='none';
-if(typeof renderTree==='function')renderTree();
-}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-})();
-</script>
-
-</body>\n</html>';
+      +'</body>\n</html>';
 
     var blob=new Blob([src],{type:'text/html;charset=utf-8'});
     var url=URL.createObjectURL(blob);
@@ -12077,57 +11836,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   });
 
   log('v4 loaded ✓');
-})();
-</script>
-
-
-<style id="side-family-style">
-.side-family-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #a855f7;border-radius:8px;background:#f3e8ff;color:#6b21a8;font-size:11px;cursor:pointer;margin-inline-start:6px;}
-.side-family-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border-radius:12px;margin-bottom:12px;}
-</style>
-<script id="side-family-system">
-(function(){
-function boot(){
-window.sideFamilies=window.sideFamilies||{};
-if(window.__sideFamilyBooted)return;
-window.__sideFamilyBooted=true;
-const origRenderNode=window.renderNode;
-if(typeof origRenderNode==='function'){
-window.renderNode=function(person,...args){
-let html=origRenderNode.call(this,person,...args);
-try{
-if(person&&person.sideFamilyId&&window.sideFamilies[person.sideFamilyId]){
-const btn=`<button class="side-family-btn" onclick="event.stopPropagation();openSideFamily('${person.sideFamilyId}','${person.id}')">🌿 عائلة مرتبطة</button>`;
-html=html.replace('</div></div>',btn+'</div></div>');
-}
-}catch(e){}
-return html;
-}
-}
-window.openSideFamily=function(familyId,personId){
-const fam=window.sideFamilies&&window.sideFamilies[familyId];
-if(!fam)return;
-window.__mainTreeSnapshot={filter:window.currentFamilyFilter||null};
-window.currentFamilyFilter={rootId:(fam.rootPersons||[])[0]||null,isSideFamily:true,sideFamilyId:familyId};
-let app=document.getElementById('treePanel')||document.getElementById('panelTree')||document.getElementById('treeContainer');
-let holder=document.getElementById('sideFamilyBanner');
-if(!holder){
-holder=document.createElement('div');
-holder.id='sideFamilyBanner';
-holder.className='side-family-banner';
-(holder.parentNode||document.getElementById('app')).prepend(holder);
-}
-holder.innerHTML=`<div style="font-size:24px">🌿</div><div style="flex:1"><div style="font-weight:700">${fam.title||'عائلة مرتبطة'}</div><div style="font-size:12px;opacity:.9">فرع جانبي مرتبط بالشجرة الرئيسية</div></div><button onclick="closeSideFamily()" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;color:#5b21b6;cursor:pointer">⬅ رجوع</button>`;
-holder.style.display='flex';
-if(typeof renderTree==='function')renderTree();
-}
-window.closeSideFamily=function(){
-window.currentFamilyFilter=window.__mainTreeSnapshot?window.__mainTreeSnapshot.filter:null;
-let holder=document.getElementById('sideFamilyBanner');if(holder)holder.style.display='none';
-if(typeof renderTree==='function')renderTree();
-}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
 </script>
 
