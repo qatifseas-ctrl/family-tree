@@ -1404,6 +1404,7 @@ let navStack=[];           // [{label, filter, sideFamily, scrollY}]
 let currentFamilyFilter=null; // null=show all, {rootId, label}=filter to one family
 let sideFamilies=[];       // [{id,title,relationType}] — العائلات الجانبية المرتبطة
 let currentSideFamily=null; // {sfId,label} when inside a side family view
+let _sfAddContext=null;    // {sfId,sfParentId} — active when adding SF member via full modal
 let _sfNextId=1;
 function sfUid(){return 'sf_'+(_sfNextId++);}
 function _rebuildSfNextId(){let m=0;sideFamilies.forEach(sf=>{let n=parseInt((sf.id||'').replace('sf_',''));if(!isNaN(n)&&n>m)m=n;});_sfNextId=m+1;}
@@ -1428,6 +1429,7 @@ let _treeOrderCache = null;  // مخزن مؤقت لترتيب الشجرة
 function _rebuildIndexes(){
   _personMap.clear();
   _childrenMap.clear();
+  // خريطة الأبناء تشمل العائلات الجانبية عبر sideFamilyParentId
   _migratedMap.clear();
   people.forEach(p=>{
     _personMap.set(p.id,p);
@@ -1436,6 +1438,12 @@ function _rebuildIndexes(){
     ch.push(p);
     if(p.motherId&&p.motherId!==p.parentId){
       _migratedMap.set(p.motherId,(_migratedMap.get(p.motherId)||0)+1);
+    }
+    // ربط الأبناء في العائلات الجانبية عبر sideFamilyParentId
+    if(p.sideFamilyParentId!=null){
+      let sfCh=_childrenMap.get(p.sideFamilyParentId);
+      if(!sfCh){sfCh=[];_childrenMap.set(p.sideFamilyParentId,sfCh);}
+      if(!sfCh.find(c=>c.id===p.id))sfCh.push(p);
     }
   });
   _rebuildRelNums();
@@ -1509,7 +1517,8 @@ function addPerson(d){
     isExternal:d.isExternal||false,
     sideFamilyId:d.sideFamilyId||null,
     sideFamilyParentId:d.sideFamilyParentId||null,
-    linkedFamilyIds:d.linkedFamilyIds||[]
+    linkedFamilyIds:d.linkedFamilyIds||[],
+    sfAnchors:d.sfAnchors||{}
   };
   people.push(p);expanded[p.id]=false;
   // تحديث الفهارس مباشرةً دون إعادة بناء كامل
@@ -2194,11 +2203,17 @@ function getParentIds(personId){
   if(p.motherId&&getPerson(p.motherId)){
     if(!result.some(r=>r.id===p.motherId))result.push({id:p.motherId,via:'mother'});
   }
+  // ── عبور العائلة الجانبية: sideFamilyParentId ──
+  if(p.sideFamilyParentId&&getPerson(p.sideFamilyParentId)){
+    let sfPar=getPerson(p.sideFamilyParentId);
+    if(!result.some(r=>r.id===p.sideFamilyParentId))
+      result.push({id:p.sideFamilyParentId,via:sfPar.gender==='female'?'mother':'father',crossTree:true});
+  }
   return result;
 }
 function getAncestorsMap(startId){
   if(_ancestorMapCache.has(startId))return _ancestorMapCache.get(startId);
-  let map=new Map(); 
+  let map=new Map();
   let queue=[{id:startId,dist:0,via:'self'}];
   while(queue.length){
     let {id:cur,dist,via}=queue.shift();
@@ -2208,6 +2223,33 @@ function getAncestorsMap(startId){
     map.set(cur,{dist,via});
     getParentIds(cur).forEach(({id:pid,via:pv})=>{
       if(!map.has(pid))queue.push({id:pid,dist:dist+1,via:pv});
+    });
+  }
+  // ── جسر صلة القرابة: إضافة الأجداد من الشجرة الجانبية عبر sfAnchors ──
+  let startP=getPerson(startId);
+  if(startP&&startP.sfAnchors&&Object.keys(startP.sfAnchors).length){
+    Object.entries(startP.sfAnchors).forEach(([sfId,anchorId])=>{
+      let anchor=getPerson(anchorId);
+      if(!anchor)return;
+      // أضف الشخص الجانبي نفسه بمسافة 0 (نفس الشخص في سياق آخر)
+      if(!map.has(anchorId))map.set(anchorId,{dist:0,via:'sf-self'});
+      // ابدأ العبور من والد الشخص الجانبي
+      let sfQueue=[{id:anchorId,dist:0}];
+      let sfVisited=new Set([startId]);
+      while(sfQueue.length){
+        let {id:scur,dist:sdist}=sfQueue.shift();
+        if(sfVisited.has(scur))continue;
+        sfVisited.add(scur);
+        let sp=getPerson(scur);if(!sp)continue;
+        if(sp.sideFamilyParentId&&getPerson(sp.sideFamilyParentId)){
+          let sfPar=getPerson(sp.sideFamilyParentId);
+          let nd=sdist+1;
+          if(!map.has(sp.sideFamilyParentId))
+            map.set(sp.sideFamilyParentId,{dist:nd,via:sfPar.gender==='female'?'mother':'father'});
+          if(!sfVisited.has(sp.sideFamilyParentId))
+            sfQueue.push({id:sp.sideFamilyParentId,dist:nd});
+        }
+      }
     });
   }
   _ancestorMapCache.set(startId,map);
@@ -2428,6 +2470,18 @@ function buildDirectSpouseTree(p1, p2){
 
 function computeBloodKinship(id1,id2){
   if(!id1||!id2||id1===id2)return null;
+  // ── هل الشخصان هما نفس الشخص في شجرتين مختلفتين؟ ──
+  let _p1=getPerson(id1),_p2=getPerson(id2);
+  if(_p1&&_p1.sfAnchors){
+    for(let [_sfId,_ancId] of Object.entries(_p1.sfAnchors)){
+      if(_ancId===id2)return{label:'نفس الشخص (في الشجرتين)',lca:{id:id1,d1:0,d2:0,total:0},path1:[{id:id1}],path2:[{id:id2}],otherLCAs:[],isSelf:true};
+    }
+  }
+  if(_p2&&_p2.sfAnchors){
+    for(let [_sfId,_ancId] of Object.entries(_p2.sfAnchors)){
+      if(_ancId===id1)return{label:'نفس الشخص (في الشجرتين)',lca:{id:id2,d1:0,d2:0,total:0},path1:[{id:id1}],path2:[{id:id2}],otherLCAs:[],isSelf:true};
+    }
+  }
   let map1=getAncestorsMap(id1),map2=getAncestorsMap(id2);
   let common=[];
   map1.forEach((v1,aid)=>{if(map2.has(aid)){let v2=map2.get(aid);common.push({id:aid,d1:v1.dist,d2:v2.dist,total:v1.dist+v2.dist});}});
@@ -3643,75 +3697,53 @@ function renderSFNode(p,sfId,q,matchIds,contextIds){
 function toggleSFNode(id){expanded[id]=!expanded[id];renderTree();}
 
 // ── Side Family CRUD (Owner only) ──
+// ── فتح النموذج الكامل لإضافة فرد في العائلة الجانبية ──
 function openAddSFPersonModal(sfId,parentId){
   let sf=getSideFamily(sfId);if(!sf)return;
-  let parentP=parentId?people.find(p=>p.id===parentId&&p.sideFamilyId===sfId):null;
-  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:400px;">
-    <h3>🌿 إضافة فرد — ${sf.title}</h3>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-      <input id="sfp-name" placeholder="الاسم *" style="border:1px solid var(--card-border);border-radius:8px;padding:8px 12px;font-size:14px;background:var(--card-bg);color:var(--text)">
-      <div style="display:flex;gap:8px;">
-        <select id="sfp-gender" style="flex:1;border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;background:var(--card-bg);color:var(--text)">
-          <option value="male">ذكر ♂</option><option value="female">أنثى ♀</option>
-        </select>
-        <input id="sfp-dob" type="date" style="flex:1;border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;font-size:12px;background:var(--card-bg);color:var(--text)" placeholder="ت. الميلاد">
-      </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="sfp-dec" style="accent-color:#7c3aed"> متوفى/ة</label>
-      <input id="sfp-notes" placeholder="ملاحظات (اختياري)" style="border:1px solid var(--card-border);border-radius:8px;padding:8px 12px;font-size:13px;background:var(--card-bg);color:var(--text)">
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal()">إلغاء</button>
-      <button class="btn primary" onclick="doAddSFPerson('${sfId}',${parentId||null})">➕ إضافة</button>
-    </div>
-  </div></div>`;
-  document.getElementById('modalContainer').innerHTML=html;
-  setTimeout(()=>document.getElementById('sfp-name')&&document.getElementById('sfp-name').focus(),100);
+  _sfAddContext={sfId,sfParentId:parentId||null};
+  let par=parentId?people.find(p=>p.id===parentId&&p.sideFamilyId===sfId):null;
+  // افتح النموذج الكامل — بدون ربط بالشجرة الرئيسية
+  currentAddParentId=null;
+  currentEditId=null;
+  let prevGender=par?par.gender:'male';
+  window._editGender=prevGender;
+  window._inheritedFamilyName=par?(par.childrenFamilyName||par.familyName||''):'';
+  showEditModal(null,null);
+  // أضف بنر تعريفي بالعائلة الجانبية فوق النموذج
+  setTimeout(()=>{
+    let modalEl=document.querySelector('.modal');
+    if(!modalEl)return;
+    let sfBanner=document.createElement('div');
+    sfBanner.style.cssText='display:flex;align-items:center;gap:8px;background:#f3e8ff;border:1px solid #8b5cf6;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#5b21b6;';
+    sfBanner.innerHTML=`<span>🌿</span><span>الإضافة في: <strong>${sf.title}</strong>${par?` — ابن/ابنة: <strong>${par.name}</strong>`:'  (جذر عائلة جانبية)'}</span>`;
+    modalEl.insertBefore(sfBanner,modalEl.firstChild);
+  },80);
 }
 function doAddSFPerson(sfId,parentId){
-  let name=(document.getElementById('sfp-name')||{}).value||'';
-  if(!name.trim()){alert('الاسم مطلوب');return;}
-  let gender=(document.getElementById('sfp-gender')||{}).value||'male';
-  let dob=(document.getElementById('sfp-dob')||{}).value||'';
-  let deceased=(document.getElementById('sfp-dec')||{}).checked||false;
-  let notes=(document.getElementById('sfp-notes')||{}).value||'';
-  let p=addPerson({name:name.trim(),gender,dob,deceased,notes,sideFamilyId:sfId,sideFamilyParentId:parentId||null});
-  expanded[p.id]=true;
-  saveData();closeModal();
-  if(currentSideFamily&&currentSideFamily.sfId===sfId)renderTree();
+  // kept for compatibility — now handled via full modal
+  _sfAddContext={sfId,sfParentId:parentId||null};
+  openAddSFPersonModal(sfId,parentId);
 }
 function openEditSFPersonModal(id,sfId){
   let p=getPerson(id);if(!p)return;
-  let html=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" style="max-width:400px;">
-    <h3>✏️ تعديل الفرد — ${p.name}</h3>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-      <input id="sfpe-name" value="${escapeHtml(p.name)}" placeholder="الاسم" style="border:1px solid var(--card-border);border-radius:8px;padding:8px 12px;font-size:14px;background:var(--card-bg);color:var(--text)">
-      <div style="display:flex;gap:8px;">
-        <select id="sfpe-gender" style="flex:1;border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;background:var(--card-bg);color:var(--text)">
-          <option value="male" ${p.gender==='male'?'selected':''}>ذكر ♂</option><option value="female" ${p.gender==='female'?'selected':''}>أنثى ♀</option>
-        </select>
-        <input id="sfpe-dob" type="date" value="${p.dob||''}" style="flex:1;border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;font-size:12px;background:var(--card-bg);color:var(--text)">
-      </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="sfpe-dec" ${p.deceased?'checked':''} style="accent-color:#7c3aed"> متوفى/ة</label>
-      <input id="sfpe-notes" value="${escapeHtml(p.notes||'')}" placeholder="ملاحظات" style="border:1px solid var(--card-border);border-radius:8px;padding:8px 12px;font-size:13px;background:var(--card-bg);color:var(--text)">
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal()">إلغاء</button>
-      <button class="btn" style="color:#ef4444;border-color:#fca5a5" onclick="deleteSFPerson(${id},'${sfId}')">🗑 حذف</button>
-      <button class="btn primary" onclick="doEditSFPerson(${id})">💾 حفظ</button>
-    </div>
-  </div></div>`;
-  document.getElementById('modalContainer').innerHTML=html;
+  let sf=getSideFamily(sfId||p.sideFamilyId||'');
+  openEditModal(id); // النموذج الكامل مع الزوجات والصور وكل الحقول
+  setTimeout(()=>{
+    let modalEl=document.querySelector('#modalContainer .modal');
+    if(!modalEl||!sf)return;
+    // إخفاء حقل الأب لأن الفرد في عائلة جانبية
+    let parentRow=modalEl.querySelector('#f_parent');
+    if(parentRow){let row=parentRow.closest('.form-row');if(row)row.style.display='none';}
+    let sfBanner=document.createElement('div');
+    sfBanner.style.cssText='display:flex;align-items:center;gap:8px;background:#f3e8ff;border:1px solid #8b5cf6;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#5b21b6;flex-shrink:0;';
+    sfBanner.innerHTML=`<span>🌿</span><span>تعديل في: <strong>${sf.title}</strong></span><button class="btn" style="margin-right:auto;font-size:11px;padding:2px 8px;color:#ef4444;border-color:#fca5a5" onclick="deleteSFPerson(${id},'${sfId||p.sideFamilyId||''}')">🗑 حذف من العائلة</button>`;
+    modalEl.insertBefore(sfBanner,modalEl.firstChild);
+  },80);
 }
 function doEditSFPerson(id){
-  let p=getPerson(id);if(!p)return;
-  p.name=(document.getElementById('sfpe-name')||{}).value||p.name;
-  p.gender=(document.getElementById('sfpe-gender')||{}).value||p.gender;
-  p.dob=(document.getElementById('sfpe-dob')||{}).value||'';
-  p.deceased=(document.getElementById('sfpe-dec')||{}).checked||false;
-  p.notes=(document.getElementById('sfpe-notes')||{}).value||'';
-  _invalidateAll();saveData();closeModal();renderTree();
+  // kept for compatibility — now handled via full modal
+  let p=getPerson(id);
+  if(p)openEditSFPersonModal(id,p.sideFamilyId||'');
 }
 function deleteSFPerson(id,sfId){
   if(!confirm('حذف هذا الفرد من العائلة الجانبية؟'))return;
@@ -3730,10 +3762,26 @@ function openSideFamilyLinksModal(personId){
   let linked=p.linkedFamilyIds||[];
   function render(){
     let available=sideFamilies.filter(sf=>!linked.includes(sf.id));
-    let linkedHtml=linked.map(sfId=>{let sf=getSideFamily(sfId);if(!sf)return '';return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #8b5cf6;border-radius:8px;background:#faf5ff;margin-bottom:6px;">
-      <span style="font-size:13px;font-weight:600;color:#5b21b6">🌿 ${sf.title}</span>
-      <button class="btn" style="font-size:11px;padding:2px 8px;color:#ef4444;border-color:#fca5a5" onclick="sfUnlinkFromPerson(${personId},'${sfId}')">✕ إلغاء</button>
-    </div>`;}).filter(Boolean).join('');
+    let linkedHtml=linked.map(sfId=>{
+      let sf=getSideFamily(sfId);if(!sf)return '';
+      let sfMembers=people.filter(pm=>pm.sideFamilyId===sfId);
+      let currentAnchor=(p.sfAnchors&&p.sfAnchors[sfId])||null;
+      let anchorPerson=currentAnchor?getPerson(currentAnchor):null;
+      let anchorSelect=sfMembers.length?
+        `<div style="margin-top:6px;font-size:11px;color:var(--text2);">موقعه/ا في هذه العائلة:</div>`+
+        `<select onchange="sfSetAnchor(${personId},'${sfId}',this.value)" style="width:100%;font-size:12px;padding:4px 8px;border:1px solid var(--card-border);border-radius:6px;background:var(--card-bg);color:var(--text);margin-top:3px;">`+
+        `<option value="">— غير محدد —</option>`+
+        sfMembers.map(m=>`<option value="${m.id}" ${currentAnchor===m.id?'selected':''}>${m.name}${m.dob?' ('+m.dob.split('-')[0]+')':''}</option>`).join('')+
+        `</select>`:
+        `<div style="font-size:11px;color:var(--text2);margin-top:4px">لا يوجد أفراد في هذه العائلة بعد — <a href="#" onclick="event.preventDefault();closeModal();openAddSFPersonModal('${sfId}',null)" style="color:#7c3aed">إضافة فرد</a></div>`;
+      return `<div style="padding:10px;border:1px solid #8b5cf6;border-radius:8px;background:#faf5ff;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:600;color:#5b21b6">🌿 ${sf.title}</span>
+          <button class="btn" style="font-size:11px;padding:2px 8px;color:#ef4444;border-color:#fca5a5" onclick="sfUnlinkFromPerson(${personId},'${sfId}')">✕ إلغاء</button>
+        </div>
+        ${anchorSelect}
+      </div>`;
+    }).filter(Boolean).join('');
     let availHtml=available.length?`<div style="margin-top:8px;font-size:12px;color:var(--text2);margin-bottom:6px;">ربط بعائلة جانبية أخرى:</div>`+
       available.map(sf=>`<div onclick="sfLinkToPerson(${personId},'${sf.id}')" style="cursor:pointer;padding:8px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);margin-bottom:6px;display:flex;align-items:center;gap:8px;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='var(--card-border)'">
         <span>🌿</span><span style="font-size:13px">${sf.title}</span><span style="font-size:11px;color:#7c3aed;margin-right:auto">ربط ↗</span>
@@ -3749,6 +3797,16 @@ function openSideFamilyLinksModal(personId){
     document.getElementById('modalContainer').innerHTML=modal;
   }
   render();
+}
+function sfSetAnchor(personId,sfId,anchorPersonId){
+  let p=getPerson(personId);if(!p)return;
+  if(!p.sfAnchors)p.sfAnchors={};
+  let aid=parseInt(anchorPersonId);
+  if(anchorPersonId&&!isNaN(aid))p.sfAnchors[sfId]=aid;
+  else delete p.sfAnchors[sfId];
+  saveData();
+  // تحديث النافذة بدون إغلاقها
+  openSideFamilyLinksModal(personId);
 }
 function sfLinkToPerson(personId,sfId){let p=getPerson(personId);if(!p)return;if(!p.linkedFamilyIds)p.linkedFamilyIds=[];if(!p.linkedFamilyIds.includes(sfId))p.linkedFamilyIds.push(sfId);saveData();openSideFamilyLinksModal(personId);}
 function sfUnlinkFromPerson(personId,sfId){let p=getPerson(personId);if(!p)return;p.linkedFamilyIds=(p.linkedFamilyIds||[]).filter(id=>id!==sfId);saveData();openSideFamilyLinksModal(personId);}
@@ -3842,7 +3900,12 @@ function renderNode(p,q,matchIds,contextIds){
   let extFatherBadge=fatherBadgeLabel?`<span title="الأب: ${fatherBadgeLabel}" style="font-size:10px;padding:1px 5px;border-radius:4px;background:#ede9fe;color:#5b21b6;border:1px solid #8b5cf6;flex-shrink:0">♂ ${fatherBadgeLabel}</span>`:'';
   let kinBadge='';
   if(myPersonId&&myPersonId===p.id){kinBadge=`<span class="my-marker">أنا</span>`;}
-  else if(myPersonId&&myPersonId!==p.id){let kin=getMyKinship(p.id);if(kin){let cls=kinBadgeClass(kin);let badgeTip=(kin.blood&&kin.marriage)?`نسب: ${kin.blood.label} | مصاهرة: ${kin.marriage.label}`:'صلة القرابة بك';let badgeLbl=kin.label+(kin.marriage&&kin.blood?' 💍':'');kinBadge=`<span class="kin-badge ${cls}" onclick="event.stopPropagation();showPersonDetail(${p.id})" title="${badgeTip}">${badgeLbl}</span>`;}}
+  else if(myPersonId&&myPersonId!==p.id){let kin=getMyKinship(p.id);if(kin){let cls=kinBadgeClass(kin);let badgeTip=(kin.blood&&kin.marriage)?`نسب: ${kin.blood.label} | مصاهرة: ${kin.marriage.label}`:'صلة القرابة بك';let badgeLbl=kin.label+(kin.marriage&&kin.blood?' 💍':'');
+    // مؤشر القرابة عبر الشجرة الجانبية
+    let myP=getPerson(myPersonId);
+    let isCrossTree=(p.sideFamilyId&&!myP?.sideFamilyId)||(!p.sideFamilyId&&myP?.sideFamilyId)||(kin.isSelf);
+    if(isCrossTree)badgeLbl=`<span style="font-size:9px;background:#ede9fe;color:#7c3aed;border-radius:3px;padding:0 3px">🌿</span>${badgeLbl}`;
+    kinBadge=`<span class="kin-badge ${cls}" onclick="event.stopPropagation();showPersonDetail(${p.id})" title="${badgeTip}">${badgeLbl}</span>`;}}
   let spInfo='';
   // For external persons: also show "wife in main tree" chips
   if(p.isExternal){
@@ -3908,7 +3971,8 @@ function renderNode(p,q,matchIds,contextIds){
     let sfArr=p.linkedFamilyIds.map(sfId=>{
       let sf=getSideFamily(sfId);if(!sf)return '';
       let typeIcon={maternal:'🌸',paternal:'🌿',linked:'🔗'}[sf.relationType]||'🌿';
-      return `<button class="sf-entry-btn" onclick="event.stopPropagation();navigateToSideFamily('${sfId}','${sf.title.replace(/'/g,"\\'")}')">` +
+      let anchorId=(p.sfAnchors&&p.sfAnchors[sfId])||'null';
+      return `<button class="sf-entry-btn" onclick="event.stopPropagation();navigateToSideFamily('${sfId}','${sf.title.replace(/'/g,"\\'")}',${anchorId})">` +
              `${typeIcon} ${sf.title}</button>`;
     }).filter(Boolean);
     sfBtns=sfArr.join(' ');
@@ -4554,7 +4618,7 @@ function showPersonDetail(id){
     ${(()=>{
       let lsf=getLinkedSideFamilies(p.id);
       if(!lsf.length)return '';
-      return `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${lsf.map(sf=>{let typeIcon={maternal:'🌸',paternal:'🌿',linked:'🔗'}[sf.relationType]||'🌿';return `<button class="sf-entry-btn" style="font-size:12px;padding:4px 12px" onclick="closeModal();navigateToSideFamily('${sf.id}','${sf.title.replace(/'/g,"\\'")}');">${typeIcon} ${sf.title}</button>`;}).join('')}</div>`;
+      return `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${lsf.map(sf=>{let typeIcon={maternal:'🌸',paternal:'🌿',linked:'🔗'}[sf.relationType]||'🌿';let ancId=(p.sfAnchors&&p.sfAnchors[sf.id])||'null';return `<button class="sf-entry-btn" style="font-size:12px;padding:4px 12px" onclick="closeModal();navigateToSideFamily('${sf.id}','${sf.title.replace(/'/g,"\\'")}',${ancId});">${typeIcon} ${sf.title}</button>`;}).join('')}</div>`;
     })()}
     <div class="modal-footer" style="flex-wrap:wrap;gap:6px;">
       <button class="btn" onclick="closeModal()">إغلاق</button>
@@ -5621,8 +5685,19 @@ function saveModal(editId,parentId){
 
   if(editId){
     let p=getPerson(editId);
+    // حفظ حقول العائلة الجانبية قبل الدمج
+    let _sfIdSave=p.sideFamilyId||null;
+    let _sfPidSave=p.sideFamilyParentId||null;
+    let _sfAnchorsSave=p.sfAnchors||{};
+    let _linkedSave=p.linkedFamilyIds||[];
     Object.assign(p,{name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,spouses:normalizedSpouses});
-    if(pid!==undefined)p.parentId=pid?parseInt(pid):null;
+    // استعادة حقول العائلة الجانبية (لا يجوز الكتابة عليها من النموذج الرئيسي)
+    p.sideFamilyId=_sfIdSave;
+    p.sideFamilyParentId=_sfPidSave;
+    p.sfAnchors=_sfAnchorsSave;
+    p.linkedFamilyIds=_linkedSave;
+    // تجاهل parentId للأفراد الجانبيين
+    if(!_sfIdSave&&pid!==undefined)p.parentId=pid?parseInt(pid):null;
     if(tempPhoto==='__deleted__')p.photo=null;
     else if(tempPhoto!==null)p.photo=tempPhoto;
     removeRelPairsForPerson(editId);
@@ -5648,10 +5723,15 @@ function saveModal(editId,parentId){
     let actualParent=parentId||null;
     if(pid)actualParent=parseInt(pid);
     if(parentId&&!pid)actualParent=parentId;
+    // ── إضافة في عائلة جانبية: تجاهل parentId الرئيسي ──
+    let _activeSFCtx=_sfAddContext;
+    if(_activeSFCtx){actualParent=null;}
     let np=addPerson({name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,
       parentId:actualParent||null,
       sortOrder:window._insertAtPos!=null?-1:9999,
-      spouses:normalizedSpouses,photo:tempPhoto});
+      spouses:normalizedSpouses,photo:tempPhoto,
+      sideFamilyId:_activeSFCtx?_activeSFCtx.sfId:null,
+      sideFamilyParentId:_activeSFCtx?_activeSFCtx.sfParentId:null});
     if(window._insertAtPos!=null){
       let siblings=getChildren(actualParent||np.parentId).filter(c=>c.id!==np.id);
       siblings.forEach((s,i)=>{s.sortOrder=i<window._insertAtPos?i:i+1;});
@@ -5667,6 +5747,7 @@ function saveModal(editId,parentId){
     editingRelatives.forEach(rid=>{addRelPairOnce(np.id,rid);});
   }
   tempPhoto=null;editingSpouses=[];editingChildren=[];editingRelatives=[];
+  _sfAddContext=null; // مسح السياق الجانبي بعد الحفظ
   closeModal();renderAll();
 }
 // ══════════════════════════════════════════════════════════
@@ -5760,7 +5841,7 @@ function navigateToSpouseFamily(personId){
     }
   },150);
 }
-function navigateToSideFamily(sfId,label){
+function navigateToSideFamily(sfId,label,anchorPersonId){
   _pushAndroidTreeSnapshot();
   let sf=getSideFamily(sfId);if(!sf)return;
   let currentLabel=currentSideFamily?currentSideFamily.label:
@@ -5774,10 +5855,26 @@ function navigateToSideFamily(sfId,label){
   });
   currentFamilyFilter=null;
   currentSideFamily={sfId,label:label||sf.title};
-  // Expand all roots of side family
-  getSideFamilyRoots(sfId).forEach(r=>{expanded[r.id]=true;});
+  // فتح كل مستويات الشجرة الجانبية لإظهار الشخص المرتبط
+  function _expandAllSF(pid){
+    people.filter(c=>c.sideFamilyId===sfId&&c.sideFamilyParentId===pid).forEach(c=>{
+      expanded[c.id]=true;_expandAllSF(c.id);
+    });
+  }
+  getSideFamilyRoots(sfId).forEach(r=>{expanded[r.id]=true;_expandAllSF(r.id);});
   renderAll();
-  setTimeout(()=>window.scrollTo({top:0,behavior:'smooth'}),100);
+  // تمييز الشخص المرتبط والتمرير إليه
+  let _anchor=anchorPersonId||null;
+  setTimeout(()=>{
+    if(_anchor){
+      _searchActiveId=_anchor;
+      let el=document.querySelector('[data-person-id="'+_anchor+'"]');
+      if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('search-active-node');setTimeout(()=>el.classList.remove('search-active-node'),2500);}
+      else window.scrollTo({top:0,behavior:'smooth'});
+    } else {
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+  },200);
 }
 function navigateHome(){
   navStack=[];
