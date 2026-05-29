@@ -8822,10 +8822,16 @@ function dismissInstallBanner(){
   `;
   document.body.appendChild(fab);
 
+
   const TOP_THRESHOLD = 88;
   const UP_THRESHOLD = 12;
+  const DOWN_THRESHOLD = 4;
+  const BOUNCE_GRACE_MS = 180;
   let lastY = window.scrollY || 0;
   let syncPending = false;
+  let activeTouch = false;
+  let touchDirection = null;
+  let ignoreDownUntil = 0;
 
   function isMobileMode(){
     return document.body.classList.contains('mobile-mode');
@@ -8885,6 +8891,7 @@ function dismissInstallBanner(){
 
   function syncFabState(){
     const y = window.scrollY || 0;
+    const now = Date.now();
 
     if(!isMobileMode() || hasVisibleBlockingUI()){
       hideFab();
@@ -8895,15 +8902,41 @@ function dismissInstallBanner(){
     if(y <= TOP_THRESHOLD){
       hideFab();
       lastY = y;
+      ignoreDownUntil = 0;
       return;
     }
 
     const dy = y - lastY;
 
-    if(dy < -UP_THRESHOLD){
-      showFab();
-    }else if(dy > 0){
-      hideFab();
+    if(activeTouch){
+      if(touchDirection === null && Math.abs(dy) >= 2){
+        touchDirection = dy < 0 ? 'up' : 'down';
+      }
+
+      if(touchDirection === 'up'){
+        if(dy < -UP_THRESHOLD){
+          showFab();
+        }
+      }else if(touchDirection === 'down'){
+        if(dy > DOWN_THRESHOLD){
+          hideFab();
+        }
+      }else{
+        if(dy < -UP_THRESHOLD){
+          showFab();
+        }else if(dy > DOWN_THRESHOLD){
+          hideFab();
+        }
+      }
+    }else{
+      if(dy < -UP_THRESHOLD){
+        showFab();
+        ignoreDownUntil = now + BOUNCE_GRACE_MS;
+      }else if(dy > DOWN_THRESHOLD){
+        if(now >= ignoreDownUntil){
+          hideFab();
+        }
+      }
     }
 
     lastY = y;
@@ -8923,15 +8956,42 @@ function dismissInstallBanner(){
     try{ document.documentElement.scrollTop = 0; }catch(e){}
     try{ document.body.scrollTop = 0; }catch(e){}
     lastY = 0;
+    ignoreDownUntil = 0;
     hideFab();
   };
 
   window._updateFabMobileMode = requestSync;
 
   window.addEventListener('scroll', syncFabState, { passive:true });
-  document.addEventListener('touchstart', function(){
+  document.addEventListener('touchstart', function(e){
+    if(!isMobileMode()) return;
+    activeTouch = true;
+    touchDirection = null;
     lastY = window.scrollY || 0;
   }, { passive:true });
+
+  document.addEventListener('touchmove', function(){
+    if(!activeTouch || !isMobileMode()) return;
+    syncFabState();
+  }, { passive:true });
+
+  document.addEventListener('touchend', function(){
+    if(!activeTouch) return;
+    activeTouch = false;
+    if(touchDirection === 'up'){
+      ignoreDownUntil = Date.now() + BOUNCE_GRACE_MS;
+    }else{
+      ignoreDownUntil = 0;
+    }
+    touchDirection = null;
+  }, { passive:true });
+
+  document.addEventListener('touchcancel', function(){
+    activeTouch = false;
+    touchDirection = null;
+    ignoreDownUntil = 0;
+  }, { passive:true });
+
   window.addEventListener('resize', requestSync, { passive:true });
   document.addEventListener('click', requestSync, true);
 
@@ -8944,6 +9004,9 @@ function dismissInstallBanner(){
       attributeFilter:['class','style','hidden','aria-hidden','open']
     });
   }catch(e){}
+
+  requestSync();
+
 
   requestSync();
 })();
