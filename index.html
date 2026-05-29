@@ -1107,6 +1107,14 @@ function openMobSheet(id){
     {icon:'➕',label:'إضافة ابن',action:`closeMobSheet();openAddModal(${id})`},
     {icon:'🌳',label:'انتقال',action:`closeMobSheet();navigateToPerson(${id})`},
   ];
+  // زر إضافة أخ/أخت — يظهر فقط إذا كان للشخص والد
+  if(p.parentId){
+    btns.push({icon:'👥',label:'إضافة أخ/أخت',action:`closeMobSheet();openAddModal(${p.parentId})`});
+  }
+  // زر إضافة والد — يظهر فقط للجذر الخارجي (بلا parentId)
+  if(!p.parentId && p.isExternal){
+    btns.push({icon:'👴',label:'إضافة والد/والدة',action:`closeMobSheet();openAddParentModal(${id})`});
+  }
   if(hasChildren) btns.push({icon:'⇅',label:'الترتيب',action:`closeMobSheet();openReorderModal(${id})`});
   btns.push({icon:'🗑',label:'حذف',action:`closeMobSheet();confirmDeleteFromList(${id})`,cls:'danger'});
   btnsEl.innerHTML=btns.map(b=>`
@@ -4203,7 +4211,9 @@ function showPersonDetail(id){
       <button class="btn" onclick="closeModal()">إغلاق</button>
       <button class="btn" onclick="closeModal();navigateToPerson(${p.id})">🌳 الشجرة</button>
       <button class="btn primary" onclick="closeModal();openEditModal(${p.id})">✏️ تعديل</button>
-      <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن</button>
+      <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن/ابنة</button>
+      ${p.parentId?`<button class="btn" style="background:#f0fdf4;border-color:#86efac;color:#15803d" onclick="closeModal();openAddModal(${p.parentId})" title="إضافة أخ أو أخت لـ ${p.name}">➕ إضافة أخ/أخت</button>`:''}
+      ${(!p.parentId&&p.isExternal)?`<button class="btn" style="background:#fff7ed;border-color:#fed7aa;color:#c2410c" onclick="closeModal();openAddParentModal(${p.id})" title="إضافة والد أو والدة لـ ${p.name}">➕ إضافة والد/والدة</button>`:''}
       ${getChildrenForNode(p.id).length?`<button class="btn" onclick="closeModal();openReorderModal(${p.id})">⇅ ترتيب</button>`:''}
       <button class="btn" style="color:#ef4444;border-color:#fca5a5" onclick="closeModal();confirmDeleteFromList(${p.id})">🗑 حذف</button>
     </div>
@@ -4359,6 +4369,84 @@ function openEditModal(id){
   window._editGender=p?p.gender:'male';
   window._inheritedFamilyName=p?(p.childrenFamilyName||p.familyName||''):'';
   showEditModal(id,null);
+}
+// ── إضافة والد/والدة لشخص خارجي جذر (parentId=null) ──
+function openAddParentModal(childId){
+  let child=getPerson(childId);if(!child)return;
+  currentAddParentId=null;
+  currentEditId=null;
+  window._editGender='male';
+  window._inheritedFamilyName=child.familyName||'';
+  window._pendingParentForChildId=childId;
+  showAddParentModalFor(childId);
+}
+function showAddParentModalFor(childId){
+  let child=getPerson(childId);if(!child)return;
+  let modal=`<div class="modal-overlay" onclick="if(event.target===this){closeModal();window._pendingParentForChildId=null;}">
+  <div class="modal">
+    <h3>إضافة والد/والدة لـ ${child.name}</h3>
+    <div style="padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px;color:#c2410c;margin-bottom:12px;">
+      سيُضاف هذا الشخص كوالد مباشر لـ <strong>${child.name}</strong> في شجرته.
+    </div>
+    <div class="form-row"><label>الاسم</label><input id="ap_name" placeholder="الاسم الكامل" autofocus></div>
+    <div class="form-row"><label>اللقب / اسم العائلة</label><input id="ap_familyName" value="${child.familyName||''}" placeholder="اختياري"></div>
+    <div class="form-row"><label>الجنس</label>
+      <select id="ap_gender">
+        <option value="male">ذكر (أب)</option>
+        <option value="female">أنثى (أم)</option>
+      </select>
+    </div>
+    <div class="form-row"><label>تاريخ الولادة</label><input type="date" id="ap_dob"></div>
+    <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="ap_deceased" onchange="let d=document.getElementById('ap_dodRow');if(d)d.style.display=this.checked?'block':'none'"><label for="ap_deceased">متوفى</label></div></div>
+    <div class="form-row" id="ap_dodRow" style="display:none"><label>تاريخ الوفاة</label><input type="date" id="ap_dod"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal();window._pendingParentForChildId=null;">إلغاء</button>
+      <button class="btn primary" onclick="_saveAddParent(${childId})">حفظ</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=modal;
+  setTimeout(()=>{let n=document.getElementById('ap_name');if(n)n.focus();},80);
+}
+function _saveAddParent(childId){
+  let name=(document.getElementById('ap_name').value||'').trim();
+  if(!name){alert('الرجاء إدخال الاسم');return;}
+  let familyName=(document.getElementById('ap_familyName').value||'').trim();
+  let gender=document.getElementById('ap_gender').value;
+  let dob=document.getElementById('ap_dob').value;
+  let deceased=document.getElementById('ap_deceased').checked;
+  let dod=deceased?(document.getElementById('ap_dod').value||''):'';
+  // أضف الوالد كشخص مستقل في الشجرة الخارجية
+  let parent=addPerson({
+    name,familyName,gender,dob,dod,deceased,
+    parentId:null,spouses:[],notes:'',isExternal:true
+  });
+  // اربط الطفل بالوالد الجديد
+  let child=getPerson(childId);
+  if(child){
+    child.parentId=parent.id;
+    let ch=_childrenMap.get(parent.id);
+    if(!ch){ch=[];_childrenMap.set(parent.id,ch);}
+    if(!ch.find(x=>x.id===childId))ch.push(child);
+    let nullCh=_childrenMap.get(null)||[];
+    let idx=nullCh.findIndex(x=>x.id===childId);
+    if(idx>=0)nullCh.splice(idx,1);
+    _personMap.set(child.id,child);
+    _ancestorMapCache.clear();_myKinCache.clear();_treeOrderCache=null;
+  }
+  window._pendingParentForChildId=null;
+  closeModal();
+  expanded[parent.id]=true;
+  // تحديث currentFamilyFilter ليصبح الوالد الجديد هو الجذر
+  if(currentFamilyFilter&&currentFamilyFilter.rootId===childId){
+    currentFamilyFilter.rootId=parent.id;
+    currentFamilyFilter.label='عائلة '+parent.name+(parent.familyName?' '+parent.familyName:'');
+    currentFamilyFilter.viaPersonId=childId;
+  }
+  saveData();renderAll();
+  setTimeout(()=>{
+    let el=document.querySelector(`[data-person-id="${parent.id}"]`);
+    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});}
+  },200);
 }
 function getAvailableMothers(){
   // الأولوية: إذا كنا نُعدّل شخصاً ذكراً → هو الأب
