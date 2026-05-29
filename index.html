@@ -8689,7 +8689,7 @@ async function doCloudRestore(mode){
   try{
     if(mode==='replace'){
       if(!confirm('هل أنت متأكد؟ ستُفقد جميع البيانات والصور الحالية.'))return;
-      people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+      people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];sideFamilies=d.sideFamilies||[];_rebuildSfNextId();
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
       migrateExternalSpouses();if(people.length)expanded[people[0].id]=true;
@@ -9101,6 +9101,7 @@ async function initCloud(){
         let localCount=people.length;
         if(localCount===0){
           people=cloudData.people;nextId=cloudData.nextId||1;relPairs=cloudData.relPairs||[];
+          sideFamilies=cloudData.sideFamilies||[];_rebuildSfNextId();
           if(cloudData.myPersonId){myPersonId=parseInt(cloudData.myPersonId);saveMyPerson();}
           expanded={};people.forEach(p=>{expanded[p.id]=false;});
           migrateExternalSpouses();
@@ -9568,6 +9569,7 @@ deletePerson=function(id){
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
+            _markDeviceInit();
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
             _idbSave({people:people,relPairs:relPairs,nextId:nextId,sideFamilies:sideFamilies}).catch(function(){});
             _lsSave({people:people,relPairs:relPairs,nextId:nextId,sideFamilies:sideFamilies});
@@ -9582,7 +9584,7 @@ deletePerson=function(id){
   // 4. لا يوجد بيانات — نسخة العائلة: شاشة ترحيب / نسخة المالك: بيانات نموذجية
   if(!dataLoaded){
     if(IS_FAMILY_COPY){
-      people=[];relPairs=[];nextId=1;
+      people=[];relPairs=[];nextId=1;sideFamilies=[];
       console.log('[Init] Family copy — no data, showing welcome screen');
       setTimeout(_showFamilyWelcome, 700);
     } else {
@@ -11786,7 +11788,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         if(!p)return null;
         var r=Object.assign({},p); delete r.photo; return r;
       }).filter(Boolean);
-      var sig=JSON.stringify({people:p,relPairs:Array.isArray(relPairs)?relPairs:[],nextId:nextId||0});
+      var sig=JSON.stringify({people:p,relPairs:Array.isArray(relPairs)?relPairs:[],nextId:nextId||0,sideFamilies:Array.isArray(sideFamilies)?sideFamilies:[]});
       return sha256(sig);
     }catch(e){return Promise.resolve('');}
   }
@@ -11824,6 +11826,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       var payload=JSON.parse(JSON.stringify({
         people:arr,relPairs:Array.isArray(relPairs)?relPairs:[],
         nextId:nextId||1,myPersonId:myPersonId||null,
+        sideFamilies:Array.isArray(sideFamilies)?sideFamilies:[],
         uploadedAt:new Date().toISOString(),deviceId:fuDevId(),deviceName:fuDevName()
       }));
       payload.people.forEach(function(p){if(p)delete p.photo;});
