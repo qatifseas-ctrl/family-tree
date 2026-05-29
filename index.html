@@ -3471,7 +3471,15 @@ function _renderTreeNow(){
 
   let includeExternal=!!q||(currentFamilyFilter&&getPerson(currentFamilyFilter.rootId)&&getPerson(currentFamilyFilter.rootId).isExternal);
   let roots=getRoots(includeExternal);
-  if(currentFamilyFilter){roots=roots.filter(r=>r.id===currentFamilyFilter.rootId);}
+  if(currentFamilyFilter){
+    roots=roots.filter(r=>r.id===currentFamilyFilter.rootId);
+    // ── أمان: إذا لم يُوجد الجذر في القائمة (خارجي بـ parentId=null مثلاً) ──
+    // أضفه مباشرةً من الفهرس دون تعديل أي بيانات
+    if(!roots.length){
+      let rootP=getPerson(currentFamilyFilter.rootId);
+      if(rootP) roots=[rootP];
+    }
+  }
   let html='';roots.forEach(r=>{html+=renderNode(r,q,matchIds,contextIds);});
   let navHtml=renderNavBreadcrumb();
   document.getElementById('treePanel').innerHTML=navHtml+(html||'<div class="no-results">لا يوجد أفراد.</div>');
@@ -5342,27 +5350,33 @@ function renderNavBreadcrumb(){
 function navigateToSpouseFamily(personId){
   _pushAndroidTreeSnapshot();
   let sp=getPerson(personId);if(!sp)return;
-  // Walk up to find the root of this person's family
+  // ── حساب جذر العرض فقط (لا نُعدّل البيانات أبداً) ──
+  // نصعد في سلسلة parentId لإيجاد الجذر الحقيقي للشجرة
   let cur=sp;
   while(cur.parentId&&getPerson(cur.parentId))cur=getPerson(cur.parentId);
   let rootId=cur.id;
-  let currentLabel=currentFamilyFilter?currentFamilyFilter.label:
-    (getRoots(false).length>0?'عائلة '+getRoots(false)[0].name:'الشجرة الرئيسية');
-  navStack.push({
-    label:currentLabel,
-    filter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,
-    scrollY:window.scrollY
-  });
-  currentFamilyFilter={
-    rootId:rootId,
-    label:'عائلة '+(cur.name)+(cur.familyName?' '+cur.familyName:''),
-    viaPersonId:personId,
-    fromLabel:currentLabel
-  };
-  // Expand path to target person + also expand root to show children
+  // ── إذا كنا بالفعل في نفس العائلة: لا نُضيف إطاراً جديداً في navStack ──
+  let alreadyHere=currentFamilyFilter&&currentFamilyFilter.rootId===rootId;
+  if(!alreadyHere){
+    let currentLabel=currentFamilyFilter?currentFamilyFilter.label:
+      (getRoots(false).length>0?'عائلة '+getRoots(false)[0].name:'الشجرة الرئيسية');
+    navStack.push({
+      label:currentLabel,
+      filter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,
+      scrollY:window.scrollY
+    });
+    // ── ضبط فلتر العرض فقط — لا يُعدّل parentId/fatherId/motherId/isExternal ──
+    currentFamilyFilter={
+      rootId:rootId,
+      label:'عائلة '+(cur.name)+(cur.familyName?' '+cur.familyName:''),
+      viaPersonId:personId,
+      fromLabel:currentLabel
+    };
+  }
+  // ── توسيع مسار العرض فقط (expanded = حالة العرض، ليست بيانات) ──
   expanded[rootId]=true;
   let p=sp;while(p){expanded[p.id]=true;p=getParent(p);}
-  // For external persons: also expand to show children (via fatherId)
+  // للأشخاص الخارجيين: توسيع الجذر لإظهار الأبناء المرتبطين عبر fatherId
   if(cur.isExternal){
     let extKids=people.filter(c=>c.fatherId===rootId);
     if(extKids.length)expanded[rootId]=true;
