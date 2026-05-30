@@ -1454,15 +1454,16 @@ function getChildrenForNode(id){
   let p=getPerson(id);
   let direct=(_childrenMap.get(id)||[]).slice().sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
   if(p&&p.isExternal){
-    let extra=[];
     if(p.gender==='male'){
-      extra=people.filter(c=>c.fatherId===id&&c.parentId!==id)
+      // الأب الخارجي: الأبناء المباشرون + أبناء مرتبطون عبر fatherId
+      let extra=people.filter(c=>c.fatherId===id&&c.parentId!==id)
         .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+      return [...direct,...extra];
     } else {
-      extra=people.filter(c=>c.motherId===id&&c.parentId!==id)
-        .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+      // ── الأنثى الخارجية: أبناؤها ينتمون لشجرة أبيهم ──
+      // لا نُظهر أي أبناء تحتها مباشرة في الشجرة
+      return [];
     }
-    return [...direct,...extra];
   }
   return direct;
 }
@@ -3566,6 +3567,14 @@ function renderNode(p,q,matchIds,contextIds){
   if(_migratedCount>0){
     let migBadge=`<span style="font-size:10px;color:#7c3aed;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="لديها ${_migratedCount} ابن/ابنة في شجرة أزواجها" onclick="event.stopPropagation();showPersonDetail(${p.id})">🌿 ${_migratedCount}</span>`;
     spInfo=(spInfo?spInfo+' ':'')+migBadge;
+  }
+  // ── شارة تحذير: أبناء مسجّلون تحت أنثى خارجية (يجب ترحيلهم) ──
+  if(p.isExternal&&p.gender==='female'){
+    let misplaced=(_childrenMap.get(p.id)||[]);
+    if(misplaced.length){
+      let warnBadge=`<span style="font-size:10px;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="${misplaced.length} ابن/ابنة مسجّلون تحتها — يجب نقلهم لشجرة الأب" onclick="event.stopPropagation();openEditModal(${p.id})">⚠️ ${misplaced.length} غير منقول</span>`;
+      spInfo=(spInfo?spInfo+' ':'')+warnBadge;
+    }
   }
   let meta='';
   if(p.dob)meta+=`<span class="node-meta">م.${p.dob.split('-')[0]}</span> `;
