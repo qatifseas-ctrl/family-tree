@@ -1422,7 +1422,13 @@ function addPerson(d){
     familyName:d.familyName||'',
     gender:d.gender||'male',
     dob:d.dob||'',
+    dobType:d.dobType||'',
+    dobGregorian:d.dobGregorian||'',
+    dobHijri:d.dobHijri||'',
     dod:d.dod||'',
+    dodType:d.dodType||'',
+    dodGregorian:d.dodGregorian||'',
+    dodHijri:d.dodHijri||'',
     deceased:d.deceased||false,
     parentId:d.parentId||null,
     fatherId:d.fatherId||null,       // ← NEW: links child to external father person record
@@ -1437,6 +1443,7 @@ function addPerson(d){
     notes:d.notes||'',
     isExternal:d.isExternal||false
   };
+  normalizePersonDates(p);
   people.push(p);expanded[p.id]=false;
   // تحديث الفهارس مباشرةً دون إعادة بناء كامل
   _personMap.set(p.id,p);
@@ -1594,6 +1601,255 @@ function normalizeAr(s){
   return (s||'').toLowerCase()
     .replace(/[أإآٱ]/g,'ا').replace(/[ىئ]/g,'ي').replace(/ة/g,'ه')
     .replace(/[\u064B-\u065F\u0670]/g,'');
+}
+
+// ══════════════════════════════════════════════════════════
+//  دعم الميلادي / الهجري (قراءة، عرض، تحويل، وتخزين مزدوج)
+// ══════════════════════════════════════════════════════════
+const HIJRI_MONTH_NAMES = [
+  'محرم','صفر','ربيع الأول','ربيع الثاني','جمادى الأولى','جمادى الآخرة',
+  'رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'
+];
+const _HIJRI_FMT = (typeof Intl!=='undefined' && Intl.DateTimeFormat)
+  ? new Intl.DateTimeFormat('en-TN-u-ca-islamic-umalqura-nu-latn',{
+      year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'
+    })
+  : null;
+
+function _pad2(n){ return String(n).padStart(2,'0'); }
+function _normalizeDigits(s){
+  return (s||'')
+    .replace(/[٠-٩]/g,ch=>'٠١٢٣٤٥٦٧٨٩'.indexOf(ch))
+    .replace(/[۰-۹]/g,ch=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(ch))
+    .replace(/[‐‑‒–—−\/.]/g,'-')
+    .trim();
+}
+function _parseISODateParts(s){
+  s=_normalizeDigits(s);
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return null;
+  let y=+m[1], mo=+m[2], d=+m[3];
+  if(!y||mo<1||mo>12||d<1||d>31)return null;
+  return {year:y,month:mo,day:d};
+}
+function _parseHijriDateParts(s){
+  s=_normalizeDigits(s);
+  let m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{3,4})$/);
+  if(!m)return null;
+  let d=+m[1], mo=+m[2], y=+m[3];
+  if(!y||mo<1||mo>12||d<1||d>30)return null;
+  return {year:y,month:mo,day:d};
+}
+function _formatGregorianDisplay(iso){
+  let p=_parseISODateParts(iso);
+  if(!p)return (iso||'').trim();
+  return `${_pad2(p.day)}-${_pad2(p.month)}-${p.year}`;
+}
+function _formatHijriInput(parts){
+  if(!parts)return '';
+  return `${_pad2(parts.day)}-${_pad2(parts.month)}-${parts.year}`;
+}
+function _formatHijriDisplayFromParts(parts){
+  if(!parts)return '';
+  return `${parts.day} ${HIJRI_MONTH_NAMES[parts.month-1]||parts.month} ${parts.year}هـ`;
+}
+function _compareHijriParts(a,b){
+  if(!a||!b)return NaN;
+  return (a.year-b.year) || (a.month-b.month) || (a.day-b.day);
+}
+function _gregorianToHijriParts(iso){
+  let p=_parseISODateParts(iso);
+  if(!p || !_HIJRI_FMT)return null;
+  let dt=new Date(Date.UTC(p.year,p.month-1,p.day));
+  let parts=_HIJRI_FMT.formatToParts(dt);
+  let year=+((parts.find(x=>x.type==='year')||{}).value||0);
+  let month=+((parts.find(x=>x.type==='month')||{}).value||0);
+  let day=+((parts.find(x=>x.type==='day')||{}).value||0);
+  if(!year||!month||!day)return null;
+  return {year,month,day};
+}
+function _isoFromUTCms(ms){
+  let d=new Date(ms);
+  let y=d.getUTCFullYear(), m=d.getUTCMonth()+1, day=d.getUTCDate();
+  return `${y}-${_pad2(m)}-${_pad2(day)}`;
+}
+function _hijriToGregorianISO(hijriInput){
+  let target=typeof hijriInput==='string' ? _parseHijriDateParts(hijriInput) : hijriInput;
+  if(!target || !_HIJRI_FMT)return '';
+  let lo=Date.UTC(1700,0,1), hi=Date.UTC(2400,11,31);
+  let loDay=Math.floor(lo/86400000), hiDay=Math.floor(hi/86400000);
+  let found=null;
+  while(loDay<=hiDay){
+    let midDay=Math.floor((loDay+hiDay)/2);
+    let parts=_gregorianToHijriParts(_isoFromUTCms(midDay*86400000));
+    if(!parts) break;
+    let cmp=_compareHijriParts(parts,target);
+    if(cmp<0) loDay=midDay+1;
+    else { found=midDay; hiDay=midDay-1; }
+  }
+  if(found===null)return '';
+  let iso=_isoFromUTCms(found*86400000);
+  let chk=_gregorianToHijriParts(iso);
+  return chk && _compareHijriParts(chk,target)===0 ? iso : '';
+}
+function _dateInfoFromPerson(p, field){
+  if(!p)return {type:'gregorian',original:'',gregorian:'',hijri:'',display:''};
+  let type=(p[field+'Type']||'').toString().toLowerCase();
+  let original=(p[field]||'').trim();
+  let greg=(p[field+'Gregorian']||'').trim();
+  let hijri=(p[field+'Hijri']||'').trim();
+
+  if(!type){
+    if(greg && !hijri) type='gregorian';
+    else if(hijri && !greg) type='hijri';
+    else if(_parseISODateParts(original)) type='gregorian';
+    else if(_parseHijriDateParts(original)) type='hijri';
+    else if(greg) type='gregorian';
+    else if(hijri) type='hijri';
+    else type='gregorian';
+  }
+
+  if(type==='gregorian'){
+    if(!greg && _parseISODateParts(original)) greg=original;
+    if(!hijri && greg){
+      let hp=_gregorianToHijriParts(greg);
+      if(hp) hijri=_formatHijriInput(hp);
+    }
+    if(!original) original=greg||hijri||'';
+  } else {
+    if(!hijri && _parseHijriDateParts(original)) hijri=original;
+    if(!greg && hijri) greg=_hijriToGregorianISO(hijri);
+    if(!original) original=hijri||greg||'';
+  }
+
+  let display='';
+  if(greg && hijri) display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(_parseHijriDateParts(hijri))})`;
+  else if(greg) display=_formatGregorianDisplay(greg);
+  else if(hijri) display=_formatHijriDisplayFromParts(_parseHijriDateParts(hijri));
+
+  return {type,original,gregorian:greg,hijri,display};
+}
+function normalizePersonDates(p){
+  if(!p)return p;
+  let b=_dateInfoFromPerson(p,'dob');
+  p.dobType=b.type; p.dob=b.original; p.dobGregorian=b.gregorian; p.dobHijri=b.hijri;
+  let d=_dateInfoFromPerson(p,'dod');
+  p.dodType=d.type; p.dod=d.original; p.dodGregorian=d.gregorian; p.dodHijri=d.hijri;
+  return p;
+}
+function normalizeAllPersonDates(){
+  people.forEach(normalizePersonDates);
+}
+function getPersonDateInfo(p, field){
+  return _dateInfoFromPerson(p, field);
+}
+function getPersonDateDisplay(p, field){
+  let info=_dateInfoFromPerson(p, field);
+  return info.display;
+}
+function getPersonLifeDatesLine(p){
+  let birth=getPersonDateDisplay(p,'dob');
+  let death=getPersonDateDisplay(p,'dod');
+  if(!birth && !death)return '';
+  let parts=[];
+  if(birth)parts.push(`الميلاد: ${birth}`);
+  if(death)parts.push(`الوفاة: ${death}`);
+  return parts.join(' · ');
+}
+function buildCalendarFieldBlock(prefix, field, label, person){
+  let info=_dateInfoFromPerson(person||{}, field);
+  let type=info.type||'gregorian';
+  let greg=info.gregorian||'';
+  let hijri=info.hijri||'';
+  let display=info.display||'—';
+  let gStyle=type==='gregorian'?'':'display:none';
+  let hStyle=type==='hijri'?'':'display:none';
+  return `
+    <div class="form-row">
+      <label>${label}</label>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select id="${prefix}_${field}_type" onchange="syncCalendarField('${prefix}','${field}')">
+          <option value="gregorian"${type==='gregorian'?' selected':''}>ميلادي</option>
+          <option value="hijri"${type==='hijri'?' selected':''}>هجري</option>
+        </select>
+        <input type="date" id="${prefix}_${field}_greg" value="${greg}" oninput="syncCalendarField('${prefix}','${field}')" style="min-width:160px;${gStyle}">
+        <input type="text" id="${prefix}_${field}_hijri" value="${hijri}" oninput="syncCalendarField('${prefix}','${field}')" placeholder="13-10-1415" inputmode="numeric" style="min-width:160px;${hStyle}">
+      </div>
+      <div id="${prefix}_${field}_preview" style="margin-top:4px;font-size:11px;color:var(--text2)">المحوّل: ${display}</div>
+    </div>`;
+}
+function syncCalendarField(prefix, field){
+  let typeEl=document.getElementById(`${prefix}_${field}_type`);
+  let gEl=document.getElementById(`${prefix}_${field}_greg`);
+  let hEl=document.getElementById(`${prefix}_${field}_hijri`);
+  let prev=document.getElementById(`${prefix}_${field}_preview`);
+  if(!typeEl||!gEl||!hEl||!prev)return;
+  let type=typeEl.value||'gregorian';
+  let original='', greg='', hijri='', display='';
+  if(type==='gregorian'){
+    gEl.style.display='';
+    hEl.style.display='none';
+    original=gEl.value.trim();
+    greg=original;
+    if(greg){
+      let hp=_gregorianToHijriParts(greg);
+      if(hp){
+        hijri=_formatHijriInput(hp);
+        hEl.value=hijri;
+        display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(hp)})`;
+      } else {
+        display=_formatGregorianDisplay(greg);
+      }
+    } else {
+      hEl.value='';
+      display='—';
+    }
+  } else {
+    gEl.style.display='none';
+    hEl.style.display='';
+    original=_normalizeDigits(hEl.value.trim());
+    if(original!==hEl.value) hEl.value=original;
+    hijri=original;
+    if(hijri){
+      let hp=_parseHijriDateParts(hijri);
+      if(hp){
+        greg=_hijriToGregorianISO(hp);
+        if(greg) gEl.value=greg;
+        display=greg ? `${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(hp)})` : _formatHijriDisplayFromParts(hp);
+      } else {
+        display=original;
+      }
+    } else {
+      gEl.value='';
+      display='—';
+    }
+  }
+  prev.textContent=`المحوّل: ${display}`;
+}
+function readCalendarField(prefix, field){
+  let typeEl=document.getElementById(`${prefix}_${field}_type`);
+  let gEl=document.getElementById(`${prefix}_${field}_greg`);
+  let hEl=document.getElementById(`${prefix}_${field}_hijri`);
+  let type=typeEl?typeEl.value:'gregorian';
+  let original='', greg='', hijri='';
+  if(type==='hijri'){
+    hijri=_normalizeDigits((hEl&&hEl.value)||'');
+    original=hijri;
+    if(hijri){
+      let hp=_parseHijriDateParts(hijri);
+      if(hp) greg=_hijriToGregorianISO(hp);
+    }
+    if(!greg && hEl && gEl && gEl.value) greg=gEl.value.trim();
+  } else {
+    greg=(gEl&&gEl.value)||'';
+    original=greg;
+    if(greg){
+      let hp=_gregorianToHijriParts(greg);
+      if(hp) hijri=_formatHijriInput(hp);
+    }
+    if(!hijri && hEl && hEl.value) hijri=_normalizeDigits(hEl.value);
+  }
+  return {type, original, gregorian:greg, hijri};
 }
 // ── قائمة الألقاب الشرفية المعيارية ──
 const KNOWN_TITLES=['السيد','السيدة','سيد','سيدة','دكتور','دكتورة','أستاذ','أستاذة','د','أ'];
@@ -3072,6 +3328,7 @@ function renderStats(){
     </div>`).join('');
 }
 function exportData(){
+  normalizeAllPersonDates();
   closeModal();
   setTimeout(function(){
     try{
@@ -3219,6 +3476,7 @@ function _buildFamilyExportOption(){
 }
 
 function doExportJSON(withPhotos){
+  normalizeAllPersonDates();
   closeModal();
   let data=JSON.parse(JSON.stringify({people,relPairs,nextId}));
   let photoCount=data.people.filter(p=>p.photo).length;
@@ -3238,6 +3496,7 @@ function doExportJSON(withPhotos){
 
 // \u062a\u0635\u062f\u064a\u0631 JSON \u062e\u0627\u0635 \u0628\u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u2014 \u0645\u0639 Gist ID + Device ID \u0641\u0631\u064a\u062f
 function doExportJSONFamily(withPhotos){
+  normalizeAllPersonDates();
   closeModal();
   var devId=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
   var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
@@ -3356,6 +3615,7 @@ function doImport(mode){
   try{
     if(mode==='replace'){
       people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+      normalizeAllPersonDates();
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
       migrateExternalSpouses();
@@ -3426,6 +3686,7 @@ function doImport(mode){
       let skipped=incoming.length-trulyNew.length;
       // الدمج: إضافة الجدد فقط
       people=people.concat(trulyNew);
+      normalizeAllPersonDates();
       trulyNew.forEach(p=>{expanded[p.id]=false;});
       _invalidateAll();
       _applyFamilyMetaIfNeeded(d);
@@ -3577,8 +3838,10 @@ function renderNode(p,q,matchIds,contextIds){
     }
   }
   let meta='';
-  if(p.dob)meta+=`<span class="node-meta">م.${p.dob.split('-')[0]}</span> `;
-  if(p.dod)meta+=`<span class="node-meta">و.${p.dod.split('-')[0]}</span>`;
+  let birthMeta=getPersonDateDisplay(p,'dob');
+  let deathMeta=getPersonDateDisplay(p,'dod');
+  if(birthMeta)meta+=`<span class="node-meta">م.${birthMeta}</span> `;
+  if(deathMeta)meta+=`<span class="node-meta">و.${deathMeta}</span>`;
 
   // ── وضع الجوال: تبسيط الواجهة ──
   let isMob=document.body.classList.contains('mobile-mode');
@@ -3934,6 +4197,7 @@ function renderList(){
           <div class="list-card-main" onclick="showPersonDetail(${p.id})" style="cursor:pointer">
             <h4 style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-left:28px">${p.title?`<span style="font-weight:500;color:var(--text2)">${p.title}</span> `:''}<span>${p.name}</span>${p.familyName?`<span style="font-size:11px;font-weight:400;color:var(--text2);background:var(--color-background-secondary,#f9fafb);border:1px solid var(--card-border);border-radius:4px;padding:1px 5px">${p.familyName}</span>`:''} ${p.deceased?`<span style="display:inline-flex">${crescent('#2e7d32')}</span>`:''}</h4>
             <p style="padding-left:28px">${p.gender==='male'?'ذكر':'أنثى'}${fl?' · '+fl:''}</p>
+            ${getPersonLifeDatesLine(p)?`<p style="padding-left:28px;font-size:11px;color:var(--text2)">${getPersonLifeDatesLine(p)}</p>`:''}
             ${myKinLine}
             <div class="list-card-actions">
               <button class="list-go-tree" onclick="event.stopPropagation();switchTab('tree',document.querySelectorAll('.tab')[0]);navigateToPerson(${p.id});" title="الانتقال إلى الشجرة">🌳 عرض في الشجرة</button>
@@ -4130,8 +4394,8 @@ function showPersonDetail(id){
     ${p.title?row('اللقب الشرفي',`<span style="font-weight:600;color:#5b21b6;background:#ede9fe;padding:2px 10px;border-radius:8px;border:1px solid #c4b5fd">${p.title}</span>`):''}
     ${row('الجنس',p.gender==='male'?'ذكر':'أنثى')}
     ${p.familyName?row('اللقب / العائلة',`<span style="font-weight:600;color:var(--text)">${p.familyName}</span>`):''}
-    ${p.dob?row('تاريخ الولادة',p.dob):''}
-    ${p.deceased&&p.dod?row('تاريخ الوفاة',p.dod):''}
+    ${getPersonDateDisplay(p,'dob')?row('تاريخ الميلاد',getPersonDateDisplay(p,'dob')):''}
+    ${getPersonDateDisplay(p,'dod')?row('تاريخ الوفاة',getPersonDateDisplay(p,'dod')):''}
     ${p.deceased?row('الحالة',`<span style="color:#2e7d32;display:flex;align-items:center;gap:4px;">${p.gender==='female'?'متوفية — رحمها الله':'متوفى — رحمه الله'} ${crescent('#2e7d32')}</span>`):''}
     ${(()=>{
       // Children under a female parent: show her as mother, father from fatherId or fatherName
@@ -4405,9 +4669,9 @@ function showAddParentModalFor(childId){
         <option value="female">أنثى (أم)</option>
       </select>
     </div>
-    <div class="form-row"><label>تاريخ الولادة</label><input type="date" id="ap_dob"></div>
+    ${buildCalendarFieldBlock('ap','dob','تاريخ الميلاد',null)}
     <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="ap_deceased" onchange="let d=document.getElementById('ap_dodRow');if(d)d.style.display=this.checked?'block':'none'"><label for="ap_deceased">متوفى</label></div></div>
-    <div class="form-row" id="ap_dodRow" style="display:none"><label>تاريخ الوفاة</label><input type="date" id="ap_dod"></div>
+    <div id="ap_dodRow" style="display:none">${buildCalendarFieldBlock('ap','dod','تاريخ الوفاة',null)}</div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal();window._pendingParentForChildId=null;">إلغاء</button>
       <button class="btn primary" onclick="_saveAddParent(${childId})">حفظ</button>
@@ -4421,12 +4685,12 @@ function _saveAddParent(childId){
   if(!name){alert('الرجاء إدخال الاسم');return;}
   let familyName=(document.getElementById('ap_familyName').value||'').trim();
   let gender=document.getElementById('ap_gender').value;
-  let dob=document.getElementById('ap_dob').value;
+  let dobData=readCalendarField('ap','dob');
   let deceased=document.getElementById('ap_deceased').checked;
-  let dod=deceased?(document.getElementById('ap_dod').value||''):'';
+  let dodData=readCalendarField('ap','dod');
   // أضف الوالد كشخص مستقل في الشجرة الخارجية
   let parent=addPerson({
-    name,familyName,gender,dob,dod,deceased,
+    name,familyName,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,deceased,
     parentId:null,spouses:[],notes:'',isExternal:true
   });
   // اربط الطفل بالوالد الجديد
@@ -4600,9 +4864,9 @@ function showEditModal(editId,parentId){
       <input type="hidden" id="f_parent" value="${parentId||(p&&p.parentId?p.parentId:'')}">
     </div>
     ${motherFieldHtml}
-    <div class="form-row"><label>تاريخ الولادة</label><input type="date" id="f_dob" value="${p?p.dob:''}"></div>
+    ${buildCalendarFieldBlock('f','dob','تاريخ الميلاد',p)}
     <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="f_deceased" ${(p&&p.deceased)?'checked':''} onchange="toggleDod()"><label for="f_deceased">متوفى</label><span style="display:inline-flex">${crescent('#2e7d32')}</span></div></div>
-    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}"><label>تاريخ الوفاة</label><input type="date" id="f_dod" value="${p?p.dod:''}"></div>
+    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}">${buildCalendarFieldBlock('f','dod','تاريخ الوفاة',p)}</div>
     <div class="form-row"><label>صورة</label><div class="file-input-btn btn" style="width:100%;justify-content:center;">📷 رفع صورة<input type="file" accept="image/*" onchange="handlePhoto(event)"></div><div id="photoPreview" style="margin-top:6px;"></div></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="f_notes" rows="2" style="resize:vertical">${p?p.notes:''}</textarea></div>
     <div class="section-title">الأزواج / الزوجات
@@ -5287,9 +5551,9 @@ function saveModal(editId,parentId){
   let gender=document.getElementById('f_gender').value;
   let parentEl=document.getElementById('f_parent');
   let pid=parentEl?(parentEl.value||''):'';
-  let dob=document.getElementById('f_dob').value;
+  let dobData=readCalendarField('f','dob');
   let deceased=document.getElementById('f_deceased').checked;
-  let dod=document.getElementById('f_dod')?document.getElementById('f_dod').value:'';
+  let dodData=readCalendarField('f','dod');
   let notes=document.getElementById('f_notes').value.trim();
   let motherIdEl=document.getElementById('f_mother_id');
   let motherTextEl=document.getElementById('f_mother');
@@ -5360,7 +5624,8 @@ function saveModal(editId,parentId){
 
   if(editId){
     let p=getPerson(editId);
-    Object.assign(p,{name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,spouses:normalizedSpouses});
+    Object.assign(p,{name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,spouses:normalizedSpouses});
+    normalizePersonDates(p);
     if(pid!==undefined)p.parentId=pid?parseInt(pid):null;
     if(tempPhoto==='__deleted__')p.photo=null;
     else if(tempPhoto!==null)p.photo=tempPhoto;
@@ -5387,7 +5652,7 @@ function saveModal(editId,parentId){
     let actualParent=parentId||null;
     if(pid)actualParent=parseInt(pid);
     if(parentId&&!pid)actualParent=parentId;
-    let np=addPerson({name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,
+    let np=addPerson({name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,
       parentId:actualParent||null,
       sortOrder:window._insertAtPos!=null?-1:9999,
       spouses:normalizedSpouses,photo:tempPhoto});
@@ -8421,6 +8686,7 @@ function _lsLoad(){
 }
 
 function saveData(){
+  normalizeAllPersonDates();
   // ── الصور تُحفظ في مخزن IDB منفصل — لا تُضمَّن في payload الرئيسي ──
   // هذا يحل مشكلة: localStorage يفشل بصمت بسبب حجم الصور (5MB)
   // وIDB الرئيسي يبقى خفيفاً قابلاً للقراءة السريعة
@@ -8689,6 +8955,7 @@ deletePerson=function(id){
     var idbData=await _idbLoad();
     if(idbData&&idbData.people&&idbData.people.length){
       people=idbData.people;nextId=idbData.nextId||1;relPairs=idbData.relPairs||[];
+      normalizeAllPersonDates();
       people.forEach(function(p){expanded[p.id]=false;});
       migrateExternalSpouses();
       _markDeviceInit();
@@ -8705,6 +8972,7 @@ deletePerson=function(id){
       var lsData=_lsLoad();
       if(lsData&&lsData.people&&lsData.people.length){
         people=lsData.people;nextId=lsData.nextId||1;relPairs=lsData.relPairs||[];
+        normalizeAllPersonDates();
         people.forEach(function(p){expanded[p.id]=false;});
         migrateExternalSpouses();
         _markDeviceInit();
@@ -8731,6 +8999,7 @@ deletePerson=function(id){
           if(d.people&&d.people.length){
             people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
+            normalizeAllPersonDates();
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
@@ -11637,237 +11906,6 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     }, 10000);
   });
 
-  /* ═══════════════════════════════════════════════════════════════════════
-   تحويل دقيق بين التقويم الميلادي والهجري - Gregorian ↔ Hijri Converter
-   ═════════════════════════════════════════════════════════════════════ */
-
-window._CalendarConverter = {
-  hijriMonthNames: ['محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني', 'جمادى الأول', 'جمادى الثانية', 
-                    'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'],
-  
-  /* تحويل تاريخ ميلادي إلى هجري */
-  gregorianToHijri: function(day, month, year) {
-    if (!day || !month || !year) return null;
-    day = parseInt(day); month = parseInt(month); year = parseInt(year);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    
-    var N = day + Math.floor(306 * (month + 1) / 11) + year * 365 + Math.floor(year / 4) - Math.floor(year / 100) + Math.floor(year / 400) - 719469;
-    var q = Math.floor(N / 10631);
-    var r = N % 10631;
-    var a = Math.floor((r + 1) / 325.25);
-    var w = Math.floor(a * 325.25) + 1;
-    var q1 = Math.floor((r - w + 1) / 354.36667);
-    var q2 = Math.floor((r - w + 1) % 354.36667 / 29.5306);
-    var m = Math.floor((q2 + 1) / 29.5306) + 1;
-    if (m > 12) m = 12;
-    var d = Math.floor((r - w + 1) % 354.36667 % 29.5306) + 1;
-    var hy = 30 * q + 30 * a + q1 + 1;
-    var hm = m;
-    var hd = Math.floor(d);
-    
-    return { day: hd, month: hm, year: hy };
-  },
-  
-  /* تحويل تاريخ هجري إلى ميلادي */
-  hijriToGregorian: function(day, month, year) {
-    if (!day || !month || !year) return null;
-    day = parseInt(day); month = parseInt(month); year = parseInt(year);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    
-    var N = Math.floor((11 * year + 3) / 30) + 354 * year + 30 * month - Math.floor((month - 1) / 11) + day + 1948439;
-    var a = N + 32044;
-    var b = Math.floor((4 * a + 3) / 146097);
-    var c = a - Math.floor((146097 * b) / 4);
-    var d = Math.floor((4 * c + 3) / 1461);
-    var e = c - Math.floor((1461 * d) / 4);
-    var m = Math.floor((5 * e + 2) / 153);
-    
-    var gd = e - Math.floor((153 * m + 2) / 5) + 1;
-    var gm = m + 3 - 12 * Math.floor(m / 10);
-    var gy = 100 * b + d - 4800 + Math.floor(m / 10);
-    
-    return { day: Math.floor(gd), month: Math.floor(gm), year: Math.floor(gy) };
-  },
-  
-  /* تنسيق التاريخ الهجري */
-  formatHijri: function(day, month, year) {
-    if (!day || !month || !year) return '';
-    day = parseInt(day); month = parseInt(month); year = parseInt(year);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return '';
-    var monthName = this.hijriMonthNames[month - 1] || '';
-    return String(day).padStart(2, '0') + ' ' + monthName + ' ' + year + 'هـ';
-  },
-  
-  /* تنسيق التاريخ الميلادي */
-  formatGregorian: function(day, month, year) {
-    if (!day || !month || !year) return '';
-    day = parseInt(day); month = parseInt(month); year = parseInt(year);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return '';
-    return String(day).padStart(2, '0') + '-' + String(month).padStart(2, '0') + '-' + year;
-  },
-  
-  /* تحليل صيغة التاريخ YYYY-MM-DD */
-  parseDate: function(dateStr) {
-    if (!dateStr) return null;
-    var parts = String(dateStr).split('-');
-    if (parts.length === 3) {
-      var year = parseInt(parts[0]);
-      var month = parseInt(parts[1]);
-      var day = parseInt(parts[2]);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        return { year: year, month: month, day: day };
-      }
-    }
-    return null;
-  },
-  
-  /* تنسيق كائن التاريخ إلى صيغة YYYY-MM-DD */
-  formatDateStr: function(date) {
-    if (!date || !date.year || !date.month || !date.day) return '';
-    var d = parseInt(date.day);
-    var m = parseInt(date.month);
-    var y = parseInt(date.year);
-    if (isNaN(d) || isNaN(m) || isNaN(y)) return '';
-    return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-  }
-};
-
-
-
-  
-  /* ═══════════════════════════════════════════════════════════════════
-     وظائف إدارة التواريخ الهجرية والميلادية
-     ═══════════════════════════════════════════════════════════════════ */
-  
-  /* تحديث الحقول المرتبطة بالتاريخ عند التغيير */
-  window._onDateTypeChange = function(fieldPrefix) {
-    var gregorianInput = document.getElementById(fieldPrefix + '_gregorian');
-    var hijriInput = document.getElementById(fieldPrefix + '_hijri');
-    var typeSelect = document.getElementById(fieldPrefix + '_type');
-    
-    if (!typeSelect) return;
-    
-    var selectedType = typeSelect.value; // 'gregorian' or 'hijri'
-    
-    if (selectedType === 'gregorian') {
-      hijriInput.disabled = true;
-      gregorianInput.disabled = false;
-      gregorianInput.focus();
-    } else {
-      gregorianInput.disabled = true;
-      hijriInput.disabled = false;
-      hijriInput.focus();
-    }
-  };
-  
-  /* تحويل تاريخ ميلادي وتحديث الحقل الهجري */
-  window._onGregorianChange = function(fieldPrefix) {
-    var gregorianInput = document.getElementById(fieldPrefix + '_gregorian');
-    var hijriInput = document.getElementById(fieldPrefix + '_hijri');
-    var dateValue = gregorianInput.value; // YYYY-MM-DD
-    
-    if (!dateValue) {
-      hijriInput.value = '';
-      return;
-    }
-    
-    var parsed = window._CalendarConverter.parseDate(dateValue);
-    if (!parsed) {
-      hijriInput.value = '';
-      return;
-    }
-    
-    var hijri = window._CalendarConverter.gregorianToHijri(parsed.day, parsed.month, parsed.year);
-    if (!hijri) {
-      hijriInput.value = '';
-      return;
-    }
-    
-    hijriInput.value = window._CalendarConverter.formatDateStr(hijri);
-  };
-  
-  /* تحويل تاريخ هجري وتحديث الحقل الميلادي */
-  window._onHijriChange = function(fieldPrefix) {
-    var gregorianInput = document.getElementById(fieldPrefix + '_gregorian');
-    var hijriInput = document.getElementById(fieldPrefix + '_hijri');
-    var dateValue = hijriInput.value; // YYYY-MM-DD (but in hijri)
-    
-    if (!dateValue) {
-      gregorianInput.value = '';
-      return;
-    }
-    
-    var parsed = window._CalendarConverter.parseDate(dateValue);
-    if (!parsed) {
-      gregorianInput.value = '';
-      return;
-    }
-    
-    var gregorian = window._CalendarConverter.hijriToGregorian(parsed.day, parsed.month, parsed.year);
-    if (!gregorian) {
-      gregorianInput.value = '';
-      return;
-    }
-    
-    gregorianInput.value = window._CalendarConverter.formatDateStr(gregorian);
-  };
-  
-  /* حفظ التاريخين معاً في بيانات الشخص */
-  window._saveDateFields = function(person, fieldPrefix, dateTypePrefix) {
-    var gregorianInput = document.getElementById(fieldPrefix + '_gregorian');
-    var hijriInput = document.getElementById(fieldPrefix + '_hijri');
-    
-    if (gregorianInput && gregorianInput.value) {
-      person[dateTypePrefix] = gregorianInput.value;
-      var parsed = window._CalendarConverter.parseDate(gregorianInput.value);
-      if (parsed) {
-        var hijri = window._CalendarConverter.gregorianToHijri(parsed.day, parsed.month, parsed.year);
-        if (hijri) {
-          person[dateTypePrefix + '_hijri'] = window._CalendarConverter.formatDateStr(hijri);
-        }
-      }
-    }
-    
-    if (hijriInput && hijriInput.value) {
-      person[dateTypePrefix + '_hijri'] = hijriInput.value;
-      var parsed = window._CalendarConverter.parseDate(hijriInput.value);
-      if (parsed) {
-        var gregorian = window._CalendarConverter.hijriToGregorian(parsed.day, parsed.month, parsed.year);
-        if (gregorian) {
-          person[dateTypePrefix] = window._CalendarConverter.formatDateStr(gregorian);
-        }
-      }
-    }
-  };
-  
-  /* عرض التاريخين معاً في النص */
-  window._formatDisplayDate = function(gregorianDate, hijriDate) {
-    var parts = [];
-    if (gregorianDate) {
-      var parsed = window._CalendarConverter.parseDate(gregorianDate);
-      if (parsed) {
-        parts.push(window._CalendarConverter.formatGregorian(parsed.day, parsed.month, parsed.year));
-      }
-    }
-    if (!gregorianDate && hijriDate) {
-      var parsed = window._CalendarConverter.parseDate(hijriDate);
-      if (parsed) {
-        var gregorian = window._CalendarConverter.hijriToGregorian(parsed.day, parsed.month, parsed.year);
-        if (gregorian) {
-          parts.push(window._CalendarConverter.formatGregorian(gregorian.day, gregorian.month, gregorian.year));
-        }
-      }
-    }
-    if (hijriDate) {
-      var parsed = window._CalendarConverter.parseDate(hijriDate);
-      if (parsed) {
-        parts.push('(' + window._CalendarConverter.formatHijri(parsed.day, parsed.month, parsed.year) + ')');
-      }
-    }
-    return parts.join(' ');
-  };
-  
-  
   log('v4 loaded ✓');
 })();
 </script>
