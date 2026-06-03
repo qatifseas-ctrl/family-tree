@@ -5950,15 +5950,14 @@ function _closeBackTarget(){
   return false;
 }
 
-function _androidBackGoTop(){
-  try{
-    if(history && history.scrollRestoration) history.scrollRestoration='manual';
-  }catch(e){}
-  try{
-    window.scrollTo({top:0,left:0,behavior:'auto'});
-  }catch(e2){
-    try{ window.scrollTo(0,0); }catch(e3){}
-  }
+function _restoreAndroidBackGuard(){
+  if(!history || !history.go) return;
+  if(window._androidBackGuardRestoring) return;
+  window._androidBackGuardRestoring=true;
+  setTimeout(function(){
+    try{ history.go(1); }catch(e){}
+    setTimeout(function(){ window._androidBackGuardRestoring=false; }, 250);
+  },0);
 }
 
 function _handleAndroidBack(){
@@ -5967,27 +5966,31 @@ function _handleAndroidBack(){
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
-    _pushAndroidHistoryState();
     return true;
   }
 
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
-    _pushAndroidHistoryState();
     return true;
   }
 
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()){
-      _pushAndroidHistoryState();
       return true;
     }
   }
 
-  _androidBackGoTop();
-  _pushAndroidHistoryState();
-  return true;
+  if((window.scrollY||0)>0){
+    try{
+      window.scrollTo({top:0,behavior:'smooth'});
+    }catch(e){
+      window.scrollTo(0,0);
+    }
+    return true;
+  }
+
+  return false;
 }
 
 function _initAndroidBackNavigation(){
@@ -5996,19 +5999,18 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    history.scrollRestoration='manual';
-  }catch(e){}
-  try{
+    if('scrollRestoration' in history) history.scrollRestoration='manual';
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
 
-  window.addEventListener('popstate', function(event){
-    if(event && event.state && event.state._ftBackGuard===false){
+  window.addEventListener('popstate', function(){
+    if(window._androidBackGuardRestoring){
+      window._androidBackGuardRestoring=false;
       return;
     }
     if(_handleAndroidBack()){
-      _pushAndroidHistoryState();
+      _restoreAndroidBackGuard();
     }
   });
 }
