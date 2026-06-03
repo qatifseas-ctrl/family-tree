@@ -5856,91 +5856,76 @@ function navigateToBreadcrumb(idx){
   setTimeout(()=>window.scrollTo({top:frame.scrollY||0,behavior:'smooth'}),100);
 }
 // ══════════════════════════════════════════════════════════
-let _modalScrollLockY=0;
-let _modalScrollLocked=false;
-let _modalObserverInited=false;
+let _androidModalScrollY = 0;
+let _androidModalGuardArmed = false;
+let _androidModalObserverReady = false;
 
-function _isModalVisible(){
-  const modalContainer=document.getElementById('modalContainer');
-  if(!modalContainer) return false;
-  const content=(modalContainer.innerHTML||'').trim();
-  if(!content) return false;
-  if(modalContainer.querySelector('.modal-overlay, .modal, [role="dialog"], [aria-modal="true"]')) return true;
-  return true;
+function _androidGetScrollY(){
+  return Math.max(
+    0,
+    window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
+  );
 }
 
-function _setModalScrollLock(locked, restoreY){
-  const docEl=document.documentElement;
-  const body=document.body;
-  if(!body||!docEl) return;
+function _androidRememberScroll(){
+  _androidModalScrollY = _androidGetScrollY();
+}
 
-  if(locked){
-    if(_modalScrollLocked) return;
-    _modalScrollLockY=typeof restoreY==='number' ? restoreY : (window.scrollY||docEl.scrollTop||body.scrollTop||0);
-    _modalScrollLocked=true;
-    body.setAttribute('data-modal-scroll-locked','1');
-    body.style.position='fixed';
-    body.style.top='-'+_modalScrollLockY+'px';
-    body.style.left='0';
-    body.style.right='0';
-    body.style.width='100%';
-    body.style.overflow='hidden';
-    body.style.touchAction='none';
-    body.style.overscrollBehavior='none';
-    docEl.style.overscrollBehavior='none';
-    docEl.style.scrollBehavior='auto';
-    return;
+function _androidRestoreScroll(){
+  try{
+    window.scrollTo({top:_androidModalScrollY, left:0, behavior:'auto'});
+  }catch(e){
+    try{ window.scrollTo(0, _androidModalScrollY); }catch(err){}
   }
-
-  if(!_modalScrollLocked) return;
-  _modalScrollLocked=false;
-  body.removeAttribute('data-modal-scroll-locked');
-  body.style.position='';
-  body.style.top='';
-  body.style.left='';
-  body.style.right='';
-  body.style.width='';
-  body.style.overflow='';
-  body.style.touchAction='';
-  body.style.overscrollBehavior='';
-  docEl.style.overscrollBehavior='';
-  docEl.style.scrollBehavior='';
-  const y=typeof restoreY==='number' ? restoreY : _modalScrollLockY;
-  requestAnimationFrame(function(){
-    try{ window.scrollTo(0, y); }catch(e){}
-    try{ document.body.scrollTop=y; }catch(e){}
-    try{ document.documentElement.scrollTop=y; }catch(e){}
-  });
+  document.documentElement.scrollTop = _androidModalScrollY;
+  document.body.scrollTop = _androidModalScrollY;
 }
 
-function _syncModalScrollLock(){
-  if(_isModalVisible()){
-    _setModalScrollLock(true);
-  }else{
-    _setModalScrollLock(false);
-  }
+function _androidIsModalOpen(){
+  let modalContainer = document.getElementById('modalContainer');
+  return !!(modalContainer && modalContainer.innerHTML && modalContainer.innerHTML.trim());
 }
 
-function _initModalScrollObserver(){
-  if(_modalObserverInited) return;
-  _modalObserverInited=true;
-  const modalContainer=document.getElementById('modalContainer');
-  if(!modalContainer || typeof MutationObserver==='undefined') return;
-  const obs=new MutationObserver(function(){
-    _syncModalScrollLock();
-  });
-  obs.observe(modalContainer,{childList:true,subtree:true});
-  _syncModalScrollLock();
+function _setupAndroidModalBackGuard(){
+  let modalContainer = document.getElementById('modalContainer');
+  if(!modalContainer || _androidModalObserverReady) return;
+  _androidModalObserverReady = true;
+
+  let syncState = function(){
+    let open = _androidIsModalOpen();
+    if(open){
+      _androidRememberScroll();
+      if(!history || !history.pushState) return;
+      if(!_androidModalGuardArmed){
+        _androidModalGuardArmed = true;
+        try{
+          history.pushState({_ftBackGuard:true, _ftModalGuard:true}, '', location.href);
+        }catch(e){}
+      }
+    } else {
+      _androidModalGuardArmed = false;
+    }
+  };
+
+  try{
+    new MutationObserver(function(){ syncState(); }).observe(modalContainer, {
+      childList: true,
+      subtree: true
+    });
+  }catch(e){}
+  syncState();
 }
 
 function closeModal(opts){
-  const modalContainer=document.getElementById('modalContainer');
-  const modalWasOpen=_isModalVisible();
+  let modalContainer = document.getElementById('modalContainer');
+  let fromBack = !!(opts && (opts.fromBack === true || opts === true));
   if(modalContainer) modalContainer.innerHTML='';
-  tempPhoto=null;
-  if(modalWasOpen){
-    const restoreY=(opts&&typeof opts.restoreY==='number') ? opts.restoreY : _modalScrollLockY;
-    _setModalScrollLock(false, restoreY);
+  tempPhoto = null;
+  if(fromBack){
+    _androidModalGuardArmed = false;
+    setTimeout(function(){
+      _androidRestoreScroll();
+    }, 0);
   }
 }
 
@@ -6010,11 +5995,7 @@ function _pushAndroidTreeSnapshot(){
 function _closeBackTarget(){
   let modalContainer=document.getElementById('modalContainer');
   if(modalContainer && modalContainer.innerHTML){
-    const restoreY=window.scrollY||document.documentElement.scrollTop||document.body.scrollTop||0;
-    closeModal({viaBack:true,restoreY:restoreY});
-    try{ window.scrollTo({top:restoreY,behavior:'auto'}); }catch(e){ try{ window.scrollTo(0,restoreY); }catch(err){} }
-    try{ document.documentElement.scrollTop=restoreY; }catch(e){}
-    try{ document.body.scrollTop=restoreY; }catch(e){}
+    closeModal({fromBack:true});
     return true;
   }
 
@@ -6073,8 +6054,9 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    history.scrollRestoration='manual';
+    if('scrollRestoration' in history) history.scrollRestoration='manual';
   }catch(e){}
+  _setupAndroidModalBackGuard();
 
   try{
     history.replaceState({_ftBackGuard:true}, '', location.href);
@@ -6086,8 +6068,6 @@ function _initAndroidBackNavigation(){
       _pushAndroidHistoryState();
     }
   });
-
-  _initModalScrollObserver();
 }
 
 // ── My Person (منظوري أنا) ──
