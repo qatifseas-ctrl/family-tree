@@ -5862,12 +5862,6 @@ function closeModal(){document.getElementById('modalContainer').innerHTML='';tem
 let _androidBackReady=false;
 window._ftTreeBackStack=window._ftTreeBackStack||[];
 
-function _isModalOpen(){
-  let mc=document.getElementById('modalContainer');
-  if(!mc) return false;
-  return !!mc.querySelector('.modal-overlay,.modal');
-}
-
 function _getActiveTabName(){
   let panels=[
     document.getElementById('treePanel'),
@@ -5928,7 +5922,8 @@ function _pushAndroidTreeSnapshot(){
 }
 
 function _closeBackTarget(){
-  if(_isModalOpen()){
+  let modalContainer=document.getElementById('modalContainer');
+  if(modalContainer && modalContainer.innerHTML){
     closeModal();
     return true;
   }
@@ -5979,7 +5974,14 @@ function _handleAndroidBack(){
     }
   }
 
-  return false;
+  // الشجرة الرئيسية: لا يخرج من التطبيق — فقط صعود لأعلى الصفحة
+  try{
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    window.scrollTo(0,0);
+  }
+  _pushAndroidHistoryState();
+  return true;
 }
 
 function _initAndroidBackNavigation(){
@@ -5988,7 +5990,7 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    history.scrollRestoration='manual';
+    if('scrollRestoration' in history) history.scrollRestoration='manual';
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
