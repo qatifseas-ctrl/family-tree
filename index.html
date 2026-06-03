@@ -5950,6 +5950,17 @@ function _closeBackTarget(){
   return false;
 }
 
+function _androidBackGoTop(){
+  try{
+    if(history && history.scrollRestoration) history.scrollRestoration='manual';
+  }catch(e){}
+  try{
+    window.scrollTo({top:0,left:0,behavior:'auto'});
+  }catch(e2){
+    try{ window.scrollTo(0,0); }catch(e3){}
+  }
+}
+
 function _handleAndroidBack(){
   if(_closeBackTarget()) return true;
 
@@ -5974,12 +5985,7 @@ function _handleAndroidBack(){
     }
   }
 
-  // الشجرة الرئيسية: لا يخرج من التطبيق — فقط صعود لأعلى الصفحة
-  try{
-    window.scrollTo({top:0,behavior:'smooth'});
-  }catch(e){
-    window.scrollTo(0,0);
-  }
+  _androidBackGoTop();
   _pushAndroidHistoryState();
   return true;
 }
@@ -5990,12 +5996,17 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    if('scrollRestoration' in history) history.scrollRestoration='manual';
+    history.scrollRestoration='manual';
+  }catch(e){}
+  try{
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
 
-  window.addEventListener('popstate', function(){
+  window.addEventListener('popstate', function(event){
+    if(event && event.state && event.state._ftBackGuard===false){
+      return;
+    }
     if(_handleAndroidBack()){
       _pushAndroidHistoryState();
     }
