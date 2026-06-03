@@ -5858,34 +5858,128 @@ function navigateToBreadcrumb(idx){
 // ══════════════════════════════════════════════════════════
 function closeModal(){document.getElementById('modalContainer').innerHTML='';tempPhoto=null;}
 
-// Android / Browser Back Button — modal first, then scroll to top
+// Android / Browser Back Button — smart internal navigation
 let _androidBackReady=false;
+window._ftTreeBackStack=window._ftTreeBackStack||[];
 
-function _hasOpenModal(){
-  let modalContainer=document.getElementById('modalContainer');
-  return !!(modalContainer && modalContainer.children && modalContainer.children.length);
+function _isModalOpen(){
+  let mc=document.getElementById('modalContainer');
+  if(!mc) return false;
+  return !!mc.querySelector('.modal-overlay,.modal');
 }
 
-function _closeModalIfOpen(){
-  if(!_hasOpenModal()) return false;
-  closeModal();
+function _getActiveTabName(){
+  let panels=[
+    document.getElementById('treePanel'),
+    document.getElementById('listPanel'),
+    document.getElementById('kinPanel'),
+    document.getElementById('guidePanel')
+  ];
+  let names=['tree','list','kin','guide'];
+  for(let i=0;i<panels.length;i++){
+    if(panels[i] && panels[i].classList.contains('active')) return names[i];
+  }
+  return 'tree';
+}
+
+function _getTabElementByName(name){
+  let tabs=document.querySelectorAll('.tab');
+  if(name==='list') return tabs[1]||tabs[0];
+  if(name==='kin') return tabs[2]||tabs[0];
+  if(name==='guide') return tabs[3]||tabs[0];
+  return tabs[0]||null;
+}
+
+function _pushAndroidHistoryState(){
+  if(!history || !history.pushState) return;
+  try{
+    history.pushState({_ftBackGuard:true}, '', location.href);
+  }catch(e){}
+}
+
+function _restoreAndroidTreeSnapshot(){
+  let stack=window._ftTreeBackStack||[];
+  let snap=stack.pop();
+  if(!snap) return false;
+  expanded=snap.expanded||{};
+  currentFamilyFilter=snap.currentFamilyFilter||null;
+  navStack=snap.navStack||[];
+  renderAll();
+  let tabEl=_getTabElementByName(snap.tab||'tree');
+  if((snap.tab||'tree')!=='tree') switchTab(snap.tab,tabEl||_getTabElementByName('tree'));
+  setTimeout(function(){
+    window.scrollTo({top:snap.scrollY||0,behavior:'smooth'});
+  },80);
   return true;
 }
 
-function _scrollToTopFromBack(){
+function _pushAndroidTreeSnapshot(){
   try{
-    window.scrollTo(0, 0);
-  }catch(e){
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    window._ftTreeBackStack=window._ftTreeBackStack||[];
+    window._ftTreeBackStack.push({
+      expanded:JSON.parse(JSON.stringify(expanded||{})),
+      currentFamilyFilter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,
+      navStack:JSON.parse(JSON.stringify(navStack||[])),
+      scrollY:window.scrollY||0,
+      tab:_getActiveTabName()
+    });
+    if(window._ftTreeBackStack.length>20) window._ftTreeBackStack.shift();
+  }catch(e){}
+}
+
+function _closeBackTarget(){
+  if(_isModalOpen()){
+    closeModal();
+    return true;
   }
+
+  let mssSheet=document.getElementById('mss-sheet');
+  if(mssSheet && mssSheet.classList.contains('open')){
+    closeMobSearchSheet();
+    return true;
+  }
+
+  if(_lastSearchQ || (document.getElementById('searchBox') && document.getElementById('searchBox').value)){
+    if(document.getElementById('searchResultsPanel') && document.getElementById('searchResultsPanel').style.display!=='none'){
+      clearSearch();
+      return true;
+    }
+  }
+
+  let actionSheet=document.getElementById('mob-action-sheet');
+  if(actionSheet && actionSheet.classList.contains('open')){
+    closeMobSheet();
+    return true;
+  }
+
+  return false;
 }
 
 function _handleAndroidBack(){
-  if(_closeModalIfOpen()) return true;
+  if(_closeBackTarget()) return true;
 
-  _scrollToTopFromBack();
-  return true;
+  if(_getActiveTabName()!=='tree'){
+    let treeTab=_getTabElementByName('tree');
+    if(treeTab) switchTab('tree',treeTab);
+    _pushAndroidHistoryState();
+    return true;
+  }
+
+  if(navStack.length>0 || currentFamilyFilter){
+    if(navStack.length>0) navigateBack();
+    else navigateHome();
+    _pushAndroidHistoryState();
+    return true;
+  }
+
+  if(window._ftTreeBackStack && window._ftTreeBackStack.length){
+    if(_restoreAndroidTreeSnapshot()){
+      _pushAndroidHistoryState();
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function _initAndroidBackNavigation(){
@@ -5894,24 +5988,15 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    if('scrollRestoration' in history) history.scrollRestoration='manual';
+    history.scrollRestoration='manual';
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
 
   window.addEventListener('popstate', function(){
     if(_handleAndroidBack()){
-      try{
-        history.pushState({_ftBackGuard:true}, '', location.href);
-      }catch(e){}
+      _pushAndroidHistoryState();
     }
-  });
-
-  window.addEventListener('pageshow', function(){
-    try{
-      history.replaceState({_ftBackGuard:true}, '', location.href);
-      history.pushState({_ftBackGuard:true}, '', location.href);
-    }catch(e){}
   });
 }
 
