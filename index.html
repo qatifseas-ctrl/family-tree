@@ -1803,6 +1803,14 @@ function getPersonDateInfo(p, field){
 
 function getPersonDateDisplay(p, field){
   let info=_dateInfoFromPerson(p, field);
+
+  if(field==='dod' && info.gregorian && info.hijri){
+    return `<div style="display:flex;flex-direction:column;line-height:1.35">
+      <span>${_formatGregorianDisplay(info.gregorian)}</span>
+      <span style="font-size:.82em;color:var(--text2);opacity:.82">${_formatHijriDisplayFromParts(_parseHijriDateParts(info.hijri))}</span>
+    </div>`;
+  }
+
   return info.display;
 }
 
