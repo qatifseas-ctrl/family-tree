@@ -3659,6 +3659,7 @@ function showRelInfo(id,pairNum){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
 }
 function navigateToPerson(id){
   _pushAndroidTreeSnapshot();
@@ -4257,6 +4258,7 @@ function showPersonDetail(id){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4382,6 +4384,7 @@ function openKinPopup(targetId){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
 }
 
 function searchPersonsAdvanced(query){
@@ -4569,6 +4572,7 @@ function showEditModal(editId,parentId){
     <div class="modal-footer"><button class="btn" onclick="closeModal()">إلغاء</button><button class="btn primary" onclick="saveModal(${editId||'null'},${parentId||'null'})">حفظ</button></div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
   // تهيئة حقل اللقب
   (function(){
     let existingTitle=p?p.title||'':'';
@@ -5461,6 +5465,12 @@ function navigateToBreadcrumb(idx){
 // ══════════════════════════════════════════════════════════
 function closeModal(){document.getElementById('modalContainer').innerHTML='';tempPhoto=null;}
 
+// Android back guard: keep one extra internal step whenever a modal is opened
+function _androidBackGuardModalOpen(){
+  if(!_androidBackReady) return;
+  _pushAndroidHistoryState();
+}
+
 // Android / Browser Back Button — smart internal navigation
 let _androidBackReady=false;
 window._ftTreeBackStack=window._ftTreeBackStack||[];
@@ -5554,41 +5564,30 @@ function _closeBackTarget(){
 }
 
 function _handleAndroidBack(){
-  // 1) إغلاق أي Modal مفتوح
-  if(_closeBackTarget()){
-    return 'handled';
-  }
+  if(_closeBackTarget()) return true;
 
-  // 2) الرجوع من أي تبويب إلى الشجرة
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
-    return 'handled';
+    _pushAndroidHistoryState();
+    return true;
   }
 
-  // 3) الرجوع داخل التنقل العميق/العائلة
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
-    return 'handled';
+    _pushAndroidHistoryState();
+    return true;
   }
 
-  // 4) استرجاع snapshot سابق للشجرة
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()){
-      return 'handled';
+      _pushAndroidHistoryState();
+      return true;
     }
   }
 
-  // 5) في الشجرة الرئيسية → اصعد للأعلى أولاً
-  let topPos=window.scrollY||document.documentElement.scrollTop||document.body.scrollTop||0;
-  if(topPos>40){
-    window.scrollTo({top:0,behavior:'smooth'});
-    return 'handled';
-  }
-
-  // 6) أعلى الصفحة الرئيسية فقط → السماح بالخروج الطبيعي
-  return 'exit';
+  return false;
 }
 
 function _initAndroidBackNavigation(){
@@ -5597,21 +5596,13 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    if('scrollRestoration' in history){
-      history.scrollRestoration='manual';
-    }
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
 
   window.addEventListener('popstate', function(){
-    let result=_handleAndroidBack();
-
-    // أي معالجة داخلية → إعادة زر الحماية فوراً
-    if(result!=='exit'){
-      setTimeout(function(){
-        _pushAndroidHistoryState();
-      },0);
+    if(_handleAndroidBack()){
+      _pushAndroidHistoryState();
     }
   });
 }
@@ -5652,6 +5643,7 @@ function openMyPersonPicker(){
     <div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button></div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
 }
 
 function filterMyPicker(q){
@@ -5815,6 +5807,7 @@ function renderReorderModal(parent){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
 }
 
 function moveChild(idx,dir){
