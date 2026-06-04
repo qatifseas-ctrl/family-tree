@@ -358,6 +358,25 @@
   --male:   var(--clr-male);
   --female: var(--clr-female);
   --color-background-secondary: var(--bg-secondary);
+
+  /* ── Review modal aliases for family update diff UI ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #059669;
+  --color-text-warning:    #92400e;
+  --color-text-info:       #1d4ed8;
+  --color-text-danger:     #dc2626;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #d1fae5;
+  --color-background-warning: #fef3c7;
+  --color-background-info:    #dbeafe;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
 }
 
 /* ── Dark Theme ── */
@@ -393,6 +412,25 @@
   --shadow-sm:  0 1px 4px rgba(0,0,0,.25);
   --shadow-md:  0 4px 16px rgba(0,0,0,.4);
   --shadow-lg:  0 8px 32px rgba(0,0,0,.5);
+
+  /* ── Review modal aliases for family update diff UI ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #6ee7b7;
+  --color-text-warning:    #fcd34d;
+  --color-text-info:       #93c5fd;
+  --color-text-danger:     #fca5a5;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #064e3b;
+  --color-background-warning: #451a03;
+  --color-background-info:    #1e3a5f;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
 }
 
 /* ── Auto mode: follows OS preference unless explicitly set ── */
@@ -429,6 +467,25 @@
     --shadow-sm:  0 1px 4px rgba(0,0,0,.25);
     --shadow-md:  0 4px 16px rgba(0,0,0,.4);
     --shadow-lg:  0 8px 32px rgba(0,0,0,.5);
+
+  /* ── Review modal aliases for family update diff UI ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #6ee7b7;
+  --color-text-warning:    #fcd34d;
+  --color-text-info:       #93c5fd;
+  --color-text-danger:     #fca5a5;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #064e3b;
+  --color-background-warning: #451a03;
+  --color-background-info:    #1e3a5f;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
   }
 }
 
@@ -1081,7 +1138,6 @@ function _applyMobileMode(){
     btn.innerHTML='📱 وضع الجوال';
     btn.title='وضع الجوال: شجرة أخف وأسرع';
   }
-  if(window._updateFabMobileMode)window._updateFabMobileMode();
 }
 
 // تبديل فتح/إغلاق فرع في وضع الجوال (بدون إغلاق الإخوة)
@@ -1107,14 +1163,6 @@ function openMobSheet(id){
     {icon:'➕',label:'إضافة ابن',action:`closeMobSheet();openAddModal(${id})`},
     {icon:'🌳',label:'انتقال',action:`closeMobSheet();navigateToPerson(${id})`},
   ];
-  // زر إضافة أخ/أخت — يظهر فقط إذا كان للشخص والد
-  if(p.parentId){
-    btns.push({icon:'👥',label:'إضافة أخ/أخت',action:`closeMobSheet();openAddModal(${p.parentId})`});
-  }
-  // زر إضافة والد — يظهر فقط للجذر الخارجي (بلا parentId)
-  if(!p.parentId && p.isExternal){
-    btns.push({icon:'👴',label:'إضافة والد/والدة',action:`closeMobSheet();openAddParentModal(${id})`});
-  }
   if(hasChildren) btns.push({icon:'⇅',label:'الترتيب',action:`closeMobSheet();openReorderModal(${id})`});
   btns.push({icon:'🗑',label:'حذف',action:`closeMobSheet();confirmDeleteFromList(${id})`,cls:'danger'});
   btnsEl.innerHTML=btns.map(b=>`
@@ -1422,13 +1470,7 @@ function addPerson(d){
     familyName:d.familyName||'',
     gender:d.gender||'male',
     dob:d.dob||'',
-    dobType:d.dobType||'',
-    dobGregorian:d.dobGregorian||'',
-    dobHijri:d.dobHijri||'',
     dod:d.dod||'',
-    dodType:d.dodType||'',
-    dodGregorian:d.dodGregorian||'',
-    dodHijri:d.dodHijri||'',
     deceased:d.deceased||false,
     parentId:d.parentId||null,
     fatherId:d.fatherId||null,       // ← NEW: links child to external father person record
@@ -1443,7 +1485,6 @@ function addPerson(d){
     notes:d.notes||'',
     isExternal:d.isExternal||false
   };
-  normalizePersonDates(p);
   people.push(p);expanded[p.id]=false;
   // تحديث الفهارس مباشرةً دون إعادة بناء كامل
   _personMap.set(p.id,p);
@@ -1461,16 +1502,15 @@ function getChildrenForNode(id){
   let p=getPerson(id);
   let direct=(_childrenMap.get(id)||[]).slice().sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
   if(p&&p.isExternal){
+    let extra=[];
     if(p.gender==='male'){
-      // الأب الخارجي: الأبناء المباشرون + أبناء مرتبطون عبر fatherId
-      let extra=people.filter(c=>c.fatherId===id&&c.parentId!==id)
+      extra=people.filter(c=>c.fatherId===id&&c.parentId!==id)
         .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-      return [...direct,...extra];
     } else {
-      // ── الأنثى الخارجية: أبناؤها ينتمون لشجرة أبيهم ──
-      // لا نُظهر أي أبناء تحتها مباشرة في الشجرة
-      return [];
+      extra=people.filter(c=>c.motherId===id&&c.parentId!==id)
+        .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
     }
+    return [...direct,...extra];
   }
   return direct;
 }
@@ -1601,332 +1641,6 @@ function normalizeAr(s){
   return (s||'').toLowerCase()
     .replace(/[أإآٱ]/g,'ا').replace(/[ىئ]/g,'ي').replace(/ة/g,'ه')
     .replace(/[\u064B-\u065F\u0670]/g,'');
-}
-
-// ══════════════════════════════════════════════════════════
-//  دعم الميلادي / الهجري (قراءة، عرض، تحويل، وتخزين مزدوج)
-// ══════════════════════════════════════════════════════════
-const HIJRI_MONTH_NAMES = [
-  'محرم','صفر','ربيع الأول','ربيع الثاني','جمادى الأولى','جمادى الآخرة',
-  'رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'
-];
-
-function _pad2(n){ return String(n).padStart(2,'0'); }
-
-function _normalizeDigits(s){
-  return (s||'')
-    .replace(/[٠-٩]/g,ch=>'٠١٢٣٤٥٦٧٨٩'.indexOf(ch))
-    .replace(/[۰-۹]/g,ch=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(ch))
-    .replace(/[‐‑‒–—−\/\.]/g,'-')
-    .trim();
-}
-
-function _parseISODateParts(s){
-  s=_normalizeDigits(s);
-  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if(!m)return null;
-  let y=+m[1], mo=+m[2], d=+m[3];
-  if(!y||mo<1||mo>12||d<1||d>31)return null;
-  return {year:y,month:mo,day:d};
-}
-
-function _parseHijriDateParts(s){
-  s=_normalizeDigits(s);
-  let m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{3,4})$/);
-  if(!m)return null;
-  let d=+m[1], mo=+m[2], y=+m[3];
-  if(!y||mo<1||mo>12||d<1||d>30)return null;
-  return {year:y,month:mo,day:d};
-}
-
-function _formatGregorianDisplay(iso){
-  let p=_parseISODateParts(iso);
-  if(!p)return (iso||'').trim();
-  return `${_pad2(p.day)}-${_pad2(p.month)}-${p.year}`;
-}
-
-function _formatHijriInput(parts){
-  if(!parts)return '';
-  return `${_pad2(parts.day)}-${_pad2(parts.month)}-${parts.year}`;
-}
-
-function _formatHijriDisplayFromParts(parts){
-  if(!parts)return '';
-  return `${parts.day} ${HIJRI_MONTH_NAMES[parts.month-1]||parts.month} ${parts.year}هـ`;
-}
-
-function _compareHijriParts(a,b){
-  if(!a||!b)return NaN;
-  return (a.year-b.year) || (a.month-b.month) || (a.day-b.day);
-}
-
-function _gregorianToJdn(y,m,d){
-  if(m<=2){
-    y--;
-    m+=12;
-  }
-  let A=Math.floor(y/100);
-  let B=2-A+Math.floor(A/4);
-  return Math.floor(365.25*(y+4716)) + Math.floor(30.6001*(m+1)) + d + B - 1524;
-}
-
-function _jdnToGregorianParts(jd){
-  let l=jd+68569;
-  let n=Math.floor((4*l)/146097);
-  l=l-Math.floor((146097*n+3)/4);
-  let i=Math.floor((4000*(l+1))/1461001);
-  l=l-Math.floor((1461*i)/4)+31;
-  let j=Math.floor((80*l)/2447);
-  let day=l-Math.floor((2447*j)/80);
-  l=Math.floor(j/11);
-  let month=j+2-12*l;
-  let year=100*(n-49)+i+l;
-  return {year,month,day};
-}
-
-function _jdnToISO(jd){
-  let p=_jdnToGregorianParts(jd);
-  return `${p.year}-${_pad2(p.month)}-${_pad2(p.day)}`;
-}
-
-function _gregorianToHijriParts(iso){
-  let p=_parseISODateParts(iso);
-  if(!p)return null;
-
-  let JD=_gregorianToJdn(p.year,p.month,p.day);
-
-  // Tabular Islamic calendar calibrated to match the attached algorithm/example.
-  let l = JD - 1948439 + 10632;
-  let n = Math.floor((l - 1) / 10631);
-
-  l = l - 10631 * n + 354;
-
-  let j =
-      Math.floor((10985 - l) / 5316) *
-      Math.floor((50 * l) / 17719) +
-      Math.floor(l / 5670) *
-      Math.floor((43 * l) / 15238);
-
-  l =
-      l
-    - Math.floor((30 - j) / 15) *
-      Math.floor((17719 * j) / 50)
-    - Math.floor(j / 16) *
-      Math.floor((15238 * j) / 43)
-    + 29;
-
-  let month = Math.floor((24 * l) / 709);
-  let day = l - Math.floor((709 * month) / 24);
-  let year = 30 * n + j - 30;
-
-  return {year,month,day};
-}
-
-function _hijriToGregorianISO(hijriInput){
-  let target=typeof hijriInput==='string' ? _parseHijriDateParts(hijriInput) : hijriInput;
-  if(!target)return '';
-
-  let loJd=_gregorianToJdn(1700,1,1);
-  let hiJd=_gregorianToJdn(2400,12,31);
-  let found=null;
-
-  while(loJd<=hiJd){
-    let midJd=Math.floor((loJd+hiJd)/2);
-    let iso=_jdnToISO(midJd);
-    let parts=_gregorianToHijriParts(iso);
-    if(!parts) break;
-    let cmp=_compareHijriParts(parts,target);
-    if(cmp<0) loJd=midJd+1;
-    else { found=midJd; hiJd=midJd-1; }
-  }
-
-  if(found===null)return '';
-  let iso=_jdnToISO(found);
-  let chk=_gregorianToHijriParts(iso);
-  return chk && _compareHijriParts(chk,target)===0 ? iso : '';
-}
-
-function _dateInfoFromPerson(p, field){
-  if(!p)return {type:'gregorian',original:'',gregorian:'',hijri:'',display:''};
-  let type=(p[field+'Type']||'').toString().toLowerCase();
-  let original=(p[field]||'').trim();
-  let greg=(p[field+'Gregorian']||'').trim();
-  let hijri=(p[field+'Hijri']||'').trim();
-
-  if(!type){
-    if(greg && !hijri) type='gregorian';
-    else if(hijri && !greg) type='hijri';
-    else if(_parseISODateParts(original)) type='gregorian';
-    else if(_parseHijriDateParts(original)) type='hijri';
-    else if(greg) type='gregorian';
-    else if(hijri) type='hijri';
-    else type='gregorian';
-  }
-
-  if(type==='gregorian'){
-    if(!greg && _parseISODateParts(original)) greg=original;
-    if(!hijri && greg){
-      let hp=_gregorianToHijriParts(greg);
-      if(hp) hijri=_formatHijriInput(hp);
-    }
-    if(!original) original=greg||hijri||'';
-  } else {
-    if(!hijri && _parseHijriDateParts(original)) hijri=original;
-    if(!greg && hijri) greg=_hijriToGregorianISO(hijri);
-    if(!original) original=hijri||greg||'';
-  }
-
-  let display='';
-  if(greg && hijri) display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(_parseHijriDateParts(hijri))})`;
-  else if(greg) display=_formatGregorianDisplay(greg);
-  else if(hijri) display=_formatHijriDisplayFromParts(_parseHijriDateParts(hijri));
-
-  return {type,original,gregorian:greg,hijri,display};
-}
-
-function normalizePersonDates(p){
-  if(!p)return p;
-  let b=_dateInfoFromPerson(p,'dob');
-  p.dobType=b.type; p.dob=b.original; p.dobGregorian=b.gregorian; p.dobHijri=b.hijri;
-  let d=_dateInfoFromPerson(p,'dod');
-  p.dodType=d.type; p.dod=d.original; p.dodGregorian=d.gregorian; p.dodHijri=d.hijri;
-  return p;
-}
-
-function normalizeAllPersonDates(){
-  people.forEach(normalizePersonDates);
-}
-
-function getPersonDateInfo(p, field){
-  return _dateInfoFromPerson(p, field);
-}
-
-function getPersonDateDisplay(p, field){
-  let info=_dateInfoFromPerson(p, field);
-
-  if(field==='dod' && info.gregorian && info.hijri){
-    return `<div style="display:flex;flex-direction:column;line-height:1.35">
-      <span>${_formatGregorianDisplay(info.gregorian)}</span>
-      <span style="color:var(--text2);opacity:.82">${_formatHijriDisplayFromParts(_parseHijriDateParts(info.hijri))}</span>
-    </div>`;
-  }
-
-  return info.display;
-}
-
-function getPersonTreeDateYearDisplay(p, field){
-  let info=_dateInfoFromPerson(p, field);
-  let source=info.gregorian || info.original || '';
-  let parts=_parseISODateParts(source);
-  return parts ? String(parts.year) : '';
-}
-
-function getPersonLifeDatesLine(p){
-  let birth=getPersonDateDisplay(p,'dob');
-  let death=getPersonDateDisplay(p,'dod');
-  if(!birth && !death)return '';
-  let parts=[];
-  if(birth)parts.push(`الميلاد: ${birth}`);
-  if(death)parts.push(`الوفاة: ${death}`);
-  return parts.join(' · ');
-}
-
-function buildCalendarFieldBlock(prefix, field, label, person){
-  let info=_dateInfoFromPerson(person||{}, field);
-  let type=info.type||'gregorian';
-  let greg=info.gregorian||'';
-  let hijri=info.hijri||'';
-  let display=info.display||'—';
-  let gStyle=type==='gregorian'?'':'display:none';
-  let hStyle=type==='hijri'?'':'display:none';
-  return `
-    <div class="form-row">
-      <label>${label}</label>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <select id="${prefix}_${field}_type" onchange="syncCalendarField('${prefix}','${field}')">
-          <option value="gregorian"${type==='gregorian'?' selected':''}>ميلادي</option>
-          <option value="hijri"${type==='hijri'?' selected':''}>هجري</option>
-        </select>
-        <input type="date" id="${prefix}_${field}_greg" value="${greg}" oninput="syncCalendarField('${prefix}','${field}')" style="min-width:160px;${gStyle}">
-        <input type="text" id="${prefix}_${field}_hijri" value="${hijri}" oninput="syncCalendarField('${prefix}','${field}')" placeholder="13-10-1415" inputmode="numeric" style="min-width:160px;${hStyle}">
-      </div>
-      <div id="${prefix}_${field}_preview" style="margin-top:4px;font-size:11px;color:var(--text2)">المحوّل: ${display}</div>
-    </div>`;
-}
-
-function syncCalendarField(prefix, field){
-  let typeEl=document.getElementById(`${prefix}_${field}_type`);
-  let gEl=document.getElementById(`${prefix}_${field}_greg`);
-  let hEl=document.getElementById(`${prefix}_${field}_hijri`);
-  let prev=document.getElementById(`${prefix}_${field}_preview`);
-  if(!typeEl||!gEl||!hEl||!prev)return;
-  let type=typeEl.value||'gregorian';
-  let original='', greg='', hijri='', display='';
-  if(type==='gregorian'){
-    gEl.style.display='';
-    hEl.style.display='none';
-    original=gEl.value.trim();
-    greg=original;
-    if(greg){
-      let hp=_gregorianToHijriParts(greg);
-      if(hp){
-        hijri=_formatHijriInput(hp);
-        hEl.value=hijri;
-        display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(hp)})`;
-      } else {
-        display=_formatGregorianDisplay(greg);
-      }
-    } else {
-      hEl.value='';
-      display='—';
-    }
-  } else {
-    gEl.style.display='none';
-    hEl.style.display='';
-    original=_normalizeDigits(hEl.value.trim());
-    if(original!==hEl.value) hEl.value=original;
-    hijri=original;
-    if(hijri){
-      let hp=_parseHijriDateParts(hijri);
-      if(hp){
-        greg=_hijriToGregorianISO(hp);
-        if(greg) gEl.value=greg;
-        display=greg ? `${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(hp)})` : _formatHijriDisplayFromParts(hp);
-      } else {
-        display=original;
-      }
-    } else {
-      gEl.value='';
-      display='—';
-    }
-  }
-  prev.textContent=`المحوّل: ${display}`;
-}
-
-function readCalendarField(prefix, field){
-  let typeEl=document.getElementById(`${prefix}_${field}_type`);
-  let gEl=document.getElementById(`${prefix}_${field}_greg`);
-  let hEl=document.getElementById(`${prefix}_${field}_hijri`);
-  let type=typeEl?typeEl.value:'gregorian';
-  let original='', greg='', hijri='';
-  if(type==='hijri'){
-    hijri=_normalizeDigits((hEl&&hEl.value)||'');
-    original=hijri;
-    if(hijri){
-      let hp=_parseHijriDateParts(hijri);
-      if(hp) greg=_hijriToGregorianISO(hp);
-    }
-    if(!greg && hEl && gEl && gEl.value) greg=gEl.value.trim();
-  } else {
-    greg=(gEl&&gEl.value)||'';
-    original=greg;
-    if(greg){
-      let hp=_gregorianToHijriParts(greg);
-      if(hp) hijri=_formatHijriInput(hp);
-    }
-    if(!hijri && hEl && hEl.value) hijri=_normalizeDigits(hEl.value);
-  }
-  return {type, original, gregorian:greg, hijri};
 }
 // ── قائمة الألقاب الشرفية المعيارية ──
 const KNOWN_TITLES=['السيد','السيدة','سيد','سيدة','دكتور','دكتورة','أستاذ','أستاذة','د','أ'];
@@ -3405,7 +3119,6 @@ function renderStats(){
     </div>`).join('');
 }
 function exportData(){
-  normalizeAllPersonDates();
   closeModal();
   setTimeout(function(){
     try{
@@ -3553,7 +3266,6 @@ function _buildFamilyExportOption(){
 }
 
 function doExportJSON(withPhotos){
-  normalizeAllPersonDates();
   closeModal();
   let data=JSON.parse(JSON.stringify({people,relPairs,nextId}));
   let photoCount=data.people.filter(p=>p.photo).length;
@@ -3573,7 +3285,6 @@ function doExportJSON(withPhotos){
 
 // \u062a\u0635\u062f\u064a\u0631 JSON \u062e\u0627\u0635 \u0628\u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u2014 \u0645\u0639 Gist ID + Device ID \u0641\u0631\u064a\u062f
 function doExportJSONFamily(withPhotos){
-  normalizeAllPersonDates();
   closeModal();
   var devId=[...crypto.getRandomValues(new Uint8Array(3))].map(b=>b.toString(16).padStart(2,'0')).join('');
   var fuGid=FAMILY_UPLOAD_CONFIG.GIST_ID||localStorage.getItem(FAMILY_UPLOAD_GIST_KEY)||localStorage.getItem('ft_fupload_gid')||'';
@@ -3692,7 +3403,6 @@ function doImport(mode){
   try{
     if(mode==='replace'){
       people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
-      normalizeAllPersonDates();
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
       migrateExternalSpouses();
@@ -3763,7 +3473,6 @@ function doImport(mode){
       let skipped=incoming.length-trulyNew.length;
       // الدمج: إضافة الجدد فقط
       people=people.concat(trulyNew);
-      normalizeAllPersonDates();
       trulyNew.forEach(p=>{expanded[p.id]=false;});
       _invalidateAll();
       _applyFamilyMetaIfNeeded(d);
@@ -3818,15 +3527,7 @@ function _renderTreeNow(){
 
   let includeExternal=!!q||(currentFamilyFilter&&getPerson(currentFamilyFilter.rootId)&&getPerson(currentFamilyFilter.rootId).isExternal);
   let roots=getRoots(includeExternal);
-  if(currentFamilyFilter){
-    roots=roots.filter(r=>r.id===currentFamilyFilter.rootId);
-    // ── أمان: إذا لم يُوجد الجذر في القائمة (خارجي بـ parentId=null مثلاً) ──
-    // أضفه مباشرةً من الفهرس دون تعديل أي بيانات
-    if(!roots.length){
-      let rootP=getPerson(currentFamilyFilter.rootId);
-      if(rootP) roots=[rootP];
-    }
-  }
+  if(currentFamilyFilter){roots=roots.filter(r=>r.id===currentFamilyFilter.rootId);}
   let html='';roots.forEach(r=>{html+=renderNode(r,q,matchIds,contextIds);});
   let navHtml=renderNavBreadcrumb();
   document.getElementById('treePanel').innerHTML=navHtml+(html||'<div class="no-results">لا يوجد أفراد.</div>');
@@ -3906,19 +3607,9 @@ function renderNode(p,q,matchIds,contextIds){
     let migBadge=`<span style="font-size:10px;color:#7c3aed;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="لديها ${_migratedCount} ابن/ابنة في شجرة أزواجها" onclick="event.stopPropagation();showPersonDetail(${p.id})">🌿 ${_migratedCount}</span>`;
     spInfo=(spInfo?spInfo+' ':'')+migBadge;
   }
-  // ── شارة تحذير: أبناء مسجّلون تحت أنثى خارجية (يجب ترحيلهم) ──
-  if(p.isExternal&&p.gender==='female'){
-    let misplaced=(_childrenMap.get(p.id)||[]);
-    if(misplaced.length){
-      let warnBadge=`<span style="font-size:10px;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="${misplaced.length} ابن/ابنة مسجّلون تحتها — يجب نقلهم لشجرة الأب" onclick="event.stopPropagation();openEditModal(${p.id})">⚠️ ${misplaced.length} غير منقول</span>`;
-      spInfo=(spInfo?spInfo+' ':'')+warnBadge;
-    }
-  }
   let meta='';
-  let birthMeta=getPersonTreeDateYearDisplay(p,'dob');
-  let deathMeta=getPersonTreeDateYearDisplay(p,'dod');
-  if(birthMeta)meta+=`<span class="node-meta">م.${birthMeta}</span> `;
-  if(deathMeta)meta+=`<span class="node-meta">و.${deathMeta}</span>`;
+  if(p.dob)meta+=`<span class="node-meta">م.${p.dob.split('-')[0]}</span> `;
+  if(p.dod)meta+=`<span class="node-meta">و.${p.dod.split('-')[0]}</span>`;
 
   // ── وضع الجوال: تبسيط الواجهة ──
   let isMob=document.body.classList.contains('mobile-mode');
@@ -4274,7 +3965,6 @@ function renderList(){
           <div class="list-card-main" onclick="showPersonDetail(${p.id})" style="cursor:pointer">
             <h4 style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-left:28px">${p.title?`<span style="font-weight:500;color:var(--text2)">${p.title}</span> `:''}<span>${p.name}</span>${p.familyName?`<span style="font-size:11px;font-weight:400;color:var(--text2);background:var(--color-background-secondary,#f9fafb);border:1px solid var(--card-border);border-radius:4px;padding:1px 5px">${p.familyName}</span>`:''} ${p.deceased?`<span style="display:inline-flex">${crescent('#2e7d32')}</span>`:''}</h4>
             <p style="padding-left:28px">${p.gender==='male'?'ذكر':'أنثى'}${fl?' · '+fl:''}</p>
-            ${getPersonLifeDatesLine(p)?`<p style="padding-left:28px;font-size:11px;color:var(--text2)">${getPersonLifeDatesLine(p)}</p>`:''}
             ${myKinLine}
             <div class="list-card-actions">
               <button class="list-go-tree" onclick="event.stopPropagation();switchTab('tree',document.querySelectorAll('.tab')[0]);navigateToPerson(${p.id});" title="الانتقال إلى الشجرة">🌳 عرض في الشجرة</button>
@@ -4471,8 +4161,8 @@ function showPersonDetail(id){
     ${p.title?row('اللقب الشرفي',`<span style="font-weight:600;color:#5b21b6;background:#ede9fe;padding:2px 10px;border-radius:8px;border:1px solid #c4b5fd">${p.title}</span>`):''}
     ${row('الجنس',p.gender==='male'?'ذكر':'أنثى')}
     ${p.familyName?row('اللقب / العائلة',`<span style="font-weight:600;color:var(--text)">${p.familyName}</span>`):''}
-    ${getPersonDateDisplay(p,'dob')?row('تاريخ الميلاد',getPersonDateDisplay(p,'dob')):''}
-    ${getPersonDateDisplay(p,'dod')?row('تاريخ الوفاة',getPersonDateDisplay(p,'dod')):''}
+    ${p.dob?row('تاريخ الولادة',p.dob):''}
+    ${p.deceased&&p.dod?row('تاريخ الوفاة',p.dod):''}
     ${p.deceased?row('الحالة',`<span style="color:#2e7d32;display:flex;align-items:center;gap:4px;">${p.gender==='female'?'متوفية — رحمها الله':'متوفى — رحمه الله'} ${crescent('#2e7d32')}</span>`):''}
     ${(()=>{
       // Children under a female parent: show her as mother, father from fatherId or fatherName
@@ -4561,9 +4251,7 @@ function showPersonDetail(id){
       <button class="btn" onclick="closeModal()">إغلاق</button>
       <button class="btn" onclick="closeModal();navigateToPerson(${p.id})">🌳 الشجرة</button>
       <button class="btn primary" onclick="closeModal();openEditModal(${p.id})">✏️ تعديل</button>
-      <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن/ابنة</button>
-      ${p.parentId?`<button class="btn" style="background:#f0fdf4;border-color:#86efac;color:#15803d" onclick="closeModal();openAddModal(${p.parentId})" title="إضافة أخ أو أخت لـ ${p.name}">➕ إضافة أخ/أخت</button>`:''}
-      ${(!p.parentId&&p.isExternal)?`<button class="btn" style="background:#fff7ed;border-color:#fed7aa;color:#c2410c" onclick="closeModal();openAddParentModal(${p.id})" title="إضافة والد أو والدة لـ ${p.name}">➕ إضافة والد/والدة</button>`:''}
+      <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن</button>
       ${getChildrenForNode(p.id).length?`<button class="btn" onclick="closeModal();openReorderModal(${p.id})">⇅ ترتيب</button>`:''}
       <button class="btn" style="color:#ef4444;border-color:#fca5a5" onclick="closeModal();confirmDeleteFromList(${p.id})">🗑 حذف</button>
     </div>
@@ -4720,84 +4408,6 @@ function openEditModal(id){
   window._inheritedFamilyName=p?(p.childrenFamilyName||p.familyName||''):'';
   showEditModal(id,null);
 }
-// ── إضافة والد/والدة لشخص خارجي جذر (parentId=null) ──
-function openAddParentModal(childId){
-  let child=getPerson(childId);if(!child)return;
-  currentAddParentId=null;
-  currentEditId=null;
-  window._editGender='male';
-  window._inheritedFamilyName=child.familyName||'';
-  window._pendingParentForChildId=childId;
-  showAddParentModalFor(childId);
-}
-function showAddParentModalFor(childId){
-  let child=getPerson(childId);if(!child)return;
-  let modal=`<div class="modal-overlay" onclick="if(event.target===this){closeModal();window._pendingParentForChildId=null;}">
-  <div class="modal">
-    <h3>إضافة والد/والدة لـ ${child.name}</h3>
-    <div style="padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px;color:#c2410c;margin-bottom:12px;">
-      سيُضاف هذا الشخص كوالد مباشر لـ <strong>${child.name}</strong> في شجرته.
-    </div>
-    <div class="form-row"><label>الاسم</label><input id="ap_name" placeholder="الاسم الكامل" autofocus></div>
-    <div class="form-row"><label>اللقب / اسم العائلة</label><input id="ap_familyName" value="${child.familyName||''}" placeholder="اختياري"></div>
-    <div class="form-row"><label>الجنس</label>
-      <select id="ap_gender">
-        <option value="male">ذكر (أب)</option>
-        <option value="female">أنثى (أم)</option>
-      </select>
-    </div>
-    ${buildCalendarFieldBlock('ap','dob','تاريخ الميلاد',null)}
-    <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="ap_deceased" onchange="let d=document.getElementById('ap_dodRow');if(d)d.style.display=this.checked?'block':'none'"><label for="ap_deceased">متوفى</label></div></div>
-    <div id="ap_dodRow" style="display:none">${buildCalendarFieldBlock('ap','dod','تاريخ الوفاة',null)}</div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal();window._pendingParentForChildId=null;">إلغاء</button>
-      <button class="btn primary" onclick="_saveAddParent(${childId})">حفظ</button>
-    </div>
-  </div></div>`;
-  document.getElementById('modalContainer').innerHTML=modal;
-  setTimeout(()=>{let n=document.getElementById('ap_name');if(n)n.focus();},80);
-}
-function _saveAddParent(childId){
-  let name=(document.getElementById('ap_name').value||'').trim();
-  if(!name){alert('الرجاء إدخال الاسم');return;}
-  let familyName=(document.getElementById('ap_familyName').value||'').trim();
-  let gender=document.getElementById('ap_gender').value;
-  let dobData=readCalendarField('ap','dob');
-  let deceased=document.getElementById('ap_deceased').checked;
-  let dodData=readCalendarField('ap','dod');
-  // أضف الوالد كشخص مستقل في الشجرة الخارجية
-  let parent=addPerson({
-    name,familyName,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,deceased,
-    parentId:null,spouses:[],notes:'',isExternal:true
-  });
-  // اربط الطفل بالوالد الجديد
-  let child=getPerson(childId);
-  if(child){
-    child.parentId=parent.id;
-    let ch=_childrenMap.get(parent.id);
-    if(!ch){ch=[];_childrenMap.set(parent.id,ch);}
-    if(!ch.find(x=>x.id===childId))ch.push(child);
-    let nullCh=_childrenMap.get(null)||[];
-    let idx=nullCh.findIndex(x=>x.id===childId);
-    if(idx>=0)nullCh.splice(idx,1);
-    _personMap.set(child.id,child);
-    _ancestorMapCache.clear();_myKinCache.clear();_treeOrderCache=null;
-  }
-  window._pendingParentForChildId=null;
-  closeModal();
-  expanded[parent.id]=true;
-  // تحديث currentFamilyFilter ليصبح الوالد الجديد هو الجذر
-  if(currentFamilyFilter&&currentFamilyFilter.rootId===childId){
-    currentFamilyFilter.rootId=parent.id;
-    currentFamilyFilter.label='عائلة '+parent.name+(parent.familyName?' '+parent.familyName:'');
-    currentFamilyFilter.viaPersonId=childId;
-  }
-  saveData();renderAll();
-  setTimeout(()=>{
-    let el=document.querySelector(`[data-person-id="${parent.id}"]`);
-    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});}
-  },200);
-}
 function getAvailableMothers(){
   // الأولوية: إذا كنا نُعدّل شخصاً ذكراً → هو الأب
   // إذا كنا نضيف ابناً → currentAddParentId هو الأب
@@ -4941,9 +4551,9 @@ function showEditModal(editId,parentId){
       <input type="hidden" id="f_parent" value="${parentId||(p&&p.parentId?p.parentId:'')}">
     </div>
     ${motherFieldHtml}
-    ${buildCalendarFieldBlock('f','dob','تاريخ الميلاد',p)}
+    <div class="form-row"><label>تاريخ الولادة</label><input type="date" id="f_dob" value="${p?p.dob:''}"></div>
     <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="f_deceased" ${(p&&p.deceased)?'checked':''} onchange="toggleDod()"><label for="f_deceased">متوفى</label><span style="display:inline-flex">${crescent('#2e7d32')}</span></div></div>
-    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}">${buildCalendarFieldBlock('f','dod','تاريخ الوفاة',p)}</div>
+    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}"><label>تاريخ الوفاة</label><input type="date" id="f_dod" value="${p?p.dod:''}"></div>
     <div class="form-row"><label>صورة</label><div class="file-input-btn btn" style="width:100%;justify-content:center;">📷 رفع صورة<input type="file" accept="image/*" onchange="handlePhoto(event)"></div><div id="photoPreview" style="margin-top:6px;"></div></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="f_notes" rows="2" style="resize:vertical">${p?p.notes:''}</textarea></div>
     <div class="section-title">الأزواج / الزوجات
@@ -5628,9 +5238,9 @@ function saveModal(editId,parentId){
   let gender=document.getElementById('f_gender').value;
   let parentEl=document.getElementById('f_parent');
   let pid=parentEl?(parentEl.value||''):'';
-  let dobData=readCalendarField('f','dob');
+  let dob=document.getElementById('f_dob').value;
   let deceased=document.getElementById('f_deceased').checked;
-  let dodData=readCalendarField('f','dod');
+  let dod=document.getElementById('f_dod')?document.getElementById('f_dod').value:'';
   let notes=document.getElementById('f_notes').value.trim();
   let motherIdEl=document.getElementById('f_mother_id');
   let motherTextEl=document.getElementById('f_mother');
@@ -5701,8 +5311,7 @@ function saveModal(editId,parentId){
 
   if(editId){
     let p=getPerson(editId);
-    Object.assign(p,{name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,spouses:normalizedSpouses});
-    normalizePersonDates(p);
+    Object.assign(p,{name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,spouses:normalizedSpouses});
     if(pid!==undefined)p.parentId=pid?parseInt(pid):null;
     if(tempPhoto==='__deleted__')p.photo=null;
     else if(tempPhoto!==null)p.photo=tempPhoto;
@@ -5729,7 +5338,7 @@ function saveModal(editId,parentId){
     let actualParent=parentId||null;
     if(pid)actualParent=parseInt(pid);
     if(parentId&&!pid)actualParent=parentId;
-    let np=addPerson({name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,
+    let np=addPerson({name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,
       parentId:actualParent||null,
       sortOrder:window._insertAtPos!=null?-1:9999,
       spouses:normalizedSpouses,photo:tempPhoto});
@@ -5789,33 +5398,27 @@ function renderNavBreadcrumb(){
 function navigateToSpouseFamily(personId){
   _pushAndroidTreeSnapshot();
   let sp=getPerson(personId);if(!sp)return;
-  // ── حساب جذر العرض فقط (لا نُعدّل البيانات أبداً) ──
-  // نصعد في سلسلة parentId لإيجاد الجذر الحقيقي للشجرة
+  // Walk up to find the root of this person's family
   let cur=sp;
   while(cur.parentId&&getPerson(cur.parentId))cur=getPerson(cur.parentId);
   let rootId=cur.id;
-  // ── إذا كنا بالفعل في نفس العائلة: لا نُضيف إطاراً جديداً في navStack ──
-  let alreadyHere=currentFamilyFilter&&currentFamilyFilter.rootId===rootId;
-  if(!alreadyHere){
-    let currentLabel=currentFamilyFilter?currentFamilyFilter.label:
-      (getRoots(false).length>0?'عائلة '+getRoots(false)[0].name:'الشجرة الرئيسية');
-    navStack.push({
-      label:currentLabel,
-      filter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,
-      scrollY:window.scrollY
-    });
-    // ── ضبط فلتر العرض فقط — لا يُعدّل parentId/fatherId/motherId/isExternal ──
-    currentFamilyFilter={
-      rootId:rootId,
-      label:'عائلة '+(cur.name)+(cur.familyName?' '+cur.familyName:''),
-      viaPersonId:personId,
-      fromLabel:currentLabel
-    };
-  }
-  // ── توسيع مسار العرض فقط (expanded = حالة العرض، ليست بيانات) ──
+  let currentLabel=currentFamilyFilter?currentFamilyFilter.label:
+    (getRoots(false).length>0?'عائلة '+getRoots(false)[0].name:'الشجرة الرئيسية');
+  navStack.push({
+    label:currentLabel,
+    filter:currentFamilyFilter?JSON.parse(JSON.stringify(currentFamilyFilter)):null,
+    scrollY:window.scrollY
+  });
+  currentFamilyFilter={
+    rootId:rootId,
+    label:'عائلة '+(cur.name)+(cur.familyName?' '+cur.familyName:''),
+    viaPersonId:personId,
+    fromLabel:currentLabel
+  };
+  // Expand path to target person + also expand root to show children
   expanded[rootId]=true;
   let p=sp;while(p){expanded[p.id]=true;p=getParent(p);}
-  // للأشخاص الخارجيين: توسيع الجذر لإظهار الأبناء المرتبطين عبر fatherId
+  // For external persons: also expand to show children (via fatherId)
   if(cur.isExternal){
     let extKids=people.filter(c=>c.fatherId===rootId);
     if(extKids.length)expanded[rootId]=true;
@@ -5950,44 +5553,28 @@ function _closeBackTarget(){
   return false;
 }
 
-function _restoreAndroidBackGuard(){
-  if(!history || !history.go) return;
-  if(window._androidBackGuardRestoring) return;
-  window._androidBackGuardRestoring=true;
-  setTimeout(function(){
-    try{ history.go(1); }catch(e){}
-    setTimeout(function(){ window._androidBackGuardRestoring=false; }, 250);
-  },0);
-}
-
 function _handleAndroidBack(){
   if(_closeBackTarget()) return true;
 
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
+    _pushAndroidHistoryState();
     return true;
   }
 
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
+    _pushAndroidHistoryState();
     return true;
   }
 
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()){
+      _pushAndroidHistoryState();
       return true;
     }
-  }
-
-  if((window.scrollY||0)>0){
-    try{
-      window.scrollTo({top:0,behavior:'smooth'});
-    }catch(e){
-      window.scrollTo(0,0);
-    }
-    return true;
   }
 
   return false;
@@ -5999,18 +5586,13 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
-    if('scrollRestoration' in history) history.scrollRestoration='manual';
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
 
   window.addEventListener('popstate', function(){
-    if(window._androidBackGuardRestoring){
-      window._androidBackGuardRestoring=false;
-      return;
-    }
     if(_handleAndroidBack()){
-      _restoreAndroidBackGuard();
+      _pushAndroidHistoryState();
     }
   });
 }
@@ -7425,78 +7007,443 @@ function renameFamilyDevice(idx, evt){
   openFamilyUpdatesModal();
 }
 
-function openFamilyUpdateDetails(idx){
-  let u=window._familyUpdates&&window._familyUpdates[idx];
-  if(!u||!u.data)return;
-  let incomingMap=(u.summary&&u.summary.incomingMap)||(_familyIncomingMap? _familyIncomingMap(u.data):new Map());
-  let newHtml=(u.summary.newPeople||[]).map(p=>{
-    let father=p.fatherId!=null?incomingMap.get(p.fatherId):null;
-    let fatherName=father?_familyDisplayName(father):'—';
-    return `<div class="sub-item" style="align-items:flex-start">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--text)">${_familyDisplayName(p)}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px">الأب: ${fatherName}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text2);white-space:nowrap">#${p.id}</div>
-    </div>`;
-  }).join('') || '<div class="no-results">لا يوجد أفراد جدد</div>';
 
-  let updatedHtml=(u.summary.updatedPeople||[]).map(x=>{
-    return `<div class="sub-item" style="align-items:flex-start">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--text)">${_familyDisplayName(x.remote)}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.7">${x.desc||'تغيير غير محدد'}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text2);white-space:nowrap">#${x.remote.id}</div>
-    </div>`;
-  }).join('') || '<div class="no-results">لا يوجد تحديثات</div>';
+// ══════════════════════════════════════════════════════════════════════════
+// نظام مراجعة تحديثات العائلة المحسَّن — مراجعة قبل الدمج الانتقائي
+// ══════════════════════════════════════════════════════════════════════════
 
-  let st=u.summary.stats;
-  document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:760px;width:min(760px,96vw)">
-    <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">🔍 تفاصيل التحديث — <span>${u.devName||u.devId}</span><span style="font-size:11px;font-family:monospace;font-weight:400;color:var(--text2)">${u.devName?'('+u.devId+')&nbsp;':''}</span><button onclick="renameFamilyDevice(${idx},event)" style="font-size:11px;background:none;border:1px solid var(--card-border);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--text2)">✏️ تسمية</button></h3>
-    <div class="kin-stats" style="margin-bottom:12px">
-      <div class="kin-stat">👨 ${st.males}</div>
-      <div class="kin-stat">👩 ${st.females}</div>
-      <div class="kin-stat">⚰️ ${st.deceased}</div>
-      <div class="kin-stat">🖼 ${st.photos}</div>
-      <div class="kin-stat">💍 ${st.marriages}</div>
-      <div class="kin-stat">➕ ${u.summary.newPeople.length}</div>
-      <div class="kin-stat">🔄 ${u.summary.updatedPeople.length}</div>
-      <div class="kin-stat">⏭ ${u.summary.unchangedPeople.length}</div>
-    </div>
-    ${u.summary.newPeople.length>0?`
-    <div class="section-title">➕ الأفراد الجدد (${u.summary.newPeople.length})</div>
-    <div class="person-list" style="max-height:33vh;overflow:auto">${newHtml}</div>`:''}
-    ${u.summary.updatedPeople.length>0?`
-    <div class="section-title">🔄 الأفراد المحدَّثون (${u.summary.updatedPeople.length})</div>
-    <div class="person-list" style="max-height:33vh;overflow:auto">${updatedHtml}</div>`:''}
-    ${u.summary.newPeople.length===0&&u.summary.updatedPeople.length===0?`
-    <div style="text-align:center;color:var(--text2);padding:18px 0;font-size:13px">
-      ✅ بيانات هذا الجهاز متطابقة تماماً مع نسختك المحلية — لا يوجد شيء للدمج
-    </div>`:''}
-    <div class="modal-footer">
-      <button class="btn primary" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
-      <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">رجوع</button>
-    </div>
-  </div></div>`;
+const _FIELD_LABELS_AR = {
+  name: 'الاسم',
+  familyName: 'اللقب / العائلة',
+  title: 'اللقب الشرفي',
+  gender: 'الجنس',
+  dob: 'تاريخ الميلاد',
+  dod: 'تاريخ الوفاة',
+  deceased: 'الحالة (متوفى)',
+  parentId: 'الوالد (ID)',
+  fatherId: 'الأب (ID)',
+  motherId: 'الأم (ID)',
+  fatherName: 'اسم الأب',
+  motherName: 'اسم الأم',
+  notes: 'ملاحظات',
+  spouses: 'الأزواج',
+  sortOrder: 'الترتيب',
+  childrenFamilyName: 'لقب الأبناء',
+  isExternal: 'خارجي',
+};
+
+function _fvFormatVal(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'نعم' : 'لا';
+  if (Array.isArray(v)) {
+    if (!v.length) return '—';
+    return v.map(s => (s && s.name) ? s.name : JSON.stringify(s)).join('، ');
+  }
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+  return String(v);
 }
 
-function confirmFamilyMerge(idx){
-  let u=window._familyUpdates&&window._familyUpdates[idx];
-  if(!u||!u.data)return;
-  let st=u.summary||_familySummarizeUpdate(u.data);
-  document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:520px">
-    <h3>⚠️ تأكيد الدمج</h3>
-    <div style="line-height:2;font-size:14px;color:var(--text)">
-      ➕ ${st.newPeople.length} أشخاص جدد سيُضافون<br>
-      🔄 ${st.updatedPeople.length} أشخاص ستُحدَّث بياناتهم<br>
-      ⏭ ${st.unchangedPeople.length} أشخاص موجودون بدون تغيير
+function _fvDiffPerson(local, remote) {
+  const IGNORE = new Set(['id', 'photo', 'isExternal', 'sortOrder', '_meta', 'uploadedAt', 'updatedAt', 'createdAt', '__meta']);
+  const diffs = [];
+  const allKeys = new Set([...(Object.keys(local || {})), ...(Object.keys(remote || {}))]);
+
+  allKeys.forEach(k => {
+    if (IGNORE.has(k)) return;
+
+    if (k === 'spouses') {
+      const la = (local.spouses || []).map(s => s && s.name ? s.name : '').filter(Boolean).sort().join('، ');
+      const ra = (remote.spouses || []).map(s => s && s.name ? s.name : '').filter(Boolean).sort().join('، ');
+      if (la !== ra) diffs.push({ field: k, label: 'الأزواج', old: la || '—', new_: ra || '—' });
+      return;
+    }
+
+    const lv = (local || {})[k];
+    const rv = (remote || {})[k];
+    if (JSON.stringify(lv) !== JSON.stringify(rv)) {
+      diffs.push({
+        field: k,
+        label: _FIELD_LABELS_AR[k] || k,
+        old: _fvFormatVal(lv),
+        new_: _fvFormatVal(rv),
+      });
+    }
+  });
+
+  return diffs;
+}
+
+function _fvBuildDiffTable(diffs) {
+  if (!diffs.length) {
+    return '<div style="font-size:12px;color:var(--color-text-secondary);padding:8px 0">لا توجد فروقات محددة</div>';
+  }
+
+  const rows = diffs.map(d => `
+    <tr>
+      <td style="padding:5px 8px;font-size:12px;color:var(--color-text-secondary);white-space:nowrap;border-bottom:0.5px solid var(--color-border-tertiary)">${d.label}</td>
+      <td style="padding:5px 8px;font-size:12px;color:var(--color-text-danger);border-bottom:0.5px solid var(--color-border-tertiary);max-width:120px;word-break:break-word">
+        <span style="text-decoration:line-through;opacity:0.7">${d.old}</span>
+      </td>
+      <td style="padding:5px 8px;font-size:13px;font-weight:500;color:var(--color-text-success);border-bottom:0.5px solid var(--color-border-tertiary);max-width:140px;word-break:break-word">${d.new_}</td>
+    </tr>`).join('');
+
+  return `<table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr>
+        <th style="padding:4px 8px;font-size:11px;font-weight:500;color:var(--color-text-secondary);text-align:right;border-bottom:0.5px solid var(--color-border-tertiary)">الحقل</th>
+        <th style="padding:4px 8px;font-size:11px;font-weight:500;color:var(--color-text-danger);text-align:right;border-bottom:0.5px solid var(--color-border-tertiary)">قبل</th>
+        <th style="padding:4px 8px;font-size:11px;font-weight:500;color:var(--color-text-success);text-align:right;border-bottom:0.5px solid var(--color-border-tertiary)">بعد</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function _fvSwitchTab(tab, idx) {
+  const newPanel = document.getElementById('fvpanel_new');
+  const updPanel = document.getElementById('fvpanel_upd');
+  const tabNew = document.getElementById('fvtab_new');
+  const tabUpd = document.getElementById('fvtab_upd');
+  if (newPanel) newPanel.style.display = tab === 'new' ? 'block' : 'none';
+  if (updPanel) updPanel.style.display = tab === 'upd' ? 'block' : 'none';
+  if (tabNew) {
+    tabNew.style.color = tab === 'new' ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
+    tabNew.style.borderBottom = tab === 'new' ? '2px solid var(--color-border-info)' : 'none';
+  }
+  if (tabUpd) {
+    tabUpd.style.color = tab === 'upd' ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
+    tabUpd.style.borderBottom = tab === 'upd' ? '2px solid var(--color-border-info)' : 'none';
+  }
+}
+
+function _fvSelectAll(idx, val) {
+  window._fvSelections = window._fvSelections || {};
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  (u.summary.newPeople || []).forEach(p => { sel[`new_${p.id}`] = !!val; });
+  (u.summary.updatedPeople || []).forEach(x => { sel[`upd_${x.remote.id}`] = !!val; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_"]`).forEach(cb => { cb.checked = !!val; });
+  _fvUpdateMergeSummary(idx);
+}
+
+function _fvSelectNewOnly(idx) {
+  window._fvSelections = window._fvSelections || {};
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  (u.summary.newPeople || []).forEach(p => { sel[`new_${p.id}`] = true; });
+  (u.summary.updatedPeople || []).forEach(x => { sel[`upd_${x.remote.id}`] = false; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_new_"]`).forEach(cb => { cb.checked = true; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_upd_"]`).forEach(cb => { cb.checked = false; });
+  _fvUpdateMergeSummary(idx);
+}
+
+function _fvSelectUpdOnly(idx) {
+  window._fvSelections = window._fvSelections || {};
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  (u.summary.newPeople || []).forEach(p => { sel[`new_${p.id}`] = false; });
+  (u.summary.updatedPeople || []).forEach(x => { sel[`upd_${x.remote.id}`] = true; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_new_"]`).forEach(cb => { cb.checked = false; });
+  document.querySelectorAll(`[id^="fvsel_${idx}_upd_"]`).forEach(cb => { cb.checked = true; });
+  _fvUpdateMergeSummary(idx);
+}
+
+function _fvUpdateMergeSummary(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.summary) return;
+
+  const sel = (window._fvSelections && window._fvSelections[idx]) || {};
+  const acceptedNew = (u.summary.newPeople || []).filter(p => sel[`new_${p.id}`]).length;
+  const acceptedUpd = (u.summary.updatedPeople || []).filter(x => sel[`upd_${x.remote.id}`]).length;
+  const el = document.getElementById(`fv_merge_summary_${idx}`);
+  if (!el) return;
+
+  if (acceptedNew + acceptedUpd === 0) {
+    el.innerHTML = '<span style="color:var(--color-text-warning)">⚠️ لم تُحدد أي عناصر للدمج</span>';
+    return;
+  }
+
+  el.innerHTML = `سيُدمج: <strong style="color:var(--color-text-success)">${acceptedNew} جديد</strong> + <strong style="color:var(--color-text-info)">${acceptedUpd} تحديث</strong>`;
+}
+
+function _fvExecuteSelectiveMerge(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+
+  window._fvSelections = window._fvSelections || {};
+  const sel = window._fvSelections[idx] || (window._fvSelections[idx] = {});
+  const summary = u.summary || _familySummarizeUpdate(u.data);
+
+  const newToAdd = (summary.newPeople || []).filter(p => sel[`new_${p.id}`]);
+  const updToApply = (summary.updatedPeople || []).filter(x => sel[`upd_${x.remote.id}`]);
+  const total = newToAdd.length + updToApply.length;
+
+  if (!total) {
+    alert('لم تُحدد أي عناصر للدمج');
+    return;
+  }
+
+  if (!confirm(
+    `تأكيد الدمج الانتقائي:\n` +
+    `➕ ${newToAdd.length} شخص جديد سيُضاف\n` +
+    `🔄 ${updToApply.length} شخص ستُحدَّث بياناته\n\n` +
+    `هل أنت متأكد؟`
+  )) return;
+
+  const incoming = Array.isArray(u.data.people) ? u.data.people : [];
+  const incomingMap = summary.incomingMap || _familyIncomingMap(u.data);
+  const localIds = new Set((people || []).map(p => p && p.id).filter(v => v != null));
+  const selectedIds = new Set();
+  const selectedPeople = [];
+
+  const addSelected = (p) => {
+    if (!p || p.id == null || selectedIds.has(p.id)) return;
+    selectedIds.add(p.id);
+    selectedPeople.push(p);
+  };
+
+  newToAdd.forEach(p => addSelected(p));
+  updToApply.forEach(x => addSelected(x.remote));
+
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const p of selectedPeople.slice()) {
+      const depIds = [];
+      const pushDep = (id) => {
+        if (id == null) return;
+        if (selectedIds.has(id)) return;
+        if (localIds.has(id)) return;
+        depIds.push(id);
+      };
+
+      pushDep(p.parentId);
+      pushDep(p.fatherId);
+      pushDep(p.motherId);
+
+      if (Array.isArray(p.spouses)) {
+        p.spouses.forEach(sp => {
+          if (!sp || typeof sp !== 'object') return;
+          pushDep(sp.personId);
+          pushDep(sp.relativeId);
+          pushDep(sp.spouseId);
+          pushDep(sp.id);
+        });
+      }
+
+      depIds.forEach(id => {
+        const dep = incomingMap.get(id);
+        if (dep) {
+          addSelected(dep);
+          grew = true;
+        }
+      });
+    }
+  }
+
+  const selectedSet = new Set(selectedIds);
+  const partialData = {
+    people: incoming.filter(p => selectedSet.has(p.id)),
+    relPairs: Array.isArray(u.data.relPairs)
+      ? u.data.relPairs.filter(pair => Array.isArray(pair) && selectedSet.has(pair[0]) && selectedSet.has(pair[1]))
+      : [],
+    nextId: u.data.nextId || nextId,
+  };
+
+  const backup = _cloneMergeState();
+  const result = _cloudSmartMerge(partialData, { mode: 'family' });
+  _recordMergeHistory({
+    source: 'family-update-selective',
+    kind: 'selective',
+    devId: u.devId,
+    added: result.added || 0,
+    updated: result.updated || 0,
+    note: `دمج انتقائي: ${newToAdd.length} جديد + ${updToApply.length} تحديث`,
+    mergeMode: 'family',
+  }, backup);
+
+  try { migrateExternalSpouses(); } catch (e) {}
+  try { _invalidateAll(); } catch (e) {}
+  try { saveData(); } catch (e) {}
+  try { renderAll(); } catch (e) {}
+  try { updateMyPersonBtn(); } catch (e) {}
+
+  closeModal();
+  _showCloudToast(`✅ ${u.devId}: ➕${result.added || 0} جديد · 🔄${result.updated || 0} تحديث`, 'success', 3500);
+}
+
+function _fvMergeAll(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+  const res = _applyFamilyMergeWithHistory(u.data, {
+    devId: u.devId,
+    kind: 'single',
+    note: 'دمج كامل نسخة تحديث عائلة',
+    mergeMode: 'family',
+  });
+  _showCloudToast(`✅ ${u.devId}: +${res.added || 0} جديد، تحديث ${res.updated || 0}`, 'success', 3000);
+  closeModal();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// openFamilyUpdateDetails — عرض التفاصيل مع المقارنة والدمج الانتقائي
+// ══════════════════════════════════════════════════════════════════════════
+function openFamilyUpdateDetails(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+
+  const summary = u.summary || _familySummarizeUpdate(u.data);
+  const incomingMap = summary.incomingMap || _familyIncomingMap(u.data);
+
+  window._fvSelections = window._fvSelections || {};
+  window._fvSelections[idx] = window._fvSelections[idx] || {};
+
+  const newPeople = summary.newPeople || [];
+  const updatedPeople = summary.updatedPeople || [];
+  const unchangedCount = (summary.unchangedPeople || []).length;
+
+  newPeople.forEach(p => {
+    const key = `new_${p.id}`;
+    if (window._fvSelections[idx][key] === undefined) window._fvSelections[idx][key] = true;
+  });
+  updatedPeople.forEach(x => {
+    const key = `upd_${x.remote.id}`;
+    if (window._fvSelections[idx][key] === undefined) window._fvSelections[idx][key] = true;
+  });
+
+  const newHtml = newPeople.length ? newPeople.map((p, i) => {
+    const father = p.fatherId != null ? incomingMap.get(p.fatherId) : null;
+    const mother = p.motherId != null ? incomingMap.get(p.motherId) : null;
+    const fatherName = father ? _familyDisplayName(father) : '—';
+    const motherName = mother ? _familyDisplayName(mother) : '—';
+    const selKey = `new_${p.id}`;
+
+    return `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:6px;background:var(--color-background-success)">
+        <input type="checkbox" id="fvsel_${idx}_new_${i}" ${window._fvSelections[idx][selKey] ? 'checked' : ''}
+          onchange="window._fvSelections[${idx}]['new_${p.id}']=this.checked;_fvUpdateMergeSummary(${idx})"
+          style="margin-top:2px;accent-color:#3b82f6;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${_familyDisplayName(p)}</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;line-height:1.7">الأب: ${fatherName} · الأم: ${motherName} · ${p.gender === 'male' ? 'ذكر' : 'أنثى'}${p.deceased ? ' · متوفى' : ''}</div>
+        </div>
+        <span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success);white-space:nowrap">جديد</span>
+      </div>`;
+  }).join('') : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا يوجد أفراد جدد</div>';
+
+  const updHtml = updatedPeople.length ? updatedPeople.map((x, i) => {
+    const diffs = _fvDiffPerson(x.local, x.remote);
+    const selKey = `upd_${x.remote.id}`;
+    const riskLevel = diffs.some(d => ['name', 'parentId', 'fatherId', 'motherId', 'gender'].includes(d.field)) ? 'high' : 'low';
+    const riskBadge = riskLevel === 'high'
+      ? '<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-warning);white-space:nowrap">راجع بعناية</span>'
+      : '<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);white-space:nowrap">تحديث عادي</span>';
+
+    return `
+      <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--color-background-secondary)">
+          <input type="checkbox" id="fvsel_${idx}_upd_${i}" ${window._fvSelections[idx][selKey] ? 'checked' : ''}
+            onchange="window._fvSelections[${idx}]['upd_${x.remote.id}']=this.checked;_fvUpdateMergeSummary(${idx})"
+            style="margin-top:1px;accent-color:#3b82f6;flex-shrink:0">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${_familyDisplayName(x.remote)}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">${diffs.length} حقل متغير</div>
+          </div>
+          ${riskBadge}
+        </div>
+        <div style="padding:8px 12px">
+          ${_fvBuildDiffTable(diffs)}
+        </div>
+      </div>`;
+  }).join('') : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا يوجد تحديثات على أفراد موجودين</div>';
+
+  const totalNew = newPeople.length;
+  const totalUpd = updatedPeople.length;
+
+  document.getElementById('modalContainer').innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:760px;width:min(760px,96vw)">
+    <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+      🔍 مراجعة تفاصيل التحديث
+      <span style="font-size:12px;font-weight:400;color:var(--color-text-secondary);font-family:monospace">${u.devName || u.devId}</span>
+    </h3>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+      <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success)">➕ ${totalNew} جديد</span>
+      <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info)">🔄 ${totalUpd} تحديث</span>
+      <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)">⏭ ${unchangedCount} بدون تغيير</span>
     </div>
-    <div class="modal-footer">
-      <button class="btn primary" onclick="_familyMergeOne(${idx})">✔ تأكيد الدمج</button>
+
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_fvSelectAll(${idx},true)">✅ قبول الكل</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_fvSelectAll(${idx},false)">❌ رفض الكل</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="_fvSelectNewOnly(${idx})">➕ الجدد فقط (آمن)</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px;background:#dbeafe;border-color:#3b82f6;color:#1e40af" onclick="_fvSelectUpdOnly(${idx})">🔄 التحديثات فقط</button>
+    </div>
+
+    <div style="display:flex;gap:0;margin-bottom:10px;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <button id="fvtab_new" onclick="_fvSwitchTab('new',${idx})"
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--color-text-info);border-bottom:2px solid currentColor;cursor:pointer">
+        ➕ جدد (${totalNew})
+      </button>
+      <button id="fvtab_upd" onclick="_fvSwitchTab('upd',${idx})"
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--color-text-secondary);cursor:pointer">
+        🔄 تحديثات (${totalUpd})
+      </button>
+    </div>
+
+    <div id="fvpanel_new" style="max-height:44vh;overflow-y:auto">${newHtml}</div>
+    <div id="fvpanel_upd" style="display:none;max-height:44vh;overflow-y:auto">${updHtml}</div>
+
+    <div id="fv_merge_summary_${idx}" style="margin-top:10px;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);font-size:13px;color:var(--color-text-primary)">
+      سيُدمج: <strong>${totalNew}</strong> جديد + <strong>${totalUpd}</strong> تحديث
+    </div>
+
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px;margin-top:10px">
+      <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">◀ رجوع</button>
+      <button class="btn primary" style="background:#059669;border-color:#059669" onclick="_fvExecuteSelectiveMerge(${idx})">✔ دمج المحدَّد</button>
+    </div>
+  </div>
+  </div>`;
+
+  _fvSwitchTab('new', idx);
+  _fvUpdateMergeSummary(idx);
+}
+
+function confirmFamilyMerge(idx) {
+  const u = window._familyUpdates && window._familyUpdates[idx];
+  if (!u || !u.data) return;
+  const st = u.summary || _familySummarizeUpdate(u.data);
+  const hasUpdates = (st.updatedPeople || []).length > 0;
+
+  const warningHtml = hasUpdates ? `
+    <div style="padding:10px 12px;background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-warning);margin-bottom:12px;line-height:1.7">
+      ⚠️ يوجد <strong>${st.updatedPeople.length}</strong> شخص محدَّث — يُنصح بمراجعة التفاصيل قبل الدمج لضمان دقة البيانات.
+    </div>` : '';
+
+  document.getElementById('modalContainer').innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:480px">
+    <h3 style="margin-bottom:4px">تأكيد الدمج</h3>
+    <div style="color:var(--color-text-secondary);font-size:12px;margin-bottom:12px">الجهاز: ${u.devName || u.devId}</div>
+    ${warningHtml}
+    <div style="line-height:2;font-size:14px;color:var(--color-text-primary);margin-bottom:12px">
+      ➕ <strong style="color:var(--color-text-success)">${st.newPeople.length}</strong> أشخاص جدد سيُضافون<br>
+      🔄 <strong style="color:var(--color-text-info)">${st.updatedPeople.length}</strong> أشخاص ستُحدَّث بياناتهم<br>
+      ⏭ <strong>${st.unchangedPeople.length}</strong> أشخاص موجودون بدون تغيير
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">إلغاء</button>
+      ${hasUpdates ? `<button class="btn" style="background:#dbeafe;border-color:#3b82f6;color:#1e40af" onclick="closeModal();openFamilyUpdateDetails(${idx})">🔍 مراجعة التفاصيل أولاً</button>` : ''}
+      <button class="btn primary" onclick="_fvMergeAll(${idx})">✔ دمج كل شيء</button>
     </div>
-  </div></div>`;
+  </div>
+  </div>`;
 }
 
 function confirmFamilyMergeAll(){
@@ -8784,7 +8731,6 @@ function _lsLoad(){
 }
 
 function saveData(){
-  normalizeAllPersonDates();
   // ── الصور تُحفظ في مخزن IDB منفصل — لا تُضمَّن في payload الرئيسي ──
   // هذا يحل مشكلة: localStorage يفشل بصمت بسبب حجم الصور (5MB)
   // وIDB الرئيسي يبقى خفيفاً قابلاً للقراءة السريعة
@@ -9053,7 +8999,6 @@ deletePerson=function(id){
     var idbData=await _idbLoad();
     if(idbData&&idbData.people&&idbData.people.length){
       people=idbData.people;nextId=idbData.nextId||1;relPairs=idbData.relPairs||[];
-      normalizeAllPersonDates();
       people.forEach(function(p){expanded[p.id]=false;});
       migrateExternalSpouses();
       _markDeviceInit();
@@ -9070,7 +9015,6 @@ deletePerson=function(id){
       var lsData=_lsLoad();
       if(lsData&&lsData.people&&lsData.people.length){
         people=lsData.people;nextId=lsData.nextId||1;relPairs=lsData.relPairs||[];
-        normalizeAllPersonDates();
         people.forEach(function(p){expanded[p.id]=false;});
         migrateExternalSpouses();
         _markDeviceInit();
@@ -9097,7 +9041,6 @@ deletePerson=function(id){
           if(d.people&&d.people.length){
             people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
-            normalizeAllPersonDates();
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
@@ -9260,101 +9203,56 @@ function dismissInstallBanner(){
 }
 
 // ══════════════════════════════════════════════════════════
-
+//  زر "للأعلى" العائم + زر إضافة سريع (للجوال)
+// ══════════════════════════════════════════════════════════
 (function(){
-  if(window._mobFabControllerInitialized) return;
-  window._mobFabControllerInitialized = true;
-
   let fab=document.createElement('div');
   fab.id='mob-fab';
   fab.innerHTML=`
     <style>
-    body:not(.mobile-mode) #mob-fab { display:none!important; }
-    body.mobile-mode #mob-fab {
+    #mob-fab{
       position:fixed;
       bottom:24px;
       left:16px;
-      display:flex;
+      display:none;
       flex-direction:column;
       gap:10px;
       z-index:400;
       opacity:0;
       pointer-events:none;
-      transition:opacity .2s ease;
+      transition:opacity .25s;
     }
-    body.mobile-mode #mob-fab.visible { opacity:1;pointer-events:auto; }
-    .mob-fab-btn {
+    body.mobile-mode #mob-fab{display:flex;}
+    #mob-fab.visible{opacity:1;pointer-events:auto;}
+    .mob-fab-btn{
       width:46px;height:46px;border-radius:50%;
       display:flex;align-items:center;justify-content:center;
       font-size:20px;cursor:pointer;
       box-shadow:0 4px 16px rgba(0,0,0,.2);
       border:none;transition:transform .15s,box-shadow .15s;
     }
-    .mob-fab-btn:active { transform:scale(.92); }
-    .mob-fab-top { background:#fff;color:#374151;border:1px solid #e5e7eb; }
-    [data-theme="dark"] .mob-fab-top { background:#1f2937;color:#f9fafb;border-color:#374151; }
-    .mob-fab-search { background:#1e40af;color:#fff; font-size:18px; }
+    .mob-fab-btn:active{transform:scale(.92);}
+    .mob-fab-top{background:#fff;color:#374151;border:1px solid #e5e7eb;}
+    [data-theme="dark"] .mob-fab-top{background:#1f2937;color:#f9fafb;border-color:#374151;}
+    .mob-fab-search{background:#1e40af;color:#fff;font-size:18px;}
     </style>
     <button id="mob-fab-search-btn" class="mob-fab-btn mob-fab-search" onclick="openSearchPanel()" title="بحث سريع">🔍</button>
     <button class="mob-fab-btn mob-fab-top" onclick="window._mobFabGoTopInstant()" title="للأعلى">↑</button>
   `;
   document.body.appendChild(fab);
 
-
   const TOP_THRESHOLD = 88;
-  const UP_THRESHOLD = 12;
-  const DOWN_THRESHOLD = 4;
-  const BOUNCE_GRACE_MS = 180;
-  let lastY = window.scrollY || 0;
-  let syncPending = false;
-  let activeTouch = false;
-  let touchDirection = null;
-  let ignoreDownUntil = 0;
+  const UP_THRESHOLD = 14;
+  let lastY = window.scrollY || document.documentElement.scrollTop || 0;
 
   function isMobileMode(){
     return document.body.classList.contains('mobile-mode');
   }
 
-  function isVisibleElement(el){
-    if(!el) return false;
-    try{
-      const st = window.getComputedStyle(el);
-      if(!st || st.display==='none' || st.visibility==='hidden' || st.opacity==='0') return false;
-    }catch(e){}
-    if(el.getClientRects && el.getClientRects().length===0) return false;
-    return true;
-  }
-
-  function hasVisibleBlockingUI(){
-    const modalContainer = document.getElementById('modalContainer');
-    if(modalContainer){
-      if(modalContainer.children && modalContainer.children.length>0) return true;
-      if((modalContainer.innerHTML||'').trim()) return true;
-    }
-
-    const selectors = [
-      '#mss-sheet.open',
-      '#mob-action-sheet.open',
-      '#mss-overlay',
-      '#mob-action-sheet-overlay',
-      '.modal-overlay',
-      '.modal',
-      '[role="dialog"]',
-      '[aria-modal="true"]',
-      '.popup',
-      '.dialog',
-      '[data-popup]',
-      '[data-dialog]'
-    ];
-
-    for(const selector of selectors){
-      const nodes = document.querySelectorAll(selector);
-      for(const node of nodes){
-        if(isVisibleElement(node)) return true;
-      }
-    }
-
-    return false;
+  function hasActiveOverlay(){
+    return !!document.querySelector(
+      '.modal-overlay,[role="dialog"],dialog[open],.modal-window,.popup,.popup-open,.dialog,.swal2-container,.tingle-modal--visible'
+    );
   }
 
   function hideFab(){
@@ -9362,133 +9260,66 @@ function dismissInstallBanner(){
   }
 
   function showFab(){
-    if(isMobileMode() && !hasVisibleBlockingUI()){
-      fab.classList.add('visible');
-    }
-  }
-
-  function syncFabState(){
-    const y = window.scrollY || 0;
-    const now = Date.now();
-
-    if(!isMobileMode() || hasVisibleBlockingUI()){
-      hideFab();
-      lastY = y;
-      return;
-    }
-
-    if(y <= TOP_THRESHOLD){
-      hideFab();
-      lastY = y;
-      ignoreDownUntil = 0;
-      return;
-    }
-
-    const dy = y - lastY;
-
-    if(activeTouch){
-      if(touchDirection === null && Math.abs(dy) >= 2){
-        touchDirection = dy < 0 ? 'up' : 'down';
-      }
-
-      if(touchDirection === 'up'){
-        if(dy < -UP_THRESHOLD){
-          showFab();
-        }
-      }else if(touchDirection === 'down'){
-        if(dy > DOWN_THRESHOLD){
-          hideFab();
-        }
-      }else{
-        if(dy < -UP_THRESHOLD){
-          showFab();
-        }else if(dy > DOWN_THRESHOLD){
-          hideFab();
-        }
-      }
-    }else{
-      if(dy < -UP_THRESHOLD){
-        showFab();
-        ignoreDownUntil = now + BOUNCE_GRACE_MS;
-      }else if(dy > DOWN_THRESHOLD){
-        if(now >= ignoreDownUntil){
-          hideFab();
-        }
-      }
-    }
-
-    lastY = y;
-  }
-
-  function requestSync(){
-    if(syncPending) return;
-    syncPending = true;
-    requestAnimationFrame(function(){
-      syncPending = false;
-      syncFabState();
-    });
+    if(!isMobileMode()) return;
+    if(hasActiveOverlay()) return;
+    if((window.scrollY || document.documentElement.scrollTop || 0) < TOP_THRESHOLD) return;
+    fab.classList.add('visible');
   }
 
   window._mobFabGoTopInstant = function(){
-    try{ window.scrollTo(0,0); }catch(e){ window.scrollTo({top:0,behavior:'auto'}); }
-    try{ document.documentElement.scrollTop = 0; }catch(e){}
-    try{ document.body.scrollTop = 0; }catch(e){}
-    lastY = 0;
-    ignoreDownUntil = 0;
+    try{ window.scrollTo({top:0,behavior:'instant'}); }
+    catch(e){ window.scrollTo(0,0); }
+
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     hideFab();
   };
 
-  window._updateFabMobileMode = requestSync;
-
-  window.addEventListener('scroll', syncFabState, { passive:true });
-  document.addEventListener('touchstart', function(e){
-    if(!isMobileMode()) return;
-    activeTouch = true;
-    touchDirection = null;
-    lastY = window.scrollY || 0;
-  }, { passive:true });
-
-  document.addEventListener('touchmove', function(){
-    if(!activeTouch || !isMobileMode()) return;
-    syncFabState();
-  }, { passive:true });
-
-  document.addEventListener('touchend', function(){
-    if(!activeTouch) return;
-    activeTouch = false;
-    if(touchDirection === 'up'){
-      ignoreDownUntil = Date.now() + BOUNCE_GRACE_MS;
-    }else{
-      ignoreDownUntil = 0;
+  function updateFabVisibility(){
+    if(!isMobileMode() || hasActiveOverlay()){
+      hideFab();
+      lastY = window.scrollY || document.documentElement.scrollTop || 0;
+      return;
     }
-    touchDirection = null;
+
+    const currentY = window.scrollY || document.documentElement.scrollTop || 0;
+    const delta = currentY - lastY;
+
+    if(currentY < TOP_THRESHOLD){
+      hideFab();
+      lastY = currentY;
+      return;
+    }
+
+    if(delta < -UP_THRESHOLD){
+      showFab();
+    }else if(delta > UP_THRESHOLD){
+      hideFab();
+    }
+
+    lastY = currentY;
+  }
+
+  window.addEventListener('scroll', updateFabVisibility, { passive:true });
+
+  document.addEventListener('touchstart', function(){
+    lastY = window.scrollY || document.documentElement.scrollTop || 0;
   }, { passive:true });
 
-  document.addEventListener('touchcancel', function(){
-    activeTouch = false;
-    touchDirection = null;
-    ignoreDownUntil = 0;
+  document.addEventListener('click', function(){
+    if(hasActiveOverlay()){
+      hideFab();
+    }
   }, { passive:true });
 
-  window.addEventListener('resize', requestSync, { passive:true });
-  document.addEventListener('click', requestSync, true);
+  window._updateFabMobileMode = function(){
+    lastY = window.scrollY || document.documentElement.scrollTop || 0;
+    updateFabVisibility();
+  };
 
-  try{
-    const observer = new MutationObserver(requestSync);
-    observer.observe(document.body, {
-      subtree:true,
-      childList:true,
-      attributes:true,
-      attributeFilter:['class','style','hidden','aria-hidden','open']
-    });
-  }catch(e){}
-
-  requestSync();
-
-
-  requestSync();
+  hideFab();
+  updateFabVisibility();
 })();
-
 
 (function(){
   // أزرار المكتب الثابتة — تظهر طوال الوقت على سطح المكتب فقط
