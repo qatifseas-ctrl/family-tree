@@ -5554,38 +5554,41 @@ function _closeBackTarget(){
 }
 
 function _handleAndroidBack(){
-  if(_closeBackTarget()) return true;
+  // 1) إغلاق أي Modal مفتوح
+  if(_closeBackTarget()){
+    return 'handled';
+  }
 
+  // 2) الرجوع من أي تبويب إلى الشجرة
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
-    _pushAndroidHistoryState();
-    return true;
+    return 'handled';
   }
 
+  // 3) الرجوع داخل التنقل العميق/العائلة
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
-    _pushAndroidHistoryState();
-    return true;
+    return 'handled';
   }
 
+  // 4) استرجاع snapshot سابق للشجرة
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()){
-      _pushAndroidHistoryState();
-      return true;
+      return 'handled';
     }
   }
 
-  // داخل الشجرة الرئيسية: اصعد للأعلى قبل السماح بالخروج
-  if((window.scrollY||document.documentElement.scrollTop||0)>40){
+  // 5) في الشجرة الرئيسية → اصعد للأعلى أولاً
+  let topPos=window.scrollY||document.documentElement.scrollTop||document.body.scrollTop||0;
+  if(topPos>40){
     window.scrollTo({top:0,behavior:'smooth'});
-    _pushAndroidHistoryState();
-    return true;
+    return 'handled';
   }
 
-  // أعلى الصفحة الرئيسية فقط → السماح بالخروج الطبيعي
-  return false;
+  // 6) أعلى الصفحة الرئيسية فقط → السماح بالخروج الطبيعي
+  return 'exit';
 }
 
 function _initAndroidBackNavigation(){
@@ -5594,13 +5597,21 @@ function _initAndroidBackNavigation(){
   _androidBackReady=true;
 
   try{
+    if('scrollRestoration' in history){
+      history.scrollRestoration='manual';
+    }
     history.replaceState({_ftBackGuard:true}, '', location.href);
     history.pushState({_ftBackGuard:true}, '', location.href);
   }catch(e){}
 
   window.addEventListener('popstate', function(){
-    if(_handleAndroidBack()){
-      _pushAndroidHistoryState();
+    let result=_handleAndroidBack();
+
+    // أي معالجة داخلية → إعادة زر الحماية فوراً
+    if(result!=='exit'){
+      setTimeout(function(){
+        _pushAndroidHistoryState();
+      },0);
     }
   });
 }
