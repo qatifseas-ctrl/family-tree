@@ -5577,6 +5577,14 @@ function _handleAndroidBack(){
     }
   }
 
+  // داخل الشجرة الرئيسية: اصعد للأعلى قبل السماح بالخروج
+  if((window.scrollY||document.documentElement.scrollTop||0)>40){
+    window.scrollTo({top:0,behavior:'smooth'});
+    _pushAndroidHistoryState();
+    return true;
+  }
+
+  // أعلى الصفحة الرئيسية فقط → السماح بالخروج الطبيعي
   return false;
 }
 
