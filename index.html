@@ -3659,7 +3659,6 @@ function showRelInfo(id,pairNum){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
-  _androidBackGuardModalOpen();
 }
 function navigateToPerson(id){
   _pushAndroidTreeSnapshot();
@@ -4258,7 +4257,6 @@ function showPersonDetail(id){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
-  _androidBackGuardModalOpen();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4384,7 +4382,6 @@ function openKinPopup(targetId){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
-  _androidBackGuardModalOpen();
 }
 
 function searchPersonsAdvanced(query){
@@ -4572,7 +4569,6 @@ function showEditModal(editId,parentId){
     <div class="modal-footer"><button class="btn" onclick="closeModal()">إلغاء</button><button class="btn primary" onclick="saveModal(${editId||'null'},${parentId||'null'})">حفظ</button></div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
-  _androidBackGuardModalOpen();
   // تهيئة حقل اللقب
   (function(){
     let existingTitle=p?p.title||'':'';
@@ -5465,12 +5461,6 @@ function navigateToBreadcrumb(idx){
 // ══════════════════════════════════════════════════════════
 function closeModal(){document.getElementById('modalContainer').innerHTML='';tempPhoto=null;}
 
-// Android back guard: keep one extra internal step whenever a modal is opened
-function _androidBackGuardModalOpen(){
-  if(!_androidBackReady) return;
-  _pushAndroidHistoryState();
-}
-
 // Android / Browser Back Button — smart internal navigation
 let _androidBackReady=false;
 window._ftTreeBackStack=window._ftTreeBackStack||[];
@@ -5587,6 +5577,14 @@ function _handleAndroidBack(){
     }
   }
 
+  // داخل الشجرة الرئيسية: اصعد للأعلى قبل السماح بالخروج
+  if((window.scrollY||document.documentElement.scrollTop||0)>40){
+    window.scrollTo({top:0,behavior:'smooth'});
+    _pushAndroidHistoryState();
+    return true;
+  }
+
+  // أعلى الصفحة الرئيسية فقط → السماح بالخروج الطبيعي
   return false;
 }
 
@@ -5643,7 +5641,6 @@ function openMyPersonPicker(){
     <div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button></div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
-  _androidBackGuardModalOpen();
 }
 
 function filterMyPicker(q){
@@ -5807,7 +5804,6 @@ function renderReorderModal(parent){
     </div>
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
-  _androidBackGuardModalOpen();
 }
 
 function moveChild(idx,dir){
