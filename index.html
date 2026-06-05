@@ -5598,12 +5598,6 @@ function _handleAndroidBack(){
     }
   }
 
-  if((window.scrollY||document.documentElement.scrollTop||0)>40){
-    window.scrollTo({top:0,behavior:'smooth'});
-    _pushAndroidHistoryState();
-    return true;
-  }
-
   return false;
 }
 
@@ -5622,6 +5616,30 @@ function _initAndroidBackNavigation(){
       _pushAndroidHistoryState();
     }
   });
+
+  // ── Modal back-guard: أضف طبقة history عند فتح أي Modal ──
+  // نعترض innerHTML على modalContainer بحيث يُشغَّل pushState تلقائياً
+  // عند أي إسناد غير فارغ، دون لمس بقية منطق الرجوع.
+  try{
+    var _mc = document.getElementById('modalContainer');
+    if(_mc){
+      var _mcProto = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+      var _mcSetter = _mcProto && _mcProto.set;
+      if(_mcSetter){
+        Object.defineProperty(_mc, 'innerHTML', {
+          get: function(){ return _mcProto.get.call(this); },
+          set: function(val){
+            _mcSetter.call(this, val);
+            // فقط عند الفتح (قيمة غير فارغة) نضيف طبقة رجوع
+            if(val && val.trim() !== ''){
+              _pushAndroidHistoryState();
+            }
+          },
+          configurable: true
+        });
+      }
+    }
+  }catch(e){}
 }
 
 // ── My Person (منظوري أنا) ──
