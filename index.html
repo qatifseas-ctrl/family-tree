@@ -4259,6 +4259,10 @@ function showPersonDetail(id){
   </div></div>`;
   document.getElementById('modalContainer').innerHTML=modal;
   _androidBackGuardModalOpen();
+  // إخفاء الأزرار العائمة فوراً عند فتح نافذة البيانات
+  if(window._updateFabMobileMode){
+    setTimeout(()=>window._updateFabMobileMode(),50);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5463,7 +5467,14 @@ function navigateToBreadcrumb(idx){
   setTimeout(()=>window.scrollTo({top:frame.scrollY||0,behavior:'smooth'}),100);
 }
 // ══════════════════════════════════════════════════════════
-function closeModal(){document.getElementById('modalContainer').innerHTML='';tempPhoto=null;}
+function closeModal(){
+  document.getElementById('modalContainer').innerHTML='';
+  tempPhoto=null;
+  // إعادة تقييم الأزرار العائمة عند إغلاق النافذة
+  if(window._updateFabMobileMode){
+    setTimeout(()=>window._updateFabMobileMode(),50);
+  }
+}
 
 // Android back guard: keep one extra internal step whenever a modal is opened
 function _androidBackGuardModalOpen(){
@@ -9262,9 +9273,18 @@ function dismissInstallBanner(){
   }
 
   function hasActiveOverlay(){
-    return !!document.querySelector(
+    // فحص جميع أنواع الـ overlays والـ modals
+    if(document.querySelector(
       '.modal-overlay,[role="dialog"],dialog[open],.modal-window,.popup,.popup-open,.dialog,.swal2-container,.tingle-modal--visible'
-    );
+    )){
+      return true;
+    }
+    // فحص إضافي: هل يوجد محتوى في modalContainer (لنوافذ البيانات والـ modals الأخرى)
+    let modalContainer = document.getElementById('modalContainer');
+    if(modalContainer && modalContainer.innerHTML && modalContainer.innerHTML.trim()){
+      return true;
+    }
+    return false;
   }
 
   function hideFab(){
