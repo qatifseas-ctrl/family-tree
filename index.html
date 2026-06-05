@@ -5581,74 +5581,87 @@ function _closeBackTarget(){
   return false;
 }
 
-// طابع آخر ضغطة "رجوع" على الجذر — للسماح بالخروج بضغطتين متتاليتين فقط
+// ══════════════════════════════════════════════════════════════════════════
+//  Android Back Button — النهج الموثوق: "ادفع أولاً، ثم عالج"
+//  المبدأ: popstate handler يُضيف guard state دائماً قبل أي معالجة،
+//  لذا لا توجد حالة "صفر طبقات" تؤدي للخروج العرضي أبداً.
+//  الخروج المتعمد فقط عبر window.close() بعد double-back في الجذر.
+// ══════════════════════════════════════════════════════════════════════════
+
 let _lastBackAtRootTime = 0;
 
-/*
- * قاعدة ثابتة: هذه الدالة لا تستدعي _pushAndroidHistoryState أبداً بداخلها.
- * المسؤول الوحيد عن الـ push هو popstate handler فقط — مرة واحدة بعد كل ضغطة.
- * هذا يمنع "double-push" الذي كان يُفقد طبقات الـ guard وسبّب الخروج المبكر.
- */
+function _showBackToast(msg){
+  var old=document.getElementById('_ftExitToast');
+  if(old) old.remove();
+  var t=document.createElement('div');
+  t.id='_ftExitToast';
+  t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
+    +'background:#1f2937;color:#f9fafb;padding:10px 22px;border-radius:20px;'
+    +'font-size:13px;z-index:99999;pointer-events:none;opacity:1;transition:opacity 0.4s;';
+  document.body.appendChild(t);
+  setTimeout(function(){
+    t.style.opacity='0';
+    setTimeout(function(){if(t.parentNode)t.remove();},400);
+  },1800);
+}
+
 function _handleAndroidBack(){
   // 1. أغلق أي طبقة مفتوحة (modal / sheet / بحث)
-  if(_closeBackTarget()) return true;
+  if(_closeBackTarget()){
+    _lastBackAtRootTime = 0; // فتح/إغلاق overlay يُلغي طابع الخروج
+    return;
+  }
 
-  // 2. إذا كان المستخدم scrolled → ارجع للأعلى أولاً
-  if(window.scrollY > 120){
+  // 2. Scroll to top إذا كان المستخدم scrolled بعيداً
+  var scrollPos = window.scrollY || window.pageYOffset ||
+                  document.documentElement.scrollTop || 0;
+  if(scrollPos > 120){
     window.scrollTo({top:0, behavior:'smooth'});
-    return true;
+    return;
   }
 
   // 3. ارجع للتاب الرئيسي إن كنا في تاب آخر
-  if(_getActiveTabName()!=='tree'){
-    let treeTab=_getTabElementByName('tree');
-    if(treeTab) switchTab('tree',treeTab);
-    return true;
+  if(_getActiveTabName() !== 'tree'){
+    var treeTab = _getTabElementByName('tree');
+    if(treeTab) switchTab('tree', treeTab);
+    return;
   }
 
   // 4. ارجع خطوة تنقل (navStack / familyFilter)
-  if(navStack.length>0 || currentFamilyFilter){
-    if(navStack.length>0) navigateBack();
+  if(navStack.length > 0 || currentFamilyFilter){
+    if(navStack.length > 0) navigateBack();
     else navigateHome();
-    return true;
+    return;
   }
 
-  // 5. استعد snapshot محفوظ
+  // 5. استعد snapshot محفوظ من التنقل العميق
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
-    if(_restoreAndroidTreeSnapshot()) return true;
+    if(_restoreAndroidTreeSnapshot()) return;
   }
 
-  // 6. نحن في أعلى الشجرة الرئيسية — اخرج فقط بضغطتين متتاليتين خلال 2 ثانية
+  // 6. نحن في أعلى الشجرة — double-back للخروج المتعمد
   var now = Date.now();
   if(now - _lastBackAtRootTime < 2000){
-    // الضغطة الثانية → لا نُعيد push → يخرج المتصفح طبيعياً
-    return false;
-  }
-  _lastBackAtRootTime = now;
-  // الضغطة الأولى → أظهر تلميح وابقَ (الـ push يحدث في popstate handler فقط)
-  (function(){
-    var old=document.getElementById('_ftExitToast');
-    if(old) old.remove();
-    var t=document.createElement('div');
-    t.id='_ftExitToast';
-    t.textContent='اضغط مرة أخرى للخروج';
-    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
-      +'background:#1f2937;color:#f9fafb;padding:10px 22px;border-radius:20px;'
-      +'font-size:13px;z-index:99999;pointer-events:none;opacity:1;'
-      +'transition:opacity 0.4s;';
-    document.body.appendChild(t);
+    // ضغطة ثانية خلال ثانيتين → حاول إغلاق التطبيق
+    _lastBackAtRootTime = 0;
+    try { window.close(); } catch(e){}
+    // احتياطي: إذا لم ينجح window.close() (PWA من الشاشة الرئيسية)
+    // أبلغ المستخدم باستخدام زر الرئيسية
     setTimeout(function(){
-      t.style.opacity='0';
-      setTimeout(function(){if(t.parentNode)t.remove();},400);
-    },1800);
-  })();
-  return true;
+      _showBackToast('استخدم زر الرئيسية للخروج');
+    }, 100);
+    return;
+  }
+  // الضغطة الأولى → أظهر تلميح
+  _lastBackAtRootTime = now;
+  _showBackToast('اضغط مرة أخرى للخروج');
 }
 
 function _initAndroidBackNavigation(){
   if(_androidBackReady) return;
   if(!history || !history.pushState) return;
-  _androidBackReady=true;
+  _androidBackReady = true;
 
   try{
     history.replaceState({_ftBackGuard:true}, '', location.href);
@@ -5656,29 +5669,32 @@ function _initAndroidBackNavigation(){
   }catch(e){}
 
   window.addEventListener('popstate', function(){
-    if(_handleAndroidBack()){
-      _pushAndroidHistoryState();
-    }
+    // ── النهج الموثوق: ادفع guard state أولاً دائماً ──
+    // هذا يضمن وجود طبقة واحدة على الأقل فوق الجذر في كل الأوقات،
+    // بغض النظر عن أي حالة أخرى. لا يوجد "عد طبقات" أو return false.
+    _pushAndroidHistoryState();
+    // ثم عالج الضغطة
+    _handleAndroidBack();
   });
 
-  // ── Modal back-guard: أضف طبقة history عند فتح أي Modal ──
-  // نعترض innerHTML على modalContainer بحيث يُشغَّل pushState تلقائياً
-  // عند أي إسناد غير فارغ، دون لمس بقية منطق الرجوع.
+  // ── Modal back-guard: اعترض innerHTML ──
   try{
     var _mc = document.getElementById('modalContainer');
     if(_mc){
-      var _mcProto = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-      var _mcSetter = _mcProto && _mcProto.set;
-      if(_mcSetter){
+      // ابحث عن descriptor في سلسلة الـ prototype
+      var desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML') ||
+                 Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerHTML');
+      if(desc && desc.set){
+        var _origSet = desc.set;
+        var _origGet = desc.get;
         Object.defineProperty(_mc, 'innerHTML', {
-          get: function(){ return _mcProto.get.call(this); },
+          get: function(){ return _origGet.call(this); },
           set: function(val){
-            _mcSetter.call(this, val);
+            _origSet.call(this, val);
             if(val && val.trim() !== ''){
-              // يمرّر عبر _androidBackGuardModalOpen ليضمن push واحد فقط
               _androidBackGuardModalOpen();
             } else {
-              _modalGuardActive = false;   // مزامنة الـ flag عند الإغلاق عبر setter
+              _modalGuardActive = false;
             }
           },
           configurable: true
