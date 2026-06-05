@@ -5476,10 +5476,10 @@ function closeModal(){
   }
 }
 
-// Android back guard: keep one extra internal step whenever a modal is opened
+// no-op: the innerHTML setter on modalContainer now handles the push automatically.
+// Keeping the function stub so existing call-sites don't break.
 function _androidBackGuardModalOpen(){
-  if(!_androidBackReady) return;
-  _pushAndroidHistoryState();
+  // intentionally empty — push handled by modalContainer innerHTML setter
 }
 
 // Android / Browser Back Button — smart internal navigation
@@ -5669,6 +5669,8 @@ function _initAndroidBackNavigation(){
             _mcSetter.call(this, val);
             // فقط عند الفتح (قيمة غير فارغة) نضيف طبقة رجوع
             if(val && val.trim() !== ''){
+              // صفّر طابع الخروج — فتح modal يعني المستخدم نشط وليس في وضع الخروج
+              _lastBackAtRootTime = 0;
               _pushAndroidHistoryState();
             }
           },
