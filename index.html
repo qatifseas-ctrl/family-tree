@@ -5574,9 +5574,14 @@ function _closeBackTarget(){
   return false;
 }
 
+// طابع آخر ضغطة "رجوع" على الجذر — للسماح بالخروج بضغطتين متتاليتين فقط
+let _lastBackAtRootTime = 0;
+
 function _handleAndroidBack(){
+  // 1. أغلق أي طبقة مفتوحة (modal / sheet / بحث)
   if(_closeBackTarget()) return true;
 
+  // 2. ارجع للتاب الرئيسي إن كنا في تاب آخر
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
@@ -5584,6 +5589,7 @@ function _handleAndroidBack(){
     return true;
   }
 
+  // 3. ارجع خطوة تنقل (navStack / familyFilter)
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
@@ -5591,6 +5597,7 @@ function _handleAndroidBack(){
     return true;
   }
 
+  // 4. استعد snapshot محفوظ
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()){
       _pushAndroidHistoryState();
@@ -5598,7 +5605,29 @@ function _handleAndroidBack(){
     }
   }
 
-  return false;
+  // 5. نحن في أعلى الشجرة — اسمح بالخروج فقط بضغطتين متتاليتين خلال 2 ثانية
+  var now = Date.now();
+  if(now - _lastBackAtRootTime < 2000){
+    return false; // ضغطة ثانية → يخرج المتصفح
+  }
+  _lastBackAtRootTime = now;
+  _pushAndroidHistoryState(); // احتفظ بالطبقة لمنع الخروج المبكر
+  (function(){
+    var t=document.createElement('div');
+    t.textContent='اضغط مرة أخرى للخروج';
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
+      +'background:#1f2937;color:#f9fafb;padding:10px 20px;border-radius:20px;'
+      +'font-size:13px;z-index:99999;pointer-events:none;';
+    t.style.animation='none';
+    t.style.opacity='1';
+    document.body.appendChild(t);
+    setTimeout(function(){
+      t.style.transition='opacity 0.4s';
+      t.style.opacity='0';
+      setTimeout(function(){t.remove();},400);
+    },1600);
+  })();
+  return true;
 }
 
 function _initAndroidBackNavigation(){
