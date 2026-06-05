@@ -5577,55 +5577,63 @@ function _closeBackTarget(){
 // طابع آخر ضغطة "رجوع" على الجذر — للسماح بالخروج بضغطتين متتاليتين فقط
 let _lastBackAtRootTime = 0;
 
+/*
+ * قاعدة ثابتة: هذه الدالة لا تستدعي _pushAndroidHistoryState أبداً بداخلها.
+ * المسؤول الوحيد عن الـ push هو popstate handler فقط — مرة واحدة بعد كل ضغطة.
+ * هذا يمنع "double-push" الذي كان يُفقد طبقات الـ guard وسبّب الخروج المبكر.
+ */
 function _handleAndroidBack(){
   // 1. أغلق أي طبقة مفتوحة (modal / sheet / بحث)
   if(_closeBackTarget()) return true;
 
-  // 2. ارجع للتاب الرئيسي إن كنا في تاب آخر
+  // 2. إذا كان المستخدم scrolled → ارجع للأعلى أولاً
+  if(window.scrollY > 120){
+    window.scrollTo({top:0, behavior:'smooth'});
+    return true;
+  }
+
+  // 3. ارجع للتاب الرئيسي إن كنا في تاب آخر
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
-    _pushAndroidHistoryState();
     return true;
   }
 
-  // 3. ارجع خطوة تنقل (navStack / familyFilter)
+  // 4. ارجع خطوة تنقل (navStack / familyFilter)
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
-    _pushAndroidHistoryState();
     return true;
   }
 
-  // 4. استعد snapshot محفوظ
+  // 5. استعد snapshot محفوظ
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
-    if(_restoreAndroidTreeSnapshot()){
-      _pushAndroidHistoryState();
-      return true;
-    }
+    if(_restoreAndroidTreeSnapshot()) return true;
   }
 
-  // 5. نحن في أعلى الشجرة — اسمح بالخروج فقط بضغطتين متتاليتين خلال 2 ثانية
+  // 6. نحن في أعلى الشجرة الرئيسية — اخرج فقط بضغطتين متتاليتين خلال 2 ثانية
   var now = Date.now();
   if(now - _lastBackAtRootTime < 2000){
-    return false; // ضغطة ثانية → يخرج المتصفح
+    // الضغطة الثانية → لا نُعيد push → يخرج المتصفح طبيعياً
+    return false;
   }
   _lastBackAtRootTime = now;
-  _pushAndroidHistoryState(); // احتفظ بالطبقة لمنع الخروج المبكر
+  // الضغطة الأولى → أظهر تلميح وابقَ (الـ push يحدث في popstate handler فقط)
   (function(){
+    var old=document.getElementById('_ftExitToast');
+    if(old) old.remove();
     var t=document.createElement('div');
+    t.id='_ftExitToast';
     t.textContent='اضغط مرة أخرى للخروج';
     t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
-      +'background:#1f2937;color:#f9fafb;padding:10px 20px;border-radius:20px;'
-      +'font-size:13px;z-index:99999;pointer-events:none;';
-    t.style.animation='none';
-    t.style.opacity='1';
+      +'background:#1f2937;color:#f9fafb;padding:10px 22px;border-radius:20px;'
+      +'font-size:13px;z-index:99999;pointer-events:none;opacity:1;'
+      +'transition:opacity 0.4s;';
     document.body.appendChild(t);
     setTimeout(function(){
-      t.style.transition='opacity 0.4s';
       t.style.opacity='0';
-      setTimeout(function(){t.remove();},400);
-    },1600);
+      setTimeout(function(){if(t.parentNode)t.remove();},400);
+    },1800);
   })();
   return true;
 }
