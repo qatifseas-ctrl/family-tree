@@ -5467,7 +5467,10 @@ function navigateToBreadcrumb(idx){
   setTimeout(()=>window.scrollTo({top:frame.scrollY||0,behavior:'smooth'}),100);
 }
 // ══════════════════════════════════════════════════════════
+let _modalGuardActive = false;  // guard flag — يُعاد تعيينه في كل فتح/إغلاق modal
+
 function closeModal(){
+  _modalGuardActive = false;         // أعد تهيئة الـ flag عند الإغلاق
   document.getElementById('modalContainer').innerHTML='';
   tempPhoto=null;
   // إعادة تقييم الأزرار العائمة عند إغلاق النافذة
@@ -5476,10 +5479,14 @@ function closeModal(){
   }
 }
 
-// no-op: the innerHTML setter on modalContainer now handles the push automatically.
-// Keeping the function stub so existing call-sites don't break.
+// يُشغَّل عند فتح أي Modal — يضيف طبقة history واحدة فقط مهما تعددت مصادر الاستدعاء
+// (setter + استدعاء صريح في نفس العملية) دون double-push
 function _androidBackGuardModalOpen(){
-  // intentionally empty — push handled by modalContainer innerHTML setter
+  if(!_androidBackReady) return;
+  if(_modalGuardActive) return;      // تمّ الـ push مسبقاً لهذا الـ modal
+  _modalGuardActive = true;
+  _lastBackAtRootTime = 0;           // فتح modal يلغي طابع الخروج
+  _pushAndroidHistoryState();
 }
 
 // Android / Browser Back Button — smart internal navigation
@@ -5667,11 +5674,11 @@ function _initAndroidBackNavigation(){
           get: function(){ return _mcProto.get.call(this); },
           set: function(val){
             _mcSetter.call(this, val);
-            // فقط عند الفتح (قيمة غير فارغة) نضيف طبقة رجوع
             if(val && val.trim() !== ''){
-              // صفّر طابع الخروج — فتح modal يعني المستخدم نشط وليس في وضع الخروج
-              _lastBackAtRootTime = 0;
-              _pushAndroidHistoryState();
+              // يمرّر عبر _androidBackGuardModalOpen ليضمن push واحد فقط
+              _androidBackGuardModalOpen();
+            } else {
+              _modalGuardActive = false;   // مزامنة الـ flag عند الإغلاق عبر setter
             }
           },
           configurable: true
