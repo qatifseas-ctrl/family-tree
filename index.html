@@ -5515,6 +5515,33 @@ function _pushAndroidHistoryState(){
   }catch(e){}
 }
 
+function _androidScrollY(){
+  try{
+    return Math.max(
+      window.scrollY || 0,
+      document.documentElement.scrollTop || 0,
+      document.body.scrollTop || 0
+    );
+  }catch(e){
+    return 0;
+  }
+}
+
+function _androidScrollToTop(){
+  try{
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    try{ window.scrollTo(0,0); }catch(err){}
+  }
+  try{
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }catch(e){}
+  if(window._updateFabMobileMode){
+    setTimeout(function(){ window._updateFabMobileMode(); }, 50);
+  }
+}
+
 function _restoreAndroidTreeSnapshot(){
   let stack=window._ftTreeBackStack||[];
   let snap=stack.pop();
@@ -5577,12 +5604,10 @@ function _closeBackTarget(){
 function _handleAndroidBack(){
   if(_closeBackTarget()) return true;
 
-  // إذا كان المستخدم داخل الصفحة لكنه ليس عند الأعلى، فزر الرجوع
-  // يجب أن يعيد الصفحة إلى الأعلى قبل أي خروج من التطبيق.
-  const currentY = window.scrollY || document.documentElement.scrollTop || 0;
-  if(currentY > 24){
-    try{ window.scrollTo({top:0,behavior:'smooth'}); }
-    catch(e){ window.scrollTo(0,0); }
+  // إذا كان المستخدم ليس عند أعلى الصفحة/اللوحة، اجعل الرجوع يعود للأعلى أولاً
+  // بدل أن يخرج من التطبيق مباشرة.
+  if(_androidScrollY() > 24){
+    _androidScrollToTop();
     _pushAndroidHistoryState();
     return true;
   }
