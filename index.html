@@ -5467,10 +5467,7 @@ function navigateToBreadcrumb(idx){
   setTimeout(()=>window.scrollTo({top:frame.scrollY||0,behavior:'smooth'}),100);
 }
 // ══════════════════════════════════════════════════════════
-let _modalGuardActive = false;  // guard flag — يُعاد تعيينه في كل فتح/إغلاق modal
-
 function closeModal(){
-  _modalGuardActive = false;         // أعد تهيئة الـ flag عند الإغلاق
   document.getElementById('modalContainer').innerHTML='';
   tempPhoto=null;
   // إعادة تقييم الأزرار العائمة عند إغلاق النافذة
@@ -5479,13 +5476,9 @@ function closeModal(){
   }
 }
 
-// يُشغَّل عند فتح أي Modal — يضيف طبقة history واحدة فقط مهما تعددت مصادر الاستدعاء
-// (setter + استدعاء صريح في نفس العملية) دون double-push
+// Android back guard: keep one extra internal step whenever a modal is opened
 function _androidBackGuardModalOpen(){
   if(!_androidBackReady) return;
-  if(_modalGuardActive) return;      // تمّ الـ push مسبقاً لهذا الـ modal
-  _modalGuardActive = true;
-  _lastBackAtRootTime = 0;           // فتح modal يلغي طابع الخروج
   _pushAndroidHistoryState();
 }
 
@@ -5581,87 +5574,47 @@ function _closeBackTarget(){
   return false;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  Android Back Button — النهج الموثوق: "ادفع أولاً، ثم عالج"
-//  المبدأ: popstate handler يُضيف guard state دائماً قبل أي معالجة،
-//  لذا لا توجد حالة "صفر طبقات" تؤدي للخروج العرضي أبداً.
-//  الخروج المتعمد فقط عبر window.close() بعد double-back في الجذر.
-// ══════════════════════════════════════════════════════════════════════════
-
-let _lastBackAtRootTime = 0;
-
-function _showBackToast(msg){
-  var old=document.getElementById('_ftExitToast');
-  if(old) old.remove();
-  var t=document.createElement('div');
-  t.id='_ftExitToast';
-  t.textContent=msg;
-  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
-    +'background:#1f2937;color:#f9fafb;padding:10px 22px;border-radius:20px;'
-    +'font-size:13px;z-index:99999;pointer-events:none;opacity:1;transition:opacity 0.4s;';
-  document.body.appendChild(t);
-  setTimeout(function(){
-    t.style.opacity='0';
-    setTimeout(function(){if(t.parentNode)t.remove();},400);
-  },1800);
-}
-
 function _handleAndroidBack(){
-  // 1. أغلق أي طبقة مفتوحة (modal / sheet / بحث)
-  if(_closeBackTarget()){
-    _lastBackAtRootTime = 0; // فتح/إغلاق overlay يُلغي طابع الخروج
-    return;
+  if(_closeBackTarget()) return true;
+
+  // إذا كان المستخدم داخل الصفحة لكنه ليس عند الأعلى، فزر الرجوع
+  // يجب أن يعيد الصفحة إلى الأعلى قبل أي خروج من التطبيق.
+  const currentY = window.scrollY || document.documentElement.scrollTop || 0;
+  if(currentY > 24){
+    try{ window.scrollTo({top:0,behavior:'smooth'}); }
+    catch(e){ window.scrollTo(0,0); }
+    _pushAndroidHistoryState();
+    return true;
   }
 
-  // 2. Scroll to top إذا كان المستخدم scrolled بعيداً
-  var scrollPos = window.scrollY || window.pageYOffset ||
-                  document.documentElement.scrollTop || 0;
-  if(scrollPos > 120){
-    window.scrollTo({top:0, behavior:'smooth'});
-    return;
+  if(_getActiveTabName()!=='tree'){
+    let treeTab=_getTabElementByName('tree');
+    if(treeTab) switchTab('tree',treeTab);
+    _pushAndroidHistoryState();
+    return true;
   }
 
-  // 3. ارجع للتاب الرئيسي إن كنا في تاب آخر
-  if(_getActiveTabName() !== 'tree'){
-    var treeTab = _getTabElementByName('tree');
-    if(treeTab) switchTab('tree', treeTab);
-    return;
-  }
-
-  // 4. ارجع خطوة تنقل (navStack / familyFilter)
-  if(navStack.length > 0 || currentFamilyFilter){
-    if(navStack.length > 0) navigateBack();
+  if(navStack.length>0 || currentFamilyFilter){
+    if(navStack.length>0) navigateBack();
     else navigateHome();
-    return;
+    _pushAndroidHistoryState();
+    return true;
   }
 
-  // 5. استعد snapshot محفوظ من التنقل العميق
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
-    if(_restoreAndroidTreeSnapshot()) return;
+    if(_restoreAndroidTreeSnapshot()){
+      _pushAndroidHistoryState();
+      return true;
+    }
   }
 
-  // 6. نحن في أعلى الشجرة — double-back للخروج المتعمد
-  var now = Date.now();
-  if(now - _lastBackAtRootTime < 2000){
-    // ضغطة ثانية خلال ثانيتين → حاول إغلاق التطبيق
-    _lastBackAtRootTime = 0;
-    try { window.close(); } catch(e){}
-    // احتياطي: إذا لم ينجح window.close() (PWA من الشاشة الرئيسية)
-    // أبلغ المستخدم باستخدام زر الرئيسية
-    setTimeout(function(){
-      _showBackToast('استخدم زر الرئيسية للخروج');
-    }, 100);
-    return;
-  }
-  // الضغطة الأولى → أظهر تلميح
-  _lastBackAtRootTime = now;
-  _showBackToast('اضغط مرة أخرى للخروج');
+  return false;
 }
 
 function _initAndroidBackNavigation(){
   if(_androidBackReady) return;
   if(!history || !history.pushState) return;
-  _androidBackReady = true;
+  _androidBackReady=true;
 
   try{
     history.replaceState({_ftBackGuard:true}, '', location.href);
@@ -5669,39 +5622,10 @@ function _initAndroidBackNavigation(){
   }catch(e){}
 
   window.addEventListener('popstate', function(){
-    // ── النهج الموثوق: ادفع guard state أولاً دائماً ──
-    // هذا يضمن وجود طبقة واحدة على الأقل فوق الجذر في كل الأوقات،
-    // بغض النظر عن أي حالة أخرى. لا يوجد "عد طبقات" أو return false.
-    _pushAndroidHistoryState();
-    // ثم عالج الضغطة
-    _handleAndroidBack();
-  });
-
-  // ── Modal back-guard: اعترض innerHTML ──
-  try{
-    var _mc = document.getElementById('modalContainer');
-    if(_mc){
-      // ابحث عن descriptor في سلسلة الـ prototype
-      var desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML') ||
-                 Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerHTML');
-      if(desc && desc.set){
-        var _origSet = desc.set;
-        var _origGet = desc.get;
-        Object.defineProperty(_mc, 'innerHTML', {
-          get: function(){ return _origGet.call(this); },
-          set: function(val){
-            _origSet.call(this, val);
-            if(val && val.trim() !== ''){
-              _androidBackGuardModalOpen();
-            } else {
-              _modalGuardActive = false;
-            }
-          },
-          configurable: true
-        });
-      }
+    if(_handleAndroidBack()){
+      _pushAndroidHistoryState();
     }
-  }catch(e){}
+  });
 }
 
 // ── My Person (منظوري أنا) ──
