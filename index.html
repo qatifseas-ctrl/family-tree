@@ -5474,6 +5474,10 @@ function closeModal(){
   if(window._updateFabMobileMode){
     setTimeout(()=>window._updateFabMobileMode(),50);
   }
+  // إعادة تسليح رجوع أندرويد بعد إغلاق أي Modal
+  if(window._rearmAndroidBackGuard){
+    setTimeout(()=>window._rearmAndroidBackGuard(),0);
+  }
 }
 
 // Android back guard: keep one extra internal step whenever a modal is opened
@@ -5515,31 +5519,21 @@ function _pushAndroidHistoryState(){
   }catch(e){}
 }
 
-function _androidScrollY(){
-  try{
-    return Math.max(
-      window.scrollY || 0,
-      document.documentElement.scrollTop || 0,
-      document.body.scrollTop || 0
-    );
-  }catch(e){
-    return 0;
-  }
+function _rearmAndroidBackGuard(){
+  if(!_androidBackReady) return;
+  _pushAndroidHistoryState();
 }
 
-function _androidScrollToTop(){
-  try{
-    window.scrollTo({top:0,behavior:'smooth'});
-  }catch(e){
-    try{ window.scrollTo(0,0); }catch(err){}
-  }
-  try{
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-  }catch(e){}
-  if(window._updateFabMobileMode){
-    setTimeout(function(){ window._updateFabMobileMode(); }, 50);
-  }
+function _getScrollTopValue(){
+  return Math.max(
+    window.scrollY || 0,
+    document.documentElement.scrollTop || 0,
+    document.body.scrollTop || 0
+  );
+}
+
+function _isAtTreeTop(){
+  return _getActiveTabName()==='tree' && _getScrollTopValue()<=24;
 }
 
 function _restoreAndroidTreeSnapshot(){
@@ -5602,35 +5596,41 @@ function _closeBackTarget(){
 }
 
 function _handleAndroidBack(){
-  if(_closeBackTarget()) return true;
-
-  // إذا كان المستخدم ليس عند أعلى الصفحة/اللوحة، اجعل الرجوع يعود للأعلى أولاً
-  // بدل أن يخرج من التطبيق مباشرة.
-  if(_androidScrollY() > 24){
-    _androidScrollToTop();
-    _pushAndroidHistoryState();
+  if(_closeBackTarget()){
+    _rearmAndroidBackGuard();
     return true;
   }
 
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
-    _pushAndroidHistoryState();
+    _rearmAndroidBackGuard();
     return true;
   }
 
   if(navStack.length>0 || currentFamilyFilter){
     if(navStack.length>0) navigateBack();
     else navigateHome();
-    _pushAndroidHistoryState();
+    _rearmAndroidBackGuard();
     return true;
   }
 
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()){
-      _pushAndroidHistoryState();
+      _rearmAndroidBackGuard();
       return true;
     }
+  }
+
+  // عند الرجوع من أعلى السياق، لا نخرج مباشرة إذا كانت الصفحة منزّلة للأسفل
+  if(!_isAtTreeTop()){
+    try{
+      window.scrollTo({top:0,behavior:'smooth'});
+    }catch(e){
+      window.scrollTo(0,0);
+    }
+    _rearmAndroidBackGuard();
+    return true;
   }
 
   return false;
@@ -5652,7 +5652,6 @@ function _initAndroidBackNavigation(){
     }
   });
 }
-
 // ── My Person (منظوري أنا) ──
 let myPersonId=null;
 const MY_KEY='family_tree_myPerson';
