@@ -10,171 +10,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#3b82f6">
 
-<!-- ═══ PWA: Proper manifest (replaces broken blob-based version) ═══ -->
 <link rel="manifest" href="manifest.json">
-
-<!-- JSZip — لتصدير نسخة العائلة كـ PWA ZIP كامل -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-<!-- Apple Touch Icons -->
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152x152.png">
 <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png">
-
-<!-- Favicon fallback -->
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
 <link rel="icon" type="image/png" sizes="96x96"  href="icons/icon-96x96.png">
 
-<!-- ═══ PWA: Service Worker Registration + Install Prompt ═══ -->
-<script>
-(function () {
-  'use strict';
-
-  /* ── 1. Register the proper external service worker ── */
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
-        .then(function (reg) {
-          console.log('[PWA] Service Worker registered. Scope:', reg.scope);
-
-          /* Listen for a new SW waiting to activate and prompt user */
-          reg.addEventListener('updatefound', function () {
-            var newWorker = reg.installing;
-            if (!newWorker) return;
-            newWorker.addEventListener('statechange', function () {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                _showUpdateToast();
-              }
-            });
-          });
-        })
-        .catch(function (err) {
-          console.warn('[PWA] Service Worker registration failed:', err);
-        });
-
-      /* Reload when a new SW takes control */
-      navigator.serviceWorker.addEventListener('controllerchange', function () {
-        window.location.reload();
-      });
-    });
-  }
-
-  /* ── 2. Capture the beforeinstallprompt event (Android/Chrome) ── */
-  var _deferredPrompt = null;
-
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault();
-    _deferredPrompt = e;
-    _showInstallBanner();
-  });
-
-  window.addEventListener('appinstalled', function () {
-    _hideInstallBanner();
-    _deferredPrompt = null;
-    console.log('[PWA] App installed successfully.');
-  });
-
-  /* ── 3. Install Banner UI ── */
-  function _showInstallBanner() {
-    if (document.getElementById('pwa-install-banner')) return;
-
-    var banner = document.createElement('div');
-    banner.id = 'pwa-install-banner';
-    banner.setAttribute('role', 'banner');
-    banner.setAttribute('aria-label', 'تثبيت التطبيق');
-    banner.innerHTML =
-      '<div id="pwa-banner-inner">' +
-        '<div id="pwa-banner-icon">🌳</div>' +
-        '<div id="pwa-banner-text">' +
-          '<strong>ثبّت شجرة العائلة</strong>' +
-          '<span>وصول سريع بدون إنترنت</span>' +
-        '</div>' +
-        '<button id="pwa-install-btn" onclick="window._pwaTriggerInstall()">تثبيت</button>' +
-        '<button id="pwa-dismiss-btn" onclick="window._pwaDismissBanner()" aria-label="إغلاق">✕</button>' +
-      '</div>';
-    document.body.appendChild(banner);
-
-    /* Animate in */
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        banner.classList.add('pwa-banner-visible');
-      });
-    });
-  }
-
-  function _hideInstallBanner() {
-    var banner = document.getElementById('pwa-install-banner');
-    if (!banner) return;
-    banner.classList.remove('pwa-banner-visible');
-    setTimeout(function () { banner && banner.remove(); }, 400);
-  }
-
-  /* ── 4. Public API ── */
-  window._pwaTriggerInstall = function () {
-    if (!_deferredPrompt) return;
-    _deferredPrompt.prompt();
-    _deferredPrompt.userChoice.then(function (choice) {
-      if (choice.outcome === 'accepted') {
-        console.log('[PWA] User accepted install.');
-      }
-      _deferredPrompt = null;
-      _hideInstallBanner();
-    });
-  };
-
-  window._pwaDismissBanner = function () {
-    _hideInstallBanner();
-    /* Remember dismissal for 3 days */
-    try { sessionStorage.setItem('pwa-banner-dismissed', '1'); } catch (e) {}
-  };
-
-  /* ── 5. iOS "Add to Home Screen" tip (Safari) ── */
-  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  var isStandalone = ('standalone' in navigator) && navigator.standalone;
-  var wasDismissed = false;
-  try { wasDismissed = !!sessionStorage.getItem('pwa-ios-tip-dismissed'); } catch(e) {}
-
-  if (isIOS && !isStandalone && !wasDismissed) {
-    window.addEventListener('load', function () {
-      setTimeout(function () { _showIOSTip(); }, 3000);
-    });
-  }
-
-  function _showIOSTip() {
-    if (document.getElementById('pwa-ios-tip')) return;
-    var tip = document.createElement('div');
-    tip.id = 'pwa-ios-tip';
-    tip.innerHTML =
-      '<div id="pwa-ios-tip-inner">' +
-        '<span>📱 لتثبيت التطبيق: اضغط</span>' +
-        '<span style="font-size:18px;margin:0 4px">⬆️</span>' +
-        '<span>ثم "إضافة إلى الشاشة الرئيسية"</span>' +
-        '<button onclick="document.getElementById(\'pwa-ios-tip\').remove();try{sessionStorage.setItem(\'pwa-ios-tip-dismissed\',\'1\')}catch(e){}" style="margin-right:10px;background:none;border:none;color:inherit;font-size:18px;cursor:pointer;opacity:.7">✕</button>' +
-      '</div>';
-    document.body.appendChild(tip);
-    setTimeout(function () { tip.classList.add('pwa-ios-tip-visible'); }, 100);
-    setTimeout(function () {
-      tip.classList.remove('pwa-ios-tip-visible');
-      setTimeout(function () { tip && tip.remove(); }, 500);
-    }, 12000);
-  }
-
-  /* ── 6. Update toast ── */
-  function _showUpdateToast() {
-    var toast = document.createElement('div');
-    toast.id = 'pwa-update-toast';
-    toast.innerHTML =
-      '🔄 يتوفر تحديث جديد &nbsp;' +
-      '<button onclick="navigator.serviceWorker.getRegistration().then(r=>r&&r.waiting&&r.waiting.postMessage(\'SKIP_WAITING\'))" ' +
-        'style="padding:4px 12px;border-radius:6px;background:#3b82f6;color:#fff;border:none;cursor:pointer;font-size:13px;">تحديث الآن</button>';
-    document.body.appendChild(toast);
-    setTimeout(function () { toast.classList.add('pwa-toast-visible'); }, 100);
-  }
-
-})();
-</script>
-
-<!-- ═══ PWA UI Styles (install banner + iOS tip + update toast) ═══ -->
+<!-- ═══ Styles ═══ -->
 <style>
 /* ── Install Banner (bottom sheet on mobile) ── */
 #pwa-install-banner {
@@ -296,6 +141,7 @@
   #pwa-install-banner { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
   #pwa-ios-tip-inner  { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 }
+
 </style>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -718,9 +564,6 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .family-context-banner .ctx-info{flex:1;min-width:0;}
 .family-context-banner .ctx-title{font-size:13px;font-weight:600;color:#5b21b6;}
 .family-context-banner .ctx-sub{font-size:11px;color:#7c3aed;margin-top:2px;}
-</style>
-
-<style>
 body {font-family: Tahoma; background: var(--bg);}
 .person{border-radius:12px;padding:10px;margin:6px;display:inline-block;min-width:120px;text-align:center}
 .person.male{background:#e3f2fd;border:1px solid #2196f3}
@@ -994,7 +837,158 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
 .field-mic-btn:hover{opacity:.9!important;}
 .field-mic-btn.voice-active{animation:fieldVoicePulse .7s ease-in-out infinite;}
 @keyframes fieldVoicePulse{0%,100%{opacity:.5;}50%{opacity:1;transform:translateY(-50%) scale(1.25);}}
+
 </style>
+
+<!-- ═══ PWA: Service Worker + Install Prompt ═══ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ── 1. Register the proper external service worker ── */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js', { scope: './' })
+        .then(function (reg) {
+          console.log('[PWA] Service Worker registered. Scope:', reg.scope);
+
+          /* Listen for a new SW waiting to activate and prompt user */
+          reg.addEventListener('updatefound', function () {
+            var newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', function () {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                _showUpdateToast();
+              }
+            });
+          });
+        })
+        .catch(function (err) {
+          console.warn('[PWA] Service Worker registration failed:', err);
+        });
+
+      /* Reload when a new SW takes control */
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        window.location.reload();
+      });
+    });
+  }
+
+  /* ── 2. Capture the beforeinstallprompt event (Android/Chrome) ── */
+  var _deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    _deferredPrompt = e;
+    _showInstallBanner();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    _hideInstallBanner();
+    _deferredPrompt = null;
+    console.log('[PWA] App installed successfully.');
+  });
+
+  /* ── 3. Install Banner UI ── */
+  function _showInstallBanner() {
+    if (document.getElementById('pwa-install-banner')) return;
+
+    var banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.setAttribute('role', 'banner');
+    banner.setAttribute('aria-label', 'تثبيت التطبيق');
+    banner.innerHTML =
+      '<div id="pwa-banner-inner">' +
+        '<div id="pwa-banner-icon">🌳</div>' +
+        '<div id="pwa-banner-text">' +
+          '<strong>ثبّت شجرة العائلة</strong>' +
+          '<span>وصول سريع بدون إنترنت</span>' +
+        '</div>' +
+        '<button id="pwa-install-btn" onclick="window._pwaTriggerInstall()">تثبيت</button>' +
+        '<button id="pwa-dismiss-btn" onclick="window._pwaDismissBanner()" aria-label="إغلاق">✕</button>' +
+      '</div>';
+    document.body.appendChild(banner);
+
+    /* Animate in */
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        banner.classList.add('pwa-banner-visible');
+      });
+    });
+  }
+
+  function _hideInstallBanner() {
+    var banner = document.getElementById('pwa-install-banner');
+    if (!banner) return;
+    banner.classList.remove('pwa-banner-visible');
+    setTimeout(function () { banner && banner.remove(); }, 400);
+  }
+
+  /* ── 4. Public API ── */
+  window._pwaTriggerInstall = function () {
+    if (!_deferredPrompt) return;
+    _deferredPrompt.prompt();
+    _deferredPrompt.userChoice.then(function (choice) {
+      if (choice.outcome === 'accepted') {
+        console.log('[PWA] User accepted install.');
+      }
+      _deferredPrompt = null;
+      _hideInstallBanner();
+    });
+  };
+
+  window._pwaDismissBanner = function () {
+    _hideInstallBanner();
+    /* Remember dismissal for 3 days */
+    try { sessionStorage.setItem('pwa-banner-dismissed', '1'); } catch (e) {}
+  };
+
+  /* ── 5. iOS "Add to Home Screen" tip (Safari) ── */
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = ('standalone' in navigator) && navigator.standalone;
+  var wasDismissed = false;
+  try { wasDismissed = !!sessionStorage.getItem('pwa-ios-tip-dismissed'); } catch(e) {}
+
+  if (isIOS && !isStandalone && !wasDismissed) {
+    window.addEventListener('load', function () {
+      setTimeout(function () { _showIOSTip(); }, 3000);
+    });
+  }
+
+  function _showIOSTip() {
+    if (document.getElementById('pwa-ios-tip')) return;
+    var tip = document.createElement('div');
+    tip.id = 'pwa-ios-tip';
+    tip.innerHTML =
+      '<div id="pwa-ios-tip-inner">' +
+        '<span>📱 لتثبيت التطبيق: اضغط</span>' +
+        '<span style="font-size:18px;margin:0 4px">⬆️</span>' +
+        '<span>ثم "إضافة إلى الشاشة الرئيسية"</span>' +
+        '<button onclick="document.getElementById(\'pwa-ios-tip\').remove();try{sessionStorage.setItem(\'pwa-ios-tip-dismissed\',\'1\')}catch(e){}" style="margin-right:10px;background:none;border:none;color:inherit;font-size:18px;cursor:pointer;opacity:.7">✕</button>' +
+      '</div>';
+    document.body.appendChild(tip);
+    setTimeout(function () { tip.classList.add('pwa-ios-tip-visible'); }, 100);
+    setTimeout(function () {
+      tip.classList.remove('pwa-ios-tip-visible');
+      setTimeout(function () { tip && tip.remove(); }, 500);
+    }, 12000);
+  }
+
+  /* ── 6. Update toast ── */
+  function _showUpdateToast() {
+    var toast = document.createElement('div');
+    toast.id = 'pwa-update-toast';
+    toast.innerHTML =
+      '🔄 يتوفر تحديث جديد &nbsp;' +
+      '<button onclick="navigator.serviceWorker.getRegistration().then(r=>r&&r.waiting&&r.waiting.postMessage(\'SKIP_WAITING\'))" ' +
+        'style="padding:4px 12px;border-radius:6px;background:#3b82f6;color:#fff;border:none;cursor:pointer;font-size:13px;">تحديث الآن</button>';
+    document.body.appendChild(toast);
+    setTimeout(function () { toast.classList.add('pwa-toast-visible'); }, 100);
+  }
+
+})();
+
+</script>
 
 </head>
 <body>
@@ -1010,7 +1004,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button onclick="fsaPickFile()" id="fsaSaveBtn" style="padding:5px 14px;background:#fff;color:#065f46;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📁 ربط الملف</button>
     <button onclick="this.parentElement.style.display='none'" style="padding:5px 10px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:11px;cursor:pointer">✕</button>
   </div>
-  <!-- تلميح تثبيت PWA على الجوال -->
+  <!-- تلميح تثبيت PWA -->
   <div id="installBanner" style="display:none;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:13px;align-items:center;gap:10px;flex-wrap:wrap;">
     <span style="font-size:20px">📲</span>
     <div style="flex:1;line-height:1.6">
@@ -1032,7 +1026,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button onclick="openCloudSetup()" style="padding:5px 14px;background:#fff;color:#1e40af;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⚙️ إعداد (المالك)</button>
     <button onclick="closeBannerForever()" style="padding:5px 10px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap">✕ إغلاق</button>
   </div>
-  <div id="saveToast"  style="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none;">✔ تم الحفظ</div>
+  <div id="saveToast" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none;">✔ تم الحفظ</div>
   <div class="legend">
     <div class="legend-item"><div class="gender-dot male-dot"></div> ذكر</div>
     <div class="legend-item"><div class="gender-dot female-dot"></div> أنثى</div>
@@ -1041,10 +1035,9 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <div class="legend-item"><span class="status-dot dot-divorced">م</span> = مطلق/ة</div>
     <div class="legend-item"><span style="font-size:13px">🔗</span> متزوج/ة من شخص في الشجرة</div>
     <button class="btn" id="myPersonBtn" onclick="openMyPersonPicker()" style="margin-right:auto;font-size:12px;padding:4px 10px;white-space:nowrap">👤 أنا في الشجرة</button>
-    <button id="themeToggleBtn" onclick="cycleTheme()" title="تبديل المظهر" style="padding:4px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s">🌗 تلقائي</button>
+    <button id="themeToggleBtn" onclick="toggleTheme()" title="تبديل المظهر" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);cursor:pointer;flex-shrink:0;transition:background .15s;display:flex;align-items:center;justify-content:center;line-height:1;"><img id="themeToggleIcon" src="" alt="theme" style="width:20px;height:20px;display:block;" /></button>
     <button id="mobileModeBtn" class="mobile-mode-btn" onclick="toggleMobileMode()" title="وضع الجوال: شجرة أخف وأسرع">📱 وضع الجوال</button>
   </div>
-  <!-- My Person Banner -->
 
   <!-- Stats Bar -->
   <div id="statsBar" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
@@ -1062,7 +1055,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button class="btn" onclick="toggleAll(false)">غلق الكل</button>
     <button class="btn" onclick="exportData()" title="حفظ كملف HTML مع الإعدادات السحابية — للمالك فقط">💾 حفظ نسخة</button>
     <button class="btn" id="fsaSaveBtn2" onclick="fsaPickFile()" title="ربط الملف للحفظ التلقائي على الجوال — Chrome/Edge" style="display:none">📁 ربط الملف</button>
-    <button class="btn" id="exportFamilyBtn" onclick="exportFamilyCopy()" title="حفظ نسخة للمشاركة مع العائلة — تحتوي إعدادات الرفع الصامت تلقائياً" style="display:none">📤 نسخة للعائلة</button>
+    <button class="btn" id="exportFamilyBtn" onclick="exportFamilyCopy()" title="حفظ نسخة للمشاركة مع العائلة" style="display:none">📤 نسخة للعائلة</button>
     <button class="btn" id="familyUploadSetupBtn" onclick="openFamilyUploadSetup()" title="إعداد الرفع الصامت لنسخة العائلة" style="display:none">⚙️ إعداد رفع العائلة</button>
     <button class="btn" id="familyUpdatesBtn" onclick="openFamilyUpdatesModal()" title="اطلع على آخر تحديث رفعته العائلة" style="display:none;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">📡 تحديثات العائلة</button>
     <button class="btn" id="mergeLogBtn" onclick="openMergeLogModal()" title="سجل الدمج" style="display:none;background:#f8fafc;border-color:#8b5cf6;color:#5b21b6">📜 سجل الدمج</button>
@@ -1094,7 +1087,12 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   <div class="sheet-btns" id="mob-sheet-btns"></div>
 </div>
 
+<!-- ═══ JavaScript Modules (ORDER MATTERS) ═══ -->
+
 <script>
+var _HTML_TEMPLATE=document.documentElement.outerHTML;
+
+/* === js/mobile.js === */
 var _HTML_TEMPLATE=document.documentElement.outerHTML;
 
 /* ══════════════════════════════════════════════════════════
@@ -1200,73 +1198,85 @@ function _mobSheetSwipe(el){
 }
 
 /* ══════════════════════════════════════════════════════════
-   THEME SYSTEM — Light / Dark / Auto
-   يُطبَّق على <html> عبر data-theme="light"|"dark"|"auto"
+   THEME SYSTEM — Light / Dark only
+   يُطبَّق على <html> عبر data-theme="light"|"dark"
+   - First launch: detects system preference and saves it.
+   - Subsequent launches: loads saved preference directly.
+   - Toggle button shows the OPPOSITE theme icon (click to switch).
+     Light icon: https://code.visualstudio.com/assets/icons/theme-light.svg
+     Dark  icon: https://code.visualstudio.com/assets/icons/theme-dark.svg
 ══════════════════════════════════════════════════════════ */
 (function(){
   var THEME_KEY='ft_theme_v1';
-  var THEMES=['auto','light','dark'];
-  var ICONS={auto:'🌗',light:'☀️',dark:'🌙'};
-  var LABELS={auto:'تلقائي',light:'فاتح',dark:'داكن'};
-  var _current='auto';
+  var ICON_LIGHT='https://code.visualstudio.com/assets/icons/theme-light.svg';
+  var ICON_DARK='https://code.visualstudio.com/assets/icons/theme-dark.svg';
+  var _current='light';
 
   function applyTheme(theme){
     _current=theme;
     var html=document.documentElement;
-    if(theme==='auto'){
-      html.removeAttribute('data-theme');
-      html.style.colorScheme='';
-    } else {
-      html.setAttribute('data-theme',theme);
-      html.style.colorScheme=theme;
-    }
+    html.setAttribute('data-theme',theme);
+    html.style.colorScheme=theme;
+
     // Update <meta name="theme-color"> for mobile browser chrome
     var metaTheme=document.querySelector('meta[name="theme-color"]');
-    var isDark=theme==='dark'||(theme==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches);
-    if(metaTheme)metaTheme.setAttribute('content',isDark?'#1f2937':'#3b82f6');
-    updateBtn();
+    if(metaTheme)metaTheme.setAttribute('content',theme==='dark'?'#1f2937':'#3b82f6');
+
     try{localStorage.setItem(THEME_KEY,theme);}catch(e){}
+    updateBtn();
   }
 
   function updateBtn(){
     var btn=document.getElementById('themeToggleBtn');
-    if(!btn)return;
-    var icon=ICONS[_current]||'🌗';
-    var lbl=LABELS[_current]||'تلقائي';
-    btn.textContent=icon+' '+lbl;
-    btn.title='المظهر الحالي: '+lbl+' — اضغط للتبديل';
-    // visual feedback for active state
-    var isDark=_current==='dark'||(
-      _current==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches
-    );
+    var img=document.getElementById('themeToggleIcon');
+    if(!btn||!img)return;
+
+    // Show the OPPOSITE icon — pressing it switches to that theme
+    if(_current==='dark'){
+      img.src=ICON_LIGHT;
+      img.alt='Light theme';
+      btn.title='التبديل إلى الوضع الفاتح';
+    } else {
+      img.src=ICON_DARK;
+      img.alt='Dark theme';
+      btn.title='التبديل إلى الوضع الداكن';
+    }
+
+    // Visual feedback for current dark state
+    var isDark=_current==='dark';
     btn.style.background=isDark?'#374151':'';
     btn.style.borderColor=isDark?'#4b5563':'';
-    btn.style.color=isDark?'#f9fafb':'';
   }
 
-  window.cycleTheme=function(){
-    var idx=THEMES.indexOf(_current);
-    applyTheme(THEMES[(idx+1)%THEMES.length]);
+  // Toggle between light and dark
+  window.toggleTheme=function(){
+    applyTheme(_current==='dark'?'light':'dark');
   };
 
-  // init on load
-  var saved='auto';
-  try{saved=localStorage.getItem(THEME_KEY)||'auto';}catch(e){}
-  if(THEMES.indexOf(saved)===-1)saved='auto';
-  applyTheme(saved);
+  // Keep legacy cycleTheme alias in case anything else calls it
+  window.cycleTheme=window.toggleTheme;
 
-  // keep button in sync when OS preference changes (auto mode)
-  try{
-    window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
-      if(_current==='auto')updateBtn();
-    });
-  }catch(e){}
+  // Init: load saved preference or detect system theme on first launch
+  var saved=null;
+  try{saved=localStorage.getItem(THEME_KEY);}catch(e){}
 
-  // update button once DOM is ready (button may not exist yet)
+  if(saved==='light'||saved==='dark'){
+    // User has an explicit saved preference — use it directly
+    applyTheme(saved);
+  } else {
+    // First launch: detect system theme and save it as the initial preference
+    var prefersDark=false;
+    try{prefersDark=window.matchMedia('(prefers-color-scheme:dark)').matches;}catch(e){}
+    applyTheme(prefersDark?'dark':'light');
+  }
+
+  // Update button once DOM is ready (button may not exist at script run time)
   document.addEventListener('DOMContentLoaded',updateBtn);
   window.addEventListener('load',updateBtn);
   setTimeout(updateBtn,200);
 })();
+
+/* === js/core.js === */
 const FATIHA_IMG='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCAEYARgDASIAAhEBAxEB/8QAHAAAAQUBAQEAAAAAAAAAAAAAAAECBAUGAwcI/8QASRAAAQMDAwEFBgIGBQoGAwAAAQIDBAAFEQYSITETQVFhcQcUIjKBkVKhFSNCscHRFiQzcpM0Q0RTVWKCkpTwFyVUg7LhdKPT/8QAGQEBAQEBAQEAAAAAAAAAAAAAAAECAwQF/8QAKhEAAgIBBAICAgIBBQAAAAAAAAECEQMSEyExMkEEIlFhcYGRBRRCobH/2gAMAwEAAhEDEQA/APcaKKKAKKKKAKKKKAKKKKAKKKKAKKKKAKKKKAKKKKAKashIyogAdSadWF17cZMa4w46lLREWhRJHQq461zy5NuDkahHXKjZJmRVKCUyGio9wWM13HPNeZw0k4UCcE5BBrVWWS+jajJUjwPdXzsf+ppyqUaOssNK0zR0UgOQDS19U4BRRRQBRRRQCKUEJKlEBIGSSelcGJsaQSI77TpHUIWDj7VFvrLr0MBtCnAhxK1tp5K0jux34ODjvxiqexxZhmNuvqeX2TSficS4PiCClQ+NIxuUdxx4DgYoDQIuMNxbqG5TClNAlxKXUkoA6554rup1CCgKUkFZwkE/McZ48eAa8+MCb7gqFFhynUpt8hnZKiJS5FJbICEujAcyrA6HPUnjm4cYu0OapEb32RHQ4lxO9YUTlh3cApXT4w35Anw4oDTyJDMZouyHW2mwQCtxQSBnzNNZmRnwksSGnErJCShwEKI64x4Vhkx7vOZMcomFHvEJ5pclpawghZ7Q/rDk4wMj4R3gVZL0263dYSy++sOyHXpTsdIZCf1QQkDbynoOQck99Aa6kBBGQRisUwb6UMe8/pD34IjBjAIaI47Uu4+HPzZ3d2NvNcUR7jEjOR0JvCUoRI927IrJMgurKSo96dpQRu+H5s0BvKK5Ru17Bvt9va7Rv29N2OceWaKA60UVykPBhpTiu7uqN0DrRVAu8v7jtCQO4YpW7u8SArr4gCuW/E3tsvqKpxPkc5UPsKPf3/xfkKb8RoZcUVTe/SPxD7Cj35/8Y+1N+I0MuaKpvfX/AMY+1Hvr/wCKpvxGhlxRmqf3178VL769+Km/EaGW+aQkAZJwKqPfXvxUx2S84kpKyAab8RoZaqltDoSfSmiY0TzkVnn1SWkFYe3Ad1QhcnMjKzjvxV3ojQzapUlSQpJyDWX9oMyOzaUsLbQ4++cNBXVPioenFUV81ZMaK4NmWAtCfieUM8nuA8ao7MbhfLq0bm6466jAwsfKK8vyPmRUGl2dseB3qZprFZ32ozT63E/Hj4K2TEVLaQDjA8B1qpeXtlMsNcBsZOKle9ujv/OvH8JY5258sZNTLYYHFFVPvjvj+dHvbv4j9zX1t1HHQy2zRmqj3t3xP3NHvbvifuabyGhlvmjNVHvbvifvR7274n7mm8hoZb0YFVHvbvifuaPe3fE/c03kNDLbA8BS4FVHvbvifuaPe3fxH7mm8hoZb4FGBVR7474/nR7474/nTeQ0Mt8CjAqo98d8fzrrFkvOPJSpXGaqypsaGWdFFFdTAVFuJAiObvCpVQrmoGKtAI3YzjNZn4sq7M1Sp5IxT+wXnoK6ts7fizyK8NHpOqcgCnGkBPeKTdjqKpkdRSbgelANSgLRRRQBS0lFKAYoooqUCBeZS47A2J4XwVY6VQKe+la1xCXEFDiQpJ6g1XuWSEtW4IUnyCuK0nRDCPpchXNyWlHaMOn4x3g1rbJMtzxSsLLa8ftDB+9Q5DLFtuTjclousqRuaz41eQ7RFZispcYR22Ny1Djk15s/xFkuSZ0WX0y1ZabUStspyeqs8mmOEbztORXNCQ2nanIHhmlrGD4207sy3YuaM0Un1r1WyDs0UlN2/FnP0pqYH0UlGauoC0UmaM1dSILRSdKUGloBS0maKtgWpMAZfT5Go1Srd/bVqPkiPotaKKK9hxOcglLDik/MEkj1xWTg9s7JecUSodmdxOSa16hkYPQ1kkf1a4PNoGc5T17qzPxZV2ScnFLnFcEvpKeeFeFdd2SABnx8q8R6B1FFJVAoopKM8ZoBaKQHNLUAuaM0lFCC5ozSUUKOoptLQhwlwmZamlPDJaWFJ/kfKpBUSok9TTc0tX1QrkUGlpqSPGhakoGVqCRkDJOOT0qUBaKKDzUoBRmgJA6UUAtFcw80XzHDie2CA4W88hJOM48Mgin0oC0VzbdS4lK21JWhQBSoHIIPeKfUoC0UlFKAtFJmlpQFzUu2/wCUfSodTbZ/bH+7W8d60Zl0WlFFFe44hWTvqDFugdIIQs54H0rWVV6gY7WApYxlv4vpUatBdmfFPbcKDx08K5g5Sk+IBpa+f0esmocSroeadmoYO0AjO6l7VeSc9aqZKJZIHBOCelNSCkYUrdUTcTySTTw4rOc59aEog6rF4/QUlGnlMpuChhBdVjA79vdu8M8V5foeF7RI/wCkIsFxyK22lRKbinKS4fwZz8R65HHjXrjjucdoQMnA9aktLTsCQa6RnSqjLj7PFdD27XUfVbrCnJcMKX2s5yUne2sZ688KUe7B+uK9uo64HPkKQEHoQcHHBzSUtQiqCiisvqjXti0zJESc487KwCpmOgKKAem7JAHp1qJN9Fbo1NFZSze0TTF3Oxq4pjOno3LHZE+hPw/nWoaWl5AW0pLiT0Ug7h9xRxa7FpmZ9orGopWn3I+mQguOZD4CsOqb8Ed2T39+OlYHS8T2jq0zNjwnVsMt/q2WpY2vcfMGlK+Xw548K9nIPeDSVqM6VUZcbdnkXsng6wjXR1iS5IiWuOs+8My2yd6z3IB6E9SRx61de0rUD8TUmmbS1lDLkxqS8rPzYc2pHoOT9q1ETVlsl6olaebcPvkZAOSfhWcZUkeaeM/Xwrz724f1e96emDjAUM/3VpP8a2vtLlEfC4PX8YJHgag3y6MWW0yblKS6pmOjepLSdyj6fz6Cpm/cdw6HkUi0haFIWApKgQQRkEedcfZs8v0d7VHbvflW+5wihEpzEQx0lZb/AN1XeR37u706eojPjXnV0uei/Z1cH3IUEKuj4G5hg5LaT3ZPCAfAc/Stlpu9xtQ2aPdIYUlt4HKFdUKBwUn61uaXaXBmL9M8X1BrC9WT2l3K4BJSptZj+7O/KtgfKPrwoEd5zW7v2u2pfs1kXmG09FdlExG0udQ4eFFJ7wBu58qyHt3iJb1Fb5QGA/E2qPiUqP8AAitP7UrTGiezSPHht7GILjBQPIgpJ9TuyfWuv1elmeeTT+zqX77oezO5yUxg0T5oJT/CtHmsD7FX+10Q2gnPYynUeg4V/Gt6a4TVSZuPKFzRTaM4rJodRSZNGaUQWp9rH6wnyP76rwasLX859DWsfkjMuizooor2nEKjz0qXCfSnGSggZqRTHSEtqJ6AUBimVb2kqxjjGPCugroI6UJwHQc5Vz51y6V8+XDZ6l0Oopopc1ko6ikBpaoKDUcnsr1ppjdgPT15HjhpWPzUK0APhWC9rMh63RbJdo4yqFPC8eORnH124+tM1D7TbOiwuOWeQpye8ja00UEFkkdVZGOPLOTXXQ5JUY1JN2V+vNX3W73Q6X0mHnFglEhyP87iu9IPckd57/Ss77ML09pnWBgXRTjDMkmO+h0kdm5n4VEeOeM+Bre+yjTps9mE6UjE+4ALUVfMhvqlP16n1HhVD7atKyHJTeoIEdTiCgNyw2nJSR8qzjuI4J8hXWMo+CMNPyPXnCtDalJQVLAJCfE9wrxKR7KNU3WS/Ony4CJMhZcWFOKUck56hOKwzepb602ltq83BCEjCUiSvAH3p41PqFfwi93E54x7yvn861HG49My5JljqnQd40xGEi4rhloq2js5A3KPkk4J+gqptMe+ODdaGbgoZ6xUr6/8Nei6A9ncq7vpu+rkvljgtR31He75rzyE+XU+nXEXN2/aUucu1tT50INuq+Bp5SErGeFAA4wRjmtKV8GaPS/ZLadRmdIuGoH7ohplHZsR5bjgC1K6q2q7gPzPlXqOD3Zr5Z/pVqH/AG5cf+qX/Oj+lOof9uXH/ql/zrEsTk7s2pUi61PCm6K16Hg844pD6ZbL6vmcQVZ58+oNbn29MhdntMpI4TIWj03IBH/xrzjTyLhq3VFshTpciWVOgKU84VlDYO5XXoMA17f7TLE/qDScmPEbC5LK0vstjqopzlI8yCcVZOpRsiVpl3p6c3dLHAnMKC0PR0HI8cAEeoOapfaNqr+ithLzODOkEtxgRwDjlR9B+ZFfPkW63a0748SfMh4V8bbbqm+fMZ61zn3a43LZ+kZ0iV2ednbule3PXGaixc2XXxRu7h7OH1aSd1NKvbT0pxoSiDyhYPJHaE8r58OvFb72NNON6FjqWCA5IdWjj9nIGfuDXgC5D6mEMKecLKTlLZWdoPiB0qbG1FeorCGIt2nMstjCG25CkpSPIA1uUW1VmU6dnqXt+jZh2eVg/C460fqEn+BrWa1Z9+9m07xMBDw/4QlX8K8ERMvGopcW3SZ8uWXXkpbQ66pYCicZwT519Lz4KF2KTbkcoMRbCc+GwpFcprSoo0ubMH7B3CrTdwb7kTcj6oT/ACr0ysR7ILO7adHNrkJKHprhkFJHISQAn8hn61tq55PJm49C0UlFZNC0UlFAOHWrC1/MfQ1XCrK1fMR5GtQ8kZn0WVFFFew4BSKGQR40tIelAZCU2tp1TbhypBKd3iK5VJmumQ+pSE8bj9PKuKmlITlVfPyeTPVDpDKWkorBoUUtJRmhKKzU1lZ1DZJFtfVs7UAocxnYscpP/fdmvOtNeyqWxdkPXx6MuIyrcG2VFReI6A5AwPH7V6mzLYeffYacCnY5SHUj9gqGQD9K7V0WSUVSMuKbscgZIHSpY4GK4MpBGTzTJ1yg24NGfMYjB5YbbLqwncrwGaitlYLtducUVLt8NSj1JjoJP5U5m3QWFb2IUZtX4kMpSfuBXONd7dKmvQo06M7KZx2jKHAVJz5fyqQxJZkIWthxLiULU2opPRSThQ+hq8meDoFpKsA5NcpEOLK2+9RmH9vTtW0rx6ZFMjyIz8mS0w4lbsdQQ8kfsKI3AHzwRUgqA6mheyJ+h7X/ALNhf9Mj+VH6Itn+zIP/AEyP5VLyDyKWlslEdiDEjKKosSOysjBU00lJI+gqR3VHiT4sx6UzGeS45Fd7J5KTyhWAcH706NJYmN9rHdDjYWpG5PTKSUkfQgiq7KqGv2+FIXvkQ4zy/wATjKVH7kVz/RNsHItsLP8A+Mj+VSGJDMjtOwcSvs3FNLwflWOo9RXWltEpEVyBCeSlL0KMsJ+UKZScenFM/RFr/wBmQv8Ap0fyp0i5wI0xqHImx2pLqSptpxwJUoDqRmm2662+6JWq3TY8oNqKV9k4FbSPGnI4Hs2+BGcDjEKK04Oi22UpI+oFSe6mqBPQUqQQOalihQMAADpSKzTqi3C4Qrc225cJTMZDiw2hTqwkKUeg5p2DuM06oTN3tr85yAxPiuS2wCtlLoKgD5d/0qYadDsXNFM76XmllHjrVjavnPoaq8mrK1fOfQ1vH5IzPotaKKK9hwCmOHahRAzgZxT6Q9KAycYksJUfmWSo+pNPWgL659Kdt2/DjBSSkjvFIa+dPyZ6Y9IiqQdxCeQO+m4PgamCqS6XQKv8Kwx17HX2lyJCwcFLKe4eajxnuAJ8KiVmm6J/NHSs3rvVzmmEMiJa1zXHBucJCg20gcDKgOp8PKslG9q10eZU9G06y8hKtqi264raT0zgd+D9jW44pNWjLmlwzQ6JC2tV6vikkkTEOj0UFf8A1V9qHUFu06y2u5LcLruexjso3uO464Hh515nH1Hqi0XiRqZdgJYu6QlTOxeE7OBz1B47+uaqpesdROatGookBxh4NBnsC2taCgDlPIzyefWu21qlbMa6XB7FprVls1ApTMZL8aUhO5UaU3sXt8R+IenSl1darBNgGbqOM24xCSXO0USCkd44PIPAx31ktN6/vt/vMOCvTjCFKUSuQ4XAGk4+JQyOOO7PPFWXtPudxtZssiHbjOityVOvtFJKVKA+AKx5kkeYFY0tTSXBdVoTQD+jLvcXrhp+AiHctuFsrG1TaTwVIGcAHPJFSfZUs/0afYWoqXHuEhCs8n5gf4mqD2d2iXO1XJ1PIsws8fsilphAUkOLVwVAHux5AZIqC/e77oLUF5is2czIE2WqSwopXj4vBSR9CPKtyV2kZTpJs1OgMs6i1jEUSSi5B3k54UFY/dW0LaVHJ614rG1JqmyXeVqR2wZYvQCiyULwkoO0cjkHjPPUGu872g6sU/Bu36E7CChbjSGSlza84U9/ecDkd3X6JY3J2VSSPXJ06HbIxkT5LUZhPVx1QSKrLLrCwXyaqHa7k29ISNwQUKSVAdSnIGa8aTqeXKlqm6g04q8SiTsMouBppPghsDA/OuCb24zqeHe4WlUQzGO73eOHUocVg4J44692M1VhJrNra7IYvteuwiyH2EiMqWhKFn41OAcK8UhSiceQq59jEhx7SRaeJK4811Bz15wr95NVugrlP1JrmVfJVtMFtqAI6k/FhZ3gjlQHOAftWg9nlnfs8e8pfSUJfujy2QeMoBwD6HFSb4p/osVzaOPsucV+jbxHWoqXHu8hJJOTyQf51bztUQoupINgAU5MlAqVs6MjaSN3mccD615/c71e9BapvXYWn3y23B/3ptSkqCQT1wpP1BB8BWSg68uMS7M3ORBZe/rD0rBBT2ri0lGSrvCUnaAOBV29TsmquD2u96c07MlC8XiFGW5HRuU88cJ2gftjoQB41Tez2bpF6bdI+k4q2VJIW64tJw4knA2kknaD3cdawOp9dXzUUaNENhLLKH0uuMhDi0yMdEKGPl8q5WXWNws17uFzZ0sy2uWhDfYMtONIbCfAAdTxn0osctNMalZ73TT1zXjMzXOr50mJeWLG41AgOELZShwocUtJHxd5wM47gfWuk/2kaqnxFJhaedjNpUO2eZQ6pQTnoFY+HPTPWsbUi60ex58aq77p606hZbau8NMgNnLaiSlSfHBHjjmvMpHtD1U9KhzRpt9uC0pQLKEO7XlEYGVYzxngePjSI11qyxTpxumnlurmOJfQlYcAaSUgBCSARgDH1zmqsckNSNmzA0fZtaR2I0KPHvMlhSmkoHwpHkOiVEA9ByAfrrq8Vbu1w1trWwvGyG3vxXwpclG/ltJ3fESO7Bx64r2r8qmRVVli7ACloFFczQYqwtX9sR3bTVfU61H9ef7tax+SMy6LeiiivacAooooChvLQanIdHR1OD6jpUOrq9NhcQFIBdCx2fmrwqmPBI868XyI1KzvidqgrAa+0dd7leY1+05NDE9hsNlKnNh4JwUq6d+CDW+zig81yjNxdo6NWeZRontVkp7B+fEiNnhTquyKsf8ACCa12jtOMaXtzjAf7eVIc7WTII29oryHcB/Grd105wngCuVWWVvgiglyTQ4CeFHPrTtyvxH71ABx0rs2sq+FZz4VjUaokFR7yfvRk93FJjjvxXCNNjSnX2oz6HFx17HUpOdivA1eTLq6JGecnk0u444JH1pueKrpl9tcKI1KkTGww6opbWjKt2OuMdw8elVW+iNqPZZ7j13HJ86YptC3UOrTucbzsUeqc8HH0pQQQCDkHoaM84z16CllHb1fiP3oyfE/ekOEglRwAMkmmNPNPtpdYdQ42r5VIUFA+hFLB0z4k/WgGqGffJ8a6uwYtlclBtpDgeD6UJwrjnPTkEVY20Ty2ty5qZS6s5DLPKWh4bjyo+J+1acWlbMLInLSiatIcbW2sZQsFKknoQRg15iv2XTUvG3sXoHT63w8qK6glaMHPw9wOOMgjPfXocW5QpcqTFjSEOPxVBLyBnKD/wB+FSVOoQtCVLSlThIQknlRAycePFWMpQL9Zcj0/DgJyAOAM0oUc8qP3qLNmx4LXaynQ2jOBnkqPgAOSfIV1Zd7RpCyhbZWndsWMKHqKzz2W10UGnWNVtXq5OX2bEet61f1ZDQO4eGPwjHUHOTWk3kHqfvWd1hqJywMMFhhtxx3ccvKKUAJxxkftHPAq9SrchKiMFQBxnpWpXWpmYyi5OK7Q/tDnO5WfWnAnHBP3riK6JPFYs2OyfE/eikz5UZq2BaKVCd5wKbVAtTbSf6yf7tQqm2n/KT/AHa3j8kZl0XNFFFe084UUUUBCumexbCepdHT0NUWavbodrTROcdqM4+tUROST4mvJ8jtHbEJS91GKOleY6kNadqiKSpS0BXr41yLB7jmlFs5U9oErGO6nBg95FMmym7fG7VSSoqWltCR1WtRwB/350SbDkkrZR3+BMg3RzUkeers4zA3RFHCVgdRnOORz0znFS7U3bbHHiALT21yWhJcSrIdd2k5z58/cU/UTa5jkO2ZaS1KUsrW40HB8A3ABJ4yevPhWb1dp5Nr0kwILzyzAkdslSzykKODjHQA4OPWvTGppRbPFO4SlKK6/wDTXzLf7+8UzHVLhgDEZPwhR7ys9VDy6eOaotVw4VyShsrVDjQUqD81HwoaQcZbSOiyeOOg9eKa/qaYYEF5lpIMyGVMqCd6nZAKfgA7uN3X+FVeq5z8rSq3XVqCFXEuNMyx2bjrIOQNvXAJP0FXHCakiZssHBmps+pLPdXBGgzAp5I4bWgoUoDvAPX6VzNx7LV5iPNPK3x20sbUHbglSnFE9OMJH2rzSQ1Hu0plWl7TOZkJwVhDm5KVf7v4ee8n6V61GdejRIDE1fay3AltZH7SgnKj9MGmXHHG7XsYcs8vD9e/RmXIF6hSZEWbPVKh3V/sUHccsgnJ69Mo3jA7wKg6uQ9pp+wN2cOBllxxSGASd6ioEjzyFEVe6jtn9IparcVtNJjNJcLi0qUoFZPKQCBxt6nPWq/XUdUK1WR0ureVCltpLq/mVx1P2qwkm437MZYNRlXr3/ZJ1tLL+ilzISylt7slbu/aVDj74q709cTdLNFmLSUuLRhwEYwscK/MVG1qwJGlbo2AOGSsAeRB/hTYbTV20nCEh1TbDkdtTxQrbuSB8QJ7gcc1z4eP+zurWVu/RBRLU5fZpsEVuQ72aGC+TiO1glSiVD5lZV0HhVnBs6Ij6rjcZK5k5KDl9wYS0nHIQnokfnWZje0O0xZCIce3rbgNnYhxsgYT47PD862x7GfCUELC2JDZAWk9UqHUfemTVGrVImJwnbTtoqHEpudndutpdcVIkNb2XDgrSkf5tGflzgj1NR7RFur15RNlRBGigvuNhb250B3b+rUkcDBGaotG3GRarZfra4Cp63BbrafuDx6gH61tYc+M5a25gkp922f5Q4doOON2T5itSuHBMbjkqT4ZnrlqGzvXhUK7zG/d2HMBgNlbalj9pxWMcfhHAPUmtYyttxpC2FIW0pIKFIIII7sYrxVmRbTDfhP2xUueXVdjKjOkFeT3jndz5dK3GhY1xsdknP3ZLrUdI7RlhZ5TgHJx3Z4GK3lxKMbOPx/kSlNprj8m1NGaakqKRvACsfEB3HvFLXkPoi0opKKAcnPdTti1nISeaRpO9aR96n4xwK0jLdEFSVJPxAiplpP9YPpSrSFJINNtmBKwM/Wtw8kZbtF1RRRXuOAUUUUBWXtYS0yNpJLo9Bwap6v7q2lyGoq6IIVj0qhVgKIByO415fkLlHbG+ABo4NJRXmOovFHFJRQC8Vnb6+lzVNggrUEo3OSCCfmUlJCR981oh1rL6ps8fUF3hQVuKZcZZW+p5AyoJJCQn6nJ+ldMVauTjnvRwWMh9qem3y4Z7VLM/ZuHePiQrHlzU65REzrdJiLGQ80pH3HH50lrt0e1wGYUQENNDA3HJJ6knzNR77fYdjih6Urc4r+yYRyt1XgB/Gnckoh8Rbn7MBD1S7Z9FxY0co9+94daSpYB7NIOSQD3/FgVVW262QvGZqBqfcpij8W9xOz9+T+7yrWaFYbZlXiBdWWPeG1pkFLiAdgUnKuvcMjNcpE2bqB1TWmLLERFSSn359hICvMZGP3n0r26kpNV/dnzdEnFSv8AqrC2a8sdviIixoEttlGcABHeSfHzpLlrGzXdcVssXRC23coLBSkqJ+EpPPQ5xSW7QCZct9y7XBTqm1hK0x0BAKtoJGcdBkdBVjamtIwZsxuHHT73bkqccW6CpXw9Sknrg8cVzksV3FNs6x36Sk0kXziFJ1G06EnDsNaF+RSsEf8AyNVntEaLuk5ah1aUhwfRQ/nVpYp0u4QBInQlQ3t6k9krk7QeDXHVqEL0xdA4QE+7KOT+VeeLqas9kknilXsrFXOPNnS4LzmHXoDbcdrHKwttS1L9M4GfIU3TDS7n7PGoiHNji47jAV4HJFXWn2NlntqpDSRITFbSVFI3AYHGetZzTsxdp0ZcHEAFyNKebaChxuKwE/ma23aaj6aOKVNOXtMy0iw6segtQnrapTEf5AlDWR6KHJ/jW19nLsgWNyDMbW29DfU1scGFJSQFAY+ppmoNXtW/FvtoE+6nCMNjKUr7846nyH1qdp2K9Z7S/Lvcoe9PrL8pxxXCOMAZ8gMcfSt5ZSljqS/g54ccIZbg/wCSlmPtWLXk2WsYakW5byh4qSMn/wCP51jJmof0zPDt+W+uKnlEWKpKEp8uf39a0dxvAuGorbfW2Si2MSRDS46P7UHJUrHhzV7qK8pizharNamZtzKQpQ7FJS0D0J4/+q6RemrXNHKa1p1Klf8AmzOWzV2nrbJD9vsz7Cw12R2LScjOck5zmrKZ7QbPNiOxX7fNW26gpWAUjg+eaROjLrdiHNQXJttOdwYitJwn7AD99XEPQtgjAFcZchXi+4SPsMCsTlgu3yzeOHyapUl/BM0jMjzrGy5DYkNMJUpCfeFblrIPKie/JJ59auaZHZajMoYjtpaaQNqEIGAkeVPPWvHKm20fRgmopPsKWkpM1DZ2ZKUnco8DuqQiQhRAAOTUKlIIOCKJtEcUyQ8+VIwkYz15rrbFYkpHXP8AKoSlE4GeB0FS7aT702McZ8PKtwf3RmS4L6iiivonmCiiigOb6O0ZWj8ScVl0J2JCD1R8J9RWrPTiszJG1wgqBIUrdjxzXDOuLOmN8nOikzSH1ryHYdRSA0tAGQOtYu/3pOndXiZJZcdiyoQa/V9UlKieM9ev51s64TIMSe0GpsZp9sHIS4nODXTHJRfPRzywlKP1dMxcjXsm4r9105a3XH1ftujdt/4Rx9ScV3t9getyxetQO++XZxxDbKFHclpSlAD1IznjgY4rXxYkaG32cRhphv8AC2gJH5Vxu1vbucJUZx11n4krQ60rC0KScgg1vdiuIqkcdib+03b/AOjK68sM52QbvZt5e7ItSG2z8S0YxkDv4yCPSo2g9WOvuR7HNY3KSkoZdQMEBIzhQ9B1rdRWERYzUdoqKGkhIKjknHeT41z9wh++Jm+6s+9JBAeCBuwevNXdWjS1Y/28lk3IOvyjNR9Rs2jUt0tt2UWW3nw8w8ofDhSQMHy46+tWU212icpMthyI26XkuuvtqTl1I6pJz0I4qRfdPW6+tpTOaPaI+R1s7Vp8s948jWbHsytu/JnyinwCEA/eieN83TMyjlX1pNFxeNZWe2JUBIEuR3NRyFc+Z6CqPE+8vsXDUyVxreHAYlsaSSuQvqMp6nx5/IVobTpa02b9ZCiJXIA+F187lZ8uOPoK43O0Xq6ODtLuzDbTkBMRgleD1+NRzz5YpFwXC/yJxyyVy/whkzUaLW8qTeJDcYbCGra1hx08j4lkcA8dOg8TWHmSL1d7POXDiKZtCXlylnHKyVZ6/tY8uOK2lr0LaILgdkByc7nO6QeM+O0dfrmtOEpCQkJG0DG3HGPDFVZIQdxVkeDJkX3dI8qsOo7LYmAbdbJMi4rThTryk8nwGM4HoOasfdLlqKY25qZ8xIiSFpgtfCoJ/EofsjzVye4VumbXBjb1Q4rEZxQI7RltKVDzBxXKDaWYxDjmHHAdw4+FJ8R4q/3jk+nSks0XbS5JH406UW+CFcrPDvNjkWmOhLDTC9jJSPhQtIz9ucH615/AvN40hdXk3BlTnabQ6h0/2gSMApX38dK9Qg21EOZLkIkPrEhZX2S1ZQ2Scq2jzPNSpEePKbLUllt5B/ZcQFD86zHKo2nymbn8dzqSdNDYj6ZURiQlJSl5tKwlXUAjODXWhICUhKQAkDAAHQU6vOz1pcDaKdSEUKJRS4oIoBKUUlLQD0Y3gqGRnmrOOpJWgpIwDVSM544q0jAJAx4fetQ7MS6LaigUV9E84UUUUAGszOCUvr2px+sVnz5rTVnrwjZKKcj4huAHcO/8645/A3j8iFmikwaRag2kqWQlKRkqJwAPM14jvY7NG6uUeQzJZS9GdQ80r5VtqCknu4Iqhm6ilvvuRdNW03F1tRQ5IWvs47ah1G/9ojwTWlFthujSZozVTY2rw0047f5Udx9Z+FqM3taaHkTyo+ZqzC0KztUDjrg5o1TCZ0zSZrIx3bvfGdRQ41zMCVHuRaZeS2FbGwlJAx3Z5yfWptqh3KJfnk3DUgmpcjpWiEWEIKccFeB0GfDrnmtONeyWaKlriXWw6GS4jtSncEbhuI8cdcU9SwlJUogADJJPAFYND6TNR3JsdqIuW4+0mMhBWp3eNoSO/PTFJCnRrhDblwHm32HE5Q4g5CqtMhJ76WsZaLlqK66IgTLSuIq5rcUHlSvlIDigrGPoPTzqdcr04JemTFkMuRZ0wtvLYVlLmEKwAfDd9eK1ofRLNLmgVjrnadQMMTJK9Ze6sCQH0rXFQEtN96SfDy6Hv61rd6WGN7zydqE5U6shI9T3Co410WzpRSJUFAFJBBGQQeDTQ80XiyHEF0DcWwobgPHHXFQD6Md9ZaV7QtLxLi9BkXLY8ysoWexUUBQ6jcBVtaNRWi9OON2qe1KW2kKWG8/CDxzkVXBrtEtFnRUSJdYE2VJixJbLz8VQS+2hWS2fOpKXWluLbS4hS28b0gglORkZHdmpRbHUtJmioUWis9Jnym9eQLeXMQ3bc84ED9pwLHJ9AOPU1bXO6QLTH94ucxmK0TgKdVjJ8B4n0q6SWS6KjwpsW4RkSYMhqQwv5XGlBSTXepRbHgbs+XWpEV5YUEAZFRQT0ycV0YUpLqSk4ouyNGlHSikbOUJPiKK+ijyjqKKKoCqa9t/1llzjKklH8f4Vc1V3dC1vsYA2oBUT+X8axk5izUeyp215v7RrfdtR3V6z2534YUJuWIe7b70pSyDk57gOnia9QKKqTZydUIvAUkJEAxVJ7ye0CgfoM/evLCouzq+TyjTF61Rp+2yIDekZb8QvudmgBwFkn5k5AJxzwT9zVAq0ywT2Gj7+ynPyofcwP/119E7MeNGzzre57omj9nzt+ipyhh3SeoXB4Kfc/wD51Js9pvrV+t7llsd2tS+2SFuPrWpvbnndlI4xnNe/lJpNpxzR5n+Bo/Z5reJeoNL6nuki2WF26Qbmpt4FsK+BYTgj4QcfXyqLY3L1f9fQLvKsEm0pjsLQ+45v2upwQlPxAc5P/eK9T21wlx1vtFDch1hR6ONbcj/mBFY18dF0/s8V1c7fLXrYXZVsle8JnARZAUS281jCWkgDHIz355PFXl2d1lrK2uNt2dFsjsLClRpKlAyz+HnHA8OAfHitZD0aEXxu73S7zro9Hz7siRtCGj+IBPGfoK0u2tSyJVSIo9nmkfT1+b9m0S1iKw7LRK7ZcJ9zCVNbirYo5Hfg4zVj7I23Y9hmIWW1NC4L7PsjlHRO4JPenOQD5Vd33TC7y0tl2+XRmOv52WVoCVDwztzj61ZWu1x7VBYgwmw1GYTtQkcn1J7yetZlP60VR5POmLnqTSwm2ROl3rnB7d1TLzQXhTayTjKQfH1FcrbY73G0JFfiQXUzoV19+iwnc70tjjbg4J7z516rt8KTbTd/Q0HlF/1NqK+WeTbJWiJiW30Y3JDuUqHII+HuOOKsdXW+8jQ9it/uEm4BpCBPYYWQs4R8IOATgE+B5SK9FKSazt901Lu6VNHUVyjxl8LZbCMEd4yAD981Y5Fa4oOJhtFao1UmxxbVbbE5KSFKaZnO7uzbGf2uMEJ9e6rLRml9R2vW6pt0S0toMuB2ahefeSo5HnuzjqBgCt/a4Ea1W9iBBb7OOwjahOc/U+JJ5zUvNR5e6QUfyYaNpqz6musx9+HHRboEpcZqOwgILzicb3HFD4jycAZ7s99amFZoFpjSEWWHHhrdQeW0YyoA7SfHBNZObpXUdvvk24aUvDEdia4XXo0lJKQs9TjBB7+eD3VYw7RquQCbvqZLIKcdnboyUnPjuUP3CrJp/wDLgLj0ZXQdruVq122zOjxo76YDgkIjuFe9ORtWs5PxKV6dM4q/nxkQfafb5NvmLMi4NL9/iZyA2lHwr8uQMDyyKsrXoyHbY0pMefchLlK3PTRIw8vwGcYxXXTekoGnn5Elh2RKmST+slSl7nCPDPh++rLJFuwovol2m7JulyuSGlfqbe6I5SnkrcxlSj5DOB4kHyrH3D2j3iHdRB/oq+gvOFEYSFrbU94YG3GT4Z76m3b2dok3h+6Wm9TLW/IUVPBnkEnqRgg+eOasLDo1i2zm7hPuM66zWs9k5LcJS2TwSlPcfPNRba57D1dGUlXrV866w9QNaTdaFtStpUdW/c8lwc4BAOBjuHfVbPveq5mpWrw7pGQ402x2KYciKt1AGclSSU/ConvH7q9mzRuPiaLKl6K4fsyehrlcLg9MVJ0uiyMgJKlYUgvL8kkAcDqfStdTSaXNc5O3ZpIWntH9Ymueac2fjFQppmDllv8Auj91FJH/ALBv+6P3UV9BdHkOtFFFUBUG4pG5lRJ+Yj8jU6oU07pDDY6jKzxngDH8akuirsg7KbsP0qTtpqtqUlSvlAyceFeSjpZn7xqay2WWItznIYfLKnwgoUSUDr0HXrxUuLdIEuzi7R5CVQC0Xe2IKQEAHJOeeMGquz6205cbZFlyrtbGH3GyVtOvJSprPVJCufXxqpuuo27ren9O216BMtk2zyA2qI4FqbdSk8KxwBjAArSh+hqNW7cITENmXIlNMMPbOzW8sICt2Ckc95zUkp4rCwdT6Qk6Etq77Kt8pUWK0tcRwhTgdQnGAg85yMeHPhVpevaFp23Wdc2NPjTXtgLUWO4FLUSO8D5QO892Kjg/Q1GikONRmVvPuJbaQMqWo4AFOACgFJ5BGQRWItWs2b1oK7Xe7xIrqYjqmVNIyGnvl2fNyASocnp1rtpDXtrm2pxN5lWy2S4jhaW0h9IbUkDIU3ycpxxxnpTbZdRsCiqc6js//mI9+b3W1e2UnPxIPHd3jJxkd9Zq0e1O1z7+qK+5Gi21wLSw+4pQWFpIwXMjCQoZx4Y5qm1BFttzd19LtrkaSFW+M+h9hQUAQcrGR4lAJosfNMaj1QoprhS22pbikoQkZUpRwAPEmsPr/V86w261JtzsdmXIjpkqMhBV2iQE/q0gD5iSeuOB1rYsS4txtcJchtGy5MpKWHBu3bkbikjvAGc1lw4suodEfYmR0SIjzb7DgyhxtQUlQ8iK6lFZ+Zf7DpK4QLC62i3x3mVONOBG1lHPQnxPPPpnrT5GuNMszI0U3iGsv7vjQ6kobwM/EroM9BRwfpF1FozKivvPMMSWXXmCEvNoWCpsnuUO6uxT3VmouptGRb3KaizbazJfbDz8pCkhDpzjaV9Crvx/Gqe7+02K1qKHbrUliVFW+229IJV8YUcHs8cHb3k9e6m230TUjcB1kyFRw4kvJSFlGeQD0NPKaxOq9XRdPavZaEKIoBLSJ8lawHkpXnbsGckAcnr1A4qXqf2gWa1RWxb58KZLeXsQEu7m2/8AfcKckJ8hyabTLqRfXa5QrPDMu4vpYYC0oK1dAVHA/wC/DNOYmxpElyNHeQ4420h1Ww5G1edpyPHaaxF81VZdS+zmb2s2GzOcjFRiqcAUl1JBwkHk9OD4GptqS3adXT3GmCiKdPR5AbQMABvjHl0NNrjnsmvkubtqmy2iW7FuE5LL7TPbKRsUTtz5Dr5VOVdIabSbr26fcg123a4IBR481XwNWaclwI8iRd7Yl11lPaIW6lJTkZKSDzjPdWZ1PfheRqCyRHYkqB+hzJjuxXAvapsgqCsdPIeQ8aLHforkeg5JTkd4zSJJ76yeotUu2HTFpkR2mHJsxlBQmS5sRhLYUok5HPQAd5NOc9oNkRp1Fz94aXJWyFiAhwKd345SQOmDnk93NZ25ehqRpZM2PFcjtvuBCpDoZaH4lEE4+wNdxzXl6NRSNTRLRcVsspdg6gZa/q+7atC08H4ufKrPU+s5Vr1jFt0ZTBjNOtNyWFJJdd7QZ3JOMAJBHf1q7T6Gr2bxRoFOKSCR4Gk2muRoWns/2ic+NcsGp1pYLskEj4UcmtRVtIN0i/bG1tKfAAUU+ivoo8oUUUUAVXuLK57gxhLbYT6k8/wqwquQR7zJPA+MD8qxPxKux5RxTQ33knNdKK4GzKSfZ1pCQ8t52wRS4slSikrSCfQKAFS7Lo+wWGUqVaLWzFfUgoLiSonaeo5J8K0FFW2Qy50DpT30zP0DDL5UVklJ25Pftzt/Kulp0fp6zS1ybZZ48d5SSguAE/CeoGScA1pMUhFLf5BlL7bXI9pdt9n0xBnRHQSqKZCWEEk5JKdvPPPBqi0p7MLRHgqe1DaYTs914ulptSy3HT3Np55A785616PigppbSBmbhojTNymOTJtliuvuI2LVtKcjxwCOeOvWpFs0vZLRDlRbZbGGWJQw82CSHeCMHJPGCfvV7tpCmpbBhtV2nUOoeztrdvtsOEpW12cp8PPIbPzBtO0bSRxn91Jq606iYlWido9EVw29lxgxJCsJKFBIBGcdyQOordbaaU1dQPOo2m9QaomR3teRLYmDF3qahR8lS1qTjKlA8DvwD1AqHD0mkusxX/Z5bWYj0lSZDnv+9TaE/Ksd/eeAefKvUMUhTTUxRlF+z/SZYSwbFE7NKioY3A5PXnOT0HU1ZIsdtYYiNx7ZEIg8xElAHZH/AHTgkdetWqzg4AzTtvFZts0jzTUek52q77G9/wBPwYUVC0l+f712rzraf2EhOMZ6cjgeFaaLovTcSLJix7NFSzKADySCrcB05JJH0rSFNIUUcnVDgyX/AIe6TGz/AMijEoAAOVc48eefr1rQGIz2qneyR2ikBtSsDJQOdvpyeKmFOKNtRtvsWjIuezzSbi1LVYo2ScnapYH2CsCplr0lYrR7x+jrYywJDfZPAFR3o7wck8VodtJtpbLwYTW9qud5ipt8fTkCSgcNSpEsYYyMbgkAHgY46cd9TtN6JstgbjrjwmlTmmuzXKIJUskYUcE4Gee7pWsKaaQEjKjgeJOKanVDgqU2uJEjdnBgRkhLvbpaSkNpLn4uBwfPFZyXZbxe9QRH7nBgQrdEWHVdm4HXpBScoSVbRhIODjy+2tk3OBG4elNJPgFZNVMnVUJBxHacePmMCtRUvSDaLgp5pUtLWcJSSazzVxu9xcSlhtMVCjgKxlR9M1uLPbxAiJQpanHVcrcWckmiwN9keQhsWtxzBc+AedW0aMiM3sQPU+NdcUtdoY4x6MSk2FFFFdDIUUUUAh6Vmk3iKh11t1mQhQdUSSnIPPlWmriqJHUsrUygqPU4qNWqBTi+Qz07Y/8AtGnC8RD0Ej/AV/KrlLTaeiEj6U7aB0ArG2i2UybrGPRMn/p1fypwuTBPDcj/AAFVcUVdtCyo/SDX+qkf4Kqd76juaf8A8I1a0VNtDUyq98R/qpH+EaPfU/6mR/hGrWim2hqZUe+p/wDTyT/7RppuKB/o8r/Cq5oq7aFlIbo2P9Hlf4Vc1XdoH/JpX/J/91fYFG1PgPtU20NTM8q9tD/RpH/KB/Guar81/wCkfP1SP41pOzQeqE/amGOyerSP+UVdtC2Zz9ONdfcn8/3k0G+JPSE79VprQKhRldWGz/w0xVshK6xm/tTbiLZn1XtfdBX9XBTFXx/ugD6vD+VX5s8A/wCYA9Ca5qscE9EKHoo00RFsoP03MPSA0PV4/wAqaq83A/LFjD1cJq9VYIp6LcH1zXJWnW/2JCx6gU24i2UK7rdz8rcNPqVGuap97V0eip9GzV4rTrn7EhJ9U1xXYZg+Utq+uKuiP4FsoHFXp3O+5BIPchGKjKtTj3Mmc+5481oV2icj/ME/3SDUdyLIa/tGHE+qaqSRCpbs0NGMoUsj8SqltRmGv7NpCfRNdaubLay8oSJCcNjlKT+151QSLDbezAlPj4iPgSe4eNXlA4ooAooooAooooAooooAooooAooooAooooAooooAooooAooooAooooAooooAooooAooooAooooAooooApMUUUBzMZgq3Flsq8SgZroBgYFFFALRRRQBRRRQBRRRQH//Z';
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  إعدادات الحفظ السحابي — للمالك فقط                             ║
@@ -1485,6 +1495,7 @@ function addPerson(d){
     notes:d.notes||'',
     isExternal:d.isExternal||false
   };
+  p=normalizePersonDates(p);
   people.push(p);expanded[p.id]=false;
   // تحديث الفهارس مباشرةً دون إعادة بناء كامل
   _personMap.set(p.id,p);
@@ -1642,6 +1653,311 @@ function normalizeAr(s){
     .replace(/[أإآٱ]/g,'ا').replace(/[ىئ]/g,'ي').replace(/ة/g,'ه')
     .replace(/[\u064B-\u065F\u0670]/g,'');
 }
+
+// ══════════════════════════════════════════════════════════
+//  دعم التاريخ الميلادي + الهجري (Tabular Islamic Calendar)
+// ══════════════════════════════════════════════════════════
+const HIJRI_MONTH_NAMES=['محرم','صفر','ربيع الأول','ربيع الثاني','جمادى الأولى','جمادى الآخرة','رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'];
+
+function _pad2(n){return String(n).padStart(2,'0');}
+
+function _normalizeDigits(s){
+  return (s||'').toString()
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+}
+
+function _parseISODateParts(s){
+  s=_normalizeDigits(s);
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(!m)return null;
+  let y=+m[1], mo=+m[2], d=+m[3];
+  if(!y||mo<1||mo>12||d<1||d>31)return null;
+  return {year:y,month:mo,day:d};
+}
+
+function _parseHijriDateParts(s){
+  s=_normalizeDigits(s);
+  let m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{3,4})$/);
+  if(!m)return null;
+  let d=+m[1], mo=+m[2], y=+m[3];
+  if(!y||mo<1||mo>12||d<1||d>30)return null;
+  return {year:y,month:mo,day:d};
+}
+
+function _formatGregorianDisplay(iso){
+  let p=_parseISODateParts(iso);
+  if(!p)return (iso||'').trim();
+  return `${_pad2(p.day)}-${_pad2(p.month)}-${p.year}`;
+}
+
+function _formatHijriInput(parts){
+  if(!parts)return '';
+  return `${_pad2(parts.day)}-${_pad2(parts.month)}-${parts.year}`;
+}
+
+function _formatHijriDisplayFromParts(parts){
+  if(!parts)return '';
+  return `${parts.day} ${HIJRI_MONTH_NAMES[parts.month-1]||parts.month} ${parts.year}هـ`;
+}
+
+function _compareHijriParts(a,b){
+  if(!a||!b)return NaN;
+  return (a.year-b.year) || (a.month-b.month) || (a.day-b.day);
+}
+
+function _gregorianToJdn(y,m,d){
+  if(m<=2){
+    y--;
+    m+=12;
+  }
+  let A=Math.floor(y/100);
+  let B=2-A+Math.floor(A/4);
+  return Math.floor(365.25*(y+4716)) + Math.floor(30.6001*(m+1)) + d + B - 1524;
+}
+
+function _jdnToGregorianParts(jd){
+  let l=jd+68569;
+  let n=Math.floor((4*l)/146097);
+  l=l-Math.floor((146097*n+3)/4);
+  let i=Math.floor((4000*(l+1))/1461001);
+  l=l-Math.floor((1461*i)/4)+31;
+  let j=Math.floor((80*l)/2447);
+  let day=l-Math.floor((2447*j)/80);
+  l=Math.floor(j/11);
+  let month=j+2-12*l;
+  let year=100*(n-49)+i+l;
+  return {year,month,day};
+}
+
+function _jdnToISO(jd){
+  let p=_jdnToGregorianParts(jd);
+  return `${p.year}-${_pad2(p.month)}-${_pad2(p.day)}`;
+}
+
+function _gregorianToHijriParts(iso){
+  let p=_parseISODateParts(iso);
+  if(!p)return null;
+  let JD=_gregorianToJdn(p.year,p.month,p.day);
+  let l = JD - 1948439 + 10632;
+  let n = Math.floor((l - 1) / 10631);
+  l = l - 10631 * n + 354;
+  let j =
+      Math.floor((10985 - l) / 5316) *
+      Math.floor((50 * l) / 17719) +
+      Math.floor(l / 5670) *
+      Math.floor((43 * l) / 15238);
+  l =
+      l
+    - Math.floor((30 - j) / 15) *
+      Math.floor((17719 * j) / 50)
+    - Math.floor(j / 16) *
+      Math.floor((15238 * j) / 43)
+    + 29;
+  let month = Math.floor((24 * l) / 709);
+  let day = l - Math.floor((709 * month) / 24);
+  let year = 30 * n + j - 30;
+  return {year,month,day};
+}
+
+function _hijriToGregorianISO(hijriInput){
+  let target=typeof hijriInput==='string' ? _parseHijriDateParts(hijriInput) : hijriInput;
+  if(!target)return '';
+  let loJd=_gregorianToJdn(1700,1,1);
+  let hiJd=_gregorianToJdn(2400,12,31);
+  let found=null;
+  while(loJd<=hiJd){
+    let midJd=Math.floor((loJd+hiJd)/2);
+    let iso=_jdnToISO(midJd);
+    let parts=_gregorianToHijriParts(iso);
+    if(!parts) break;
+    let cmp=_compareHijriParts(parts,target);
+    if(cmp<0) loJd=midJd+1;
+    else { found=midJd; hiJd=midJd-1; }
+  }
+  if(found===null)return '';
+  let iso=_jdnToISO(found);
+  let chk=_gregorianToHijriParts(iso);
+  return chk && _compareHijriParts(chk,target)===0 ? iso : '';
+}
+
+function _dateInfoFromPerson(p, field){
+  if(!p)return {type:'gregorian',original:'',gregorian:'',hijri:'',display:''};
+  let type=(p[field+'Type']||'').toString().toLowerCase();
+  let original=(p[field]||'').trim();
+  let greg=(p[field+'Gregorian']||'').trim();
+  let hijri=(p[field+'Hijri']||'').trim();
+  if(!type){
+    if(greg && !hijri) type='gregorian';
+    else if(hijri && !greg) type='hijri';
+    else if(_parseISODateParts(original)) type='gregorian';
+    else if(_parseHijriDateParts(original)) type='hijri';
+    else if(greg) type='gregorian';
+    else if(hijri) type='hijri';
+    else type='gregorian';
+  }
+  if(type==='gregorian'){
+    if(!greg && _parseISODateParts(original)) greg=original;
+    if(!hijri && greg){
+      let hp=_gregorianToHijriParts(greg);
+      if(hp) hijri=_formatHijriInput(hp);
+    }
+    if(!original) original=greg||hijri||'';
+  } else {
+    if(!hijri && _parseHijriDateParts(original)) hijri=original;
+    if(!greg && hijri) greg=_hijriToGregorianISO(hijri);
+    if(!original) original=hijri||greg||'';
+  }
+  let display='';
+  if(greg && hijri) display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(_parseHijriDateParts(hijri))})`;
+  else if(greg) display=_formatGregorianDisplay(greg);
+  else if(hijri) display=_formatHijriDisplayFromParts(_parseHijriDateParts(hijri));
+  return {type,original,gregorian:greg,hijri,display};
+}
+
+function normalizePersonDates(p){
+  if(!p)return p;
+  let b=_dateInfoFromPerson(p,'dob');
+  p.dobType=b.type; p.dob=b.original; p.dobGregorian=b.gregorian; p.dobHijri=b.hijri;
+  let d=_dateInfoFromPerson(p,'dod');
+  p.dodType=d.type; p.dod=d.original; p.dodGregorian=d.gregorian; p.dodHijri=d.hijri;
+  return p;
+}
+
+function normalizeAllPersonDates(){
+  people.forEach(normalizePersonDates);
+}
+
+function getPersonDateInfo(p, field){
+  return _dateInfoFromPerson(p, field);
+}
+
+function getPersonDateDisplay(p, field){
+  let info=_dateInfoFromPerson(p, field);
+  if(info.gregorian && info.hijri){
+    return `<div style="display:flex;flex-direction:column;line-height:1.35">
+      <span>${_formatGregorianDisplay(info.gregorian)}</span>
+      <span style="color:var(--text2);opacity:.82">${_formatHijriDisplayFromParts(_parseHijriDateParts(info.hijri))}</span>
+    </div>`;
+  }
+  return info.display;
+}
+
+function getPersonTreeDateYearDisplay(p, field){
+  let info=_dateInfoFromPerson(p, field);
+  let source=info.gregorian || info.original || '';
+  let parts=_parseISODateParts(source);
+  return parts ? String(parts.year) : '';
+}
+
+function getPersonLifeDatesLine(p){
+  let birth=getPersonDateDisplay(p,'dob');
+  let death=getPersonDateDisplay(p,'dod');
+  if(!birth && !death)return '';
+  let parts=[];
+  if(birth)parts.push(`الميلاد: ${birth}`);
+  if(death)parts.push(`الوفاة: ${death}`);
+  return parts.join(' · ');
+}
+
+function buildCalendarFieldBlock(prefix, field, label, person){
+  let info=_dateInfoFromPerson(person||{}, field);
+  let type=info.type||'gregorian';
+  let greg=info.gregorian||'';
+  let hijri=info.hijri||'';
+  let display=info.display||'—';
+  let gStyle=type==='gregorian'?'':'display:none';
+  let hStyle=type==='hijri'?'':'display:none';
+  return `
+    <div class="form-row">
+      <label>${label}</label>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select id="${prefix}_${field}_type" onchange="syncCalendarField('${prefix}','${field}')">
+          <option value="gregorian"${type==='gregorian'?' selected':''}>ميلادي</option>
+          <option value="hijri"${type==='hijri'?' selected':''}>هجري</option>
+        </select>
+        <input type="date" id="${prefix}_${field}_greg" value="${greg}" oninput="syncCalendarField('${prefix}','${field}')" style="min-width:160px;${gStyle}">
+        <input type="text" id="${prefix}_${field}_hijri" value="${hijri}" oninput="syncCalendarField('${prefix}','${field}')" placeholder="13-10-1415" inputmode="numeric" style="min-width:160px;${hStyle}">
+      </div>
+      <div id="${prefix}_${field}_preview" style="margin-top:4px;font-size:11px;color:var(--text2)">المحوّل: ${display}</div>
+    </div>`;
+}
+
+function syncCalendarField(prefix, field){
+  let typeEl=document.getElementById(`${prefix}_${field}_type`);
+  let gEl=document.getElementById(`${prefix}_${field}_greg`);
+  let hEl=document.getElementById(`${prefix}_${field}_hijri`);
+  let prev=document.getElementById(`${prefix}_${field}_preview`);
+  if(!typeEl||!gEl||!hEl||!prev)return;
+  let type=typeEl.value||'gregorian';
+  let original='', greg='', hijri='', display='';
+  if(type==='gregorian'){
+    gEl.style.display='';
+    hEl.style.display='none';
+    original=gEl.value.trim();
+    greg=original;
+    if(greg){
+      let hp=_gregorianToHijriParts(greg);
+      if(hp){
+        hijri=_formatHijriInput(hp);
+        hEl.value=hijri;
+        display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(hp)})`;
+      } else {
+        display=_formatGregorianDisplay(greg);
+      }
+    } else {
+      hEl.value='';
+      display='—';
+    }
+  } else {
+    gEl.style.display='none';
+    hEl.style.display='';
+    original=_normalizeDigits(hEl.value.trim());
+    if(original!==hEl.value) hEl.value=original;
+    hijri=original;
+    if(hijri){
+      let hp=_parseHijriDateParts(hijri);
+      if(hp){
+        greg=_hijriToGregorianISO(hp);
+        if(greg) gEl.value=greg;
+        display=greg ? `${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(hp)})` : _formatHijriDisplayFromParts(hp);
+      } else {
+        display=original;
+      }
+    } else {
+      gEl.value='';
+      display='—';
+    }
+  }
+  prev.textContent=`المحوّل: ${display}`;
+}
+
+function readCalendarField(prefix, field){
+  let typeEl=document.getElementById(`${prefix}_${field}_type`);
+  let gEl=document.getElementById(`${prefix}_${field}_greg`);
+  let hEl=document.getElementById(`${prefix}_${field}_hijri`);
+  let type=typeEl?typeEl.value:'gregorian';
+  let original='', greg='', hijri='';
+  if(type==='hijri'){
+    hijri=_normalizeDigits((hEl&&hEl.value)||'');
+    original=hijri;
+    if(hijri){
+      let hp=_parseHijriDateParts(hijri);
+      if(hp) greg=_hijriToGregorianISO(hp);
+    }
+    if(!greg && hEl && gEl && gEl.value) greg=gEl.value.trim();
+  } else {
+    greg=(gEl&&gEl.value)||'';
+    original=greg;
+    if(greg){
+      let hp=_gregorianToHijriParts(greg);
+      if(hp) hijri=_formatHijriInput(hp);
+    }
+    if(!hijri && hEl && hEl.value) hijri=_normalizeDigits(hEl.value);
+  }
+  return {type, original, gregorian:greg, hijri};
+}
+
 // ── قائمة الألقاب الشرفية المعيارية ──
 const KNOWN_TITLES=['السيد','السيدة','سيد','سيدة','دكتور','دكتورة','أستاذ','أستاذة','د','أ'];
 // ── تجريد الألقاب من نص البحث ──
@@ -1825,6 +2141,8 @@ function _showSrpOverlay(){} // لم يعد مستخدماً
   document.body.appendChild(bar);
 })();
 
+
+/* === js/search.js === */
 // ══════════════════════════════════════════════════════════
 //  دوال شريط التنقل في نتائج البحث
 // ══════════════════════════════════════════════════════════
@@ -2342,6 +2660,8 @@ function describeKinshipFromPaths(path1,path2,p1,p2){
 // ══════════════════════════════════════════════════════
 
 // حساب القرابة الدموية بين شخصين، يُعيد null إذا لا توجد صلة
+
+/* === js/kinship.js === */
 // ══════════════════════════════════════════════════════════
 //  التحقق من الزواج المباشر بين شخصين
 // ══════════════════════════════════════════════════════════
@@ -3206,6 +3526,8 @@ function exportData(){
   },100);
 }
 
+
+/* === js/export.js === */
 // ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
 // تصدير JSON — بدون صور / مع صور / للعائلة (مع Gist + Device ID)
@@ -3403,6 +3725,7 @@ function doImport(mode){
   try{
     if(mode==='replace'){
       people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+      try{normalizeAllPersonDates();}catch(e){}
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
       migrateExternalSpouses();
@@ -3473,6 +3796,7 @@ function doImport(mode){
       let skipped=incoming.length-trulyNew.length;
       // الدمج: إضافة الجدد فقط
       people=people.concat(trulyNew);
+      try{normalizeAllPersonDates();}catch(e){}
       trulyNew.forEach(p=>{expanded[p.id]=false;});
       _invalidateAll();
       _applyFamilyMetaIfNeeded(d);
@@ -3608,8 +3932,8 @@ function renderNode(p,q,matchIds,contextIds){
     spInfo=(spInfo?spInfo+' ':'')+migBadge;
   }
   let meta='';
-  if(p.dob)meta+=`<span class="node-meta">م.${p.dob.split('-')[0]}</span> `;
-  if(p.dod)meta+=`<span class="node-meta">و.${p.dod.split('-')[0]}</span>`;
+  let birthYear=getPersonTreeDateYearDisplay(p,'dob');
+  if(birthYear)meta+=`<span class="node-meta">${birthYear}</span>`;
 
   // ── وضع الجوال: تبسيط الواجهة ──
   let isMob=document.body.classList.contains('mobile-mode');
@@ -4056,7 +4380,7 @@ function _listLoadMore(offset){
 function toggleNode(id){expanded[id]=!expanded[id];renderTree();}
 function selectNode(e,id){if(e.target.closest('.node-actions')||e.target.closest('.toggle-btn')||e.target.closest('.node-name'))return;expanded[id]=!expanded[id];renderTree();}
 function deletePerson(id){confirmDeleteFromList(id);}
-function row(label,val){return`<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val">${val}</span></div>`;}
+function row(label,val){return`<div class="detail-row"><span class="detail-label">${label}</span><div class="detail-val">${val}</div></div>`;}
 function showPersonDetail(id){
   let p=getPerson(id);if(!p)return;
   let fl=getFullFatherLine(p);
@@ -4162,8 +4486,8 @@ function showPersonDetail(id){
     ${p.title?row('اللقب الشرفي',`<span style="font-weight:600;color:#5b21b6;background:#ede9fe;padding:2px 10px;border-radius:8px;border:1px solid #c4b5fd">${p.title}</span>`):''}
     ${row('الجنس',p.gender==='male'?'ذكر':'أنثى')}
     ${p.familyName?row('اللقب / العائلة',`<span style="font-weight:600;color:var(--text)">${p.familyName}</span>`):''}
-    ${p.dob?row('تاريخ الولادة',p.dob):''}
-    ${p.deceased&&p.dod?row('تاريخ الوفاة',p.dod):''}
+    ${p.dob?row('تاريخ الولادة',getPersonDateDisplay(p,'dob')):''}
+    ${p.deceased&&p.dod?row('تاريخ الوفاة',getPersonDateDisplay(p,'dod')):''}
     ${p.deceased?row('الحالة',`<span style="color:#2e7d32;display:flex;align-items:center;gap:4px;">${p.gender==='female'?'متوفية — رحمها الله':'متوفى — رحمه الله'} ${crescent('#2e7d32')}</span>`):''}
     ${(()=>{
       // Children under a female parent: show her as mother, father from fatherId or fatherName
@@ -4265,6 +4589,8 @@ function showPersonDetail(id){
   }
 }
 
+
+/* === js/tree.js === */
 // ══════════════════════════════════════════════════════════
 //  Kinship Popup — شجرة قرابة كاملة من بيانات الشخص
 // ══════════════════════════════════════════════════════════
@@ -4558,9 +4884,9 @@ function showEditModal(editId,parentId){
       <input type="hidden" id="f_parent" value="${parentId||(p&&p.parentId?p.parentId:'')}">
     </div>
     ${motherFieldHtml}
-    <div class="form-row"><label>تاريخ الولادة</label><input type="date" id="f_dob" value="${p?p.dob:''}"></div>
+    ${buildCalendarFieldBlock('f','dob','تاريخ الولادة',p)}
     <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="f_deceased" ${(p&&p.deceased)?'checked':''} onchange="toggleDod()"><label for="f_deceased">متوفى</label><span style="display:inline-flex">${crescent('#2e7d32')}</span></div></div>
-    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}"><label>تاريخ الوفاة</label><input type="date" id="f_dod" value="${p?p.dod:''}"></div>
+    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}">${buildCalendarFieldBlock('f','dod','تاريخ الوفاة',p)}</div>
     <div class="form-row"><label>صورة</label><div class="file-input-btn btn" style="width:100%;justify-content:center;">📷 رفع صورة<input type="file" accept="image/*" onchange="handlePhoto(event)"></div><div id="photoPreview" style="margin-top:6px;"></div></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="f_notes" rows="2" style="resize:vertical">${p?p.notes:''}</textarea></div>
     <div class="section-title">الأزواج / الزوجات
@@ -5246,9 +5572,9 @@ function saveModal(editId,parentId){
   let gender=document.getElementById('f_gender').value;
   let parentEl=document.getElementById('f_parent');
   let pid=parentEl?(parentEl.value||''):'';
-  let dob=document.getElementById('f_dob').value;
+  let dobData=readCalendarField('f','dob');
   let deceased=document.getElementById('f_deceased').checked;
-  let dod=document.getElementById('f_dod')?document.getElementById('f_dod').value:'';
+  let dodData=readCalendarField('f','dod');
   let notes=document.getElementById('f_notes').value.trim();
   let motherIdEl=document.getElementById('f_mother_id');
   let motherTextEl=document.getElementById('f_mother');
@@ -5319,7 +5645,7 @@ function saveModal(editId,parentId){
 
   if(editId){
     let p=getPerson(editId);
-    Object.assign(p,{name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,spouses:normalizedSpouses});
+    Object.assign(p,{name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,spouses:normalizedSpouses});
     if(pid!==undefined)p.parentId=pid?parseInt(pid):null;
     if(tempPhoto==='__deleted__')p.photo=null;
     else if(tempPhoto!==null)p.photo=tempPhoto;
@@ -5346,7 +5672,7 @@ function saveModal(editId,parentId){
     let actualParent=parentId||null;
     if(pid)actualParent=parseInt(pid);
     if(parentId&&!pid)actualParent=parentId;
-    let np=addPerson({name,familyName,title,gender,dob,deceased,dod,notes,motherId,motherName,
+    let np=addPerson({name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,
       parentId:actualParent||null,
       sortOrder:window._insertAtPos!=null?-1:9999,
       spouses:normalizedSpouses,photo:tempPhoto});
@@ -5467,10 +5793,7 @@ function navigateToBreadcrumb(idx){
   setTimeout(()=>window.scrollTo({top:frame.scrollY||0,behavior:'smooth'}),100);
 }
 // ══════════════════════════════════════════════════════════
-let _modalGuardActive = false;  // guard flag — يُعاد تعيينه في كل فتح/إغلاق modal
-
 function closeModal(){
-  _modalGuardActive = false;         // أعد تهيئة الـ flag عند الإغلاق
   document.getElementById('modalContainer').innerHTML='';
   tempPhoto=null;
   // إعادة تقييم الأزرار العائمة عند إغلاق النافذة
@@ -5479,13 +5802,9 @@ function closeModal(){
   }
 }
 
-// يُشغَّل عند فتح أي Modal — يضيف طبقة history واحدة فقط مهما تعددت مصادر الاستدعاء
-// (setter + استدعاء صريح في نفس العملية) دون double-push
+// Android back guard: keep one extra internal step whenever a modal is opened
 function _androidBackGuardModalOpen(){
   if(!_androidBackReady) return;
-  if(_modalGuardActive) return;      // تمّ الـ push مسبقاً لهذا الـ modal
-  _modalGuardActive = true;
-  _lastBackAtRootTime = 0;           // فتح modal يلغي طابع الخروج
   _pushAndroidHistoryState();
 }
 
@@ -5581,113 +5900,74 @@ function _closeBackTarget(){
   return false;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  Android Back Button
-//  نهج "ادفع أولاً" + تتبع scroll مستقل + dialog تأكيد للخروج
-// ══════════════════════════════════════════════════════════════════════════
+// طابع آخر ضغطة "رجوع" على الجذر — للسماح بالخروج بضغطتين متتاليتين فقط
+let _lastBackAtRootTime = 0;
 
-// ── تتبع scroll مستقل عن Chrome restoration ──
-// Chrome يُصفّر window.scrollY قبل popstate (حتى مع manual).
-// setInterval يعمل async فيحتفظ بآخر قيمة حقيقية للمستخدم.
-let _trackedScrollY = 0;
-setInterval(function(){
-  var s = window.scrollY || window.pageYOffset || 0;
-  _trackedScrollY = s;
-}, 80);
-
-// ── dialog تأكيد الخروج ──
-function _showExitDialog(){
-  if(document.getElementById('_ftExitDlg')) return;
-  var d=document.createElement('div');
-  d.id='_ftExitDlg';
-  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999999;'
-    +'display:flex;align-items:center;justify-content:center;';
-  d.innerHTML='<div style="background:var(--card-bg,#fff);border:1px solid var(--card-border,#e5e7eb);'
-    +'border-radius:16px;padding:24px 28px;width:min(290px,88vw);text-align:center;direction:rtl;">'
-    +'<div style="font-size:16px;font-weight:700;color:var(--text,#111);margin-bottom:8px;">خروج من التطبيق؟</div>'
-    +'<div style="font-size:13px;color:var(--text2,#666);margin-bottom:20px;">هل تريد إغلاق شجرة العائلة؟</div>'
-    +'<div style="display:flex;gap:10px;justify-content:center;">'
-    +'<button onclick="document.getElementById(\'_ftExitDlg\').remove()" '
-    +'style="padding:10px 24px;border-radius:10px;border:1px solid var(--card-border,#ddd);'
-    +'background:var(--bg-secondary,#f5f5f5);color:var(--text,#111);cursor:pointer;font-size:14px;">لا</button>'
-    +'<button onclick="_ftDoExit()" '
-    +'style="padding:10px 24px;border-radius:10px;border:none;background:#ef4444;'
-    +'color:#fff;cursor:pointer;font-size:14px;font-weight:700;">خروج</button>'
-    +'</div></div>';
-  d.addEventListener('click',function(e){if(e.target===d)d.remove();});
-  document.body.appendChild(d);
-}
-function _ftDoExit(){
-  var d=document.getElementById('_ftExitDlg');if(d)d.remove();
-  try{window.close();}catch(e){}
-  // احتياطي إذا لم ينجح window.close (PWA من الشاشة الرئيسية)
-  setTimeout(function(){
-    if(!document.hidden)
-      _showBackToast('استخدم زر الرئيسية للخروج');
-  },300);
-}
-
-function _showBackToast(msg){
-  var old=document.getElementById('_ftExitToast');if(old)old.remove();
-  var t=document.createElement('div');
-  t.id='_ftExitToast';t.textContent=msg;
-  t.style.cssText='position:fixed;bottom:140px;left:50%;transform:translateX(-50%);'
-    +'background:#1f2937;color:#f9fafb;padding:12px 28px;border-radius:24px;'
-    +'font-size:14px;font-weight:600;z-index:99999;pointer-events:none;opacity:1;'
-    +'transition:opacity 0.4s;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
-  document.body.appendChild(t);
-  setTimeout(function(){
-    t.style.opacity='0';
-    setTimeout(function(){if(t.parentNode)t.remove();},400);
-  },1800);
-}
-
+/*
+ * قاعدة ثابتة: هذه الدالة لا تستدعي _pushAndroidHistoryState أبداً بداخلها.
+ * المسؤول الوحيد عن الـ push هو popstate handler فقط — مرة واحدة بعد كل ضغطة.
+ * هذا يمنع "double-push" الذي كان يُفقد طبقات الـ guard وسبّب الخروج المبكر.
+ */
 function _handleAndroidBack(){
-  // 1. أغلق أي overlay مفتوح (modal / sheet / بحث)
-  if(_closeBackTarget()){ return; }
+  // 1. أغلق أي طبقة مفتوحة (modal / sheet / بحث)
+  if(_closeBackTarget()) return true;
 
-  // 2. Scroll to top — فوري (instant)
-  // نستخدم max(window.scrollY, _trackedScrollY) لأن Chrome قد يُصفّر
-  // window.scrollY قبل popstate، بينما _trackedScrollY يحتفظ بالقيمة الحقيقية
-  var liveScroll   = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
-  var scrollToUse  = Math.max(liveScroll, _trackedScrollY);
-  if(scrollToUse > 100){
-    window.scrollTo(0, 0);          // فوري بدون smooth
-    _trackedScrollY = 0;
-    return;
+  // 2. إذا كان المستخدم scrolled → ارجع للأعلى أولاً
+  if(window.scrollY > 120){
+    window.scrollTo({top:0, behavior:'smooth'});
+    return true;
   }
 
   // 3. ارجع للتاب الرئيسي إن كنا في تاب آخر
-  if(_getActiveTabName() !== 'tree'){
-    var treeTab=_getTabElementByName('tree');
-    if(treeTab) switchTab('tree', treeTab);
-    return;
+  if(_getActiveTabName()!=='tree'){
+    let treeTab=_getTabElementByName('tree');
+    if(treeTab) switchTab('tree',treeTab);
+    return true;
   }
 
   // 4. ارجع خطوة تنقل (navStack / familyFilter)
-  if(navStack.length > 0 || currentFamilyFilter){
-    if(navStack.length > 0) navigateBack();
+  if(navStack.length>0 || currentFamilyFilter){
+    if(navStack.length>0) navigateBack();
     else navigateHome();
-    return;
+    return true;
   }
 
-  // 5. استعد snapshot محفوظ من التنقل العميق
+  // 5. استعد snapshot محفوظ
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
-    if(_restoreAndroidTreeSnapshot()){ _trackedScrollY=0; return; }
+    if(_restoreAndroidTreeSnapshot()) return true;
   }
 
-  // 6. وصلنا لأعلى الشجرة — أظهر dialog تأكيد الخروج
-  // لا double-back timeout هنا: dialog صريح يمنع الخروج العرضي تماماً
-  _showExitDialog();
+  // 6. نحن في أعلى الشجرة الرئيسية — اخرج فقط بضغطتين متتاليتين خلال 2 ثانية
+  var now = Date.now();
+  if(now - _lastBackAtRootTime < 2000){
+    // الضغطة الثانية → لا نُعيد push → يخرج المتصفح طبيعياً
+    return false;
+  }
+  _lastBackAtRootTime = now;
+  // الضغطة الأولى → أظهر تلميح وابقَ (الـ push يحدث في popstate handler فقط)
+  (function(){
+    var old=document.getElementById('_ftExitToast');
+    if(old) old.remove();
+    var t=document.createElement('div');
+    t.id='_ftExitToast';
+    t.textContent='اضغط مرة أخرى للخروج';
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
+      +'background:#1f2937;color:#f9fafb;padding:10px 22px;border-radius:20px;'
+      +'font-size:13px;z-index:99999;pointer-events:none;opacity:1;'
+      +'transition:opacity 0.4s;';
+    document.body.appendChild(t);
+    setTimeout(function(){
+      t.style.opacity='0';
+      setTimeout(function(){if(t.parentNode)t.remove();},400);
+    },1800);
+  })();
+  return true;
 }
 
 function _initAndroidBackNavigation(){
   if(_androidBackReady) return;
   if(!history || !history.pushState) return;
-  _androidBackReady = true;
-
-  // منع Chrome من إعادة موضع الـ scroll تلقائياً عند popstate
-  try{ if('scrollRestoration' in history) history.scrollRestoration = 'manual'; }catch(e){}
+  _androidBackReady=true;
 
   try{
     history.replaceState({_ftBackGuard:true}, '', location.href);
@@ -5695,27 +5975,30 @@ function _initAndroidBackNavigation(){
   }catch(e){}
 
   window.addEventListener('popstate', function(){
-    // ادفع guard state أولاً دائماً — لا يوجد حالة "صفر طبقات"
-    _pushAndroidHistoryState();
-    _handleAndroidBack();
+    if(_handleAndroidBack()){
+      _pushAndroidHistoryState();
+    }
   });
 
-  // اعترض innerHTML على modalContainer لاكتشاف فتح أي modal
+  // ── Modal back-guard: أضف طبقة history عند فتح أي Modal ──
+  // نعترض innerHTML على modalContainer بحيث يُشغَّل pushState تلقائياً
+  // عند أي إسناد غير فارغ، دون لمس بقية منطق الرجوع.
   try{
     var _mc = document.getElementById('modalContainer');
     if(_mc){
-      var desc = Object.getOwnPropertyDescriptor(Element.prototype,  'innerHTML') ||
-                 Object.getOwnPropertyDescriptor(HTMLElement.prototype,'innerHTML');
-      if(desc && desc.set){
-        var _origSet=desc.set, _origGet=desc.get;
-        Object.defineProperty(_mc,'innerHTML',{
-          get: function(){ return _origGet.call(this); },
+      var _mcProto = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+      var _mcSetter = _mcProto && _mcProto.set;
+      if(_mcSetter){
+        Object.defineProperty(_mc, 'innerHTML', {
+          get: function(){ return _mcProto.get.call(this); },
           set: function(val){
-            _origSet.call(this, val);
-            if(val && val.trim()!=='') _androidBackGuardModalOpen();
-            else _modalGuardActive=false;
+            _mcSetter.call(this, val);
+            // فقط عند الفتح (قيمة غير فارغة) نضيف طبقة رجوع
+            if(val && val.trim() !== ''){
+              _pushAndroidHistoryState();
+            }
           },
-          configurable:true
+          configurable: true
         });
       }
     }
@@ -6107,6 +6390,8 @@ function renderGuide(){
 }
 
 
+
+/* === js/cloud.js === */
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  نظام الحفظ السحابي المشفَّر                                     ║
 // ║  ENCRYPTED CLOUD SAVE SYSTEM                                     ║
@@ -7135,6 +7420,8 @@ function renameFamilyDevice(idx, evt){
 }
 
 
+
+/* === js/merge.js === */
 // ══════════════════════════════════════════════════════════════════════════
 // نظام مراجعة تحديثات العائلة المحسَّن — مراجعة قبل الدمج الانتقائي
 // ══════════════════════════════════════════════════════════════════════════
@@ -8122,6 +8409,7 @@ function _restoreMergeState(snapshot){
   if(!snapshot) return false;
 
   people = JSON.parse(JSON.stringify(snapshot.people || []));
+  try{normalizeAllPersonDates();}catch(e){}
   relPairs = JSON.parse(JSON.stringify(snapshot.relPairs || []));
   nextId = snapshot.nextId || 1;
   if(typeof myPersonId !== 'undefined'){
@@ -8703,6 +8991,7 @@ async function initCloud(){
         let localCount=people.length;
         if(localCount===0){
           people=cloudData.people;nextId=cloudData.nextId||1;relPairs=cloudData.relPairs||[];
+          try{normalizeAllPersonDates();}catch(e){}
           if(cloudData.myPersonId){myPersonId=parseInt(cloudData.myPersonId);saveMyPerson();}
           expanded={};people.forEach(p=>{expanded[p.id]=false;});
           migrateExternalSpouses();
@@ -8742,6 +9031,8 @@ async function initCloud(){
 function triggerCloudSync(){ /* manual only */ }
 let _imgSyncForcePhotos=false; // يُضبط مؤقتاً قبل cloudLoad
 
+
+/* === js/storage.js === */
 // ══════════════════════════════════════════════════════════
 //  IndexedDB — التخزين الرئيسي (أكثر ثباتاً على الجوال)
 // ══════════════════════════════════════════════════════════
@@ -8861,6 +9152,7 @@ function saveData(){
   // ── الصور تُحفظ في مخزن IDB منفصل — لا تُضمَّن في payload الرئيسي ──
   // هذا يحل مشكلة: localStorage يفشل بصمت بسبب حجم الصور (5MB)
   // وIDB الرئيسي يبقى خفيفاً قابلاً للقراءة السريعة
+  try{normalizeAllPersonDates();}catch(e){}
   var peopleNoPhotos=people.map(function(p){
     if(!p.photo)return p;
     var c=Object.assign({},p);delete c.photo;return c;
@@ -9126,6 +9418,7 @@ deletePerson=function(id){
     var idbData=await _idbLoad();
     if(idbData&&idbData.people&&idbData.people.length){
       people=idbData.people;nextId=idbData.nextId||1;relPairs=idbData.relPairs||[];
+        try{normalizeAllPersonDates();}catch(e){}
       people.forEach(function(p){expanded[p.id]=false;});
       migrateExternalSpouses();
       _markDeviceInit();
@@ -9142,6 +9435,7 @@ deletePerson=function(id){
       var lsData=_lsLoad();
       if(lsData&&lsData.people&&lsData.people.length){
         people=lsData.people;nextId=lsData.nextId||1;relPairs=lsData.relPairs||[];
+        try{normalizeAllPersonDates();}catch(e){}
         people.forEach(function(p){expanded[p.id]=false;});
         migrateExternalSpouses();
         _markDeviceInit();
@@ -9167,6 +9461,7 @@ deletePerson=function(id){
           var d=JSON.parse(new TextDecoder().decode(bytes));
           if(d.people&&d.people.length){
             people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
+            try{normalizeAllPersonDates();}catch(e){}
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
@@ -10316,9 +10611,8 @@ function _copyGistId(){
 }
 
 document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMergeHistoryButtons,0);});
-</script>
 
-<script>
+/* === js/supabase-sync.js === */
 (function () {
   'use strict';
 
@@ -11220,12 +11514,8 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   window._ftReadSettings      = _ftReadSettings;
   window._ftSettingsReady     = _ftSettingsReady;
 })();
-</script>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     FAMILY UPDATES — SUPABASE ONLY (v4)
-     ═══════════════════════════════════════════════════════════════════════ -->
-<script>
+/* === js/family-updates.js === */
 (function () {
   'use strict';
 
@@ -11973,7 +12263,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
   log('v4 loaded ✓');
 })();
-</script>
 
+</script>
 </body>
 </html>
