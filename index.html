@@ -6103,19 +6103,34 @@ function _handleAndroidBack(){
     return true;
   }
 
-  // 4. ارجع خطوة تنقل (navStack / familyFilter)
-  if(navStack.length>0 || currentFamilyFilter){
-    if(navStack.length>0) navigateBack();
-    else navigateHome();
+  // 4. ارجع خطوة تنقل (navStack)
+  if(navStack.length>0){
+    navigateBack();
     return true;
   }
 
-  // 5. استعد snapshot محفوظ
+  // 5. داخل شجرة خارجية (currentFamilyFilter) — ارجع خطوة داخلها أو للرئيسية
+  if(currentFamilyFilter){
+    // حاول استعادة snapshot داخل الشجرة الخارجية (خطوة للأعلى داخلها)
+    if(window._ftTreeBackStack && window._ftTreeBackStack.length){
+      // تحقق أن الـ snapshot هو لنفس السياق الخارجي الحالي
+      let topSnap=window._ftTreeBackStack[window._ftTreeBackStack.length-1];
+      if(topSnap && topSnap.currentFamilyFilter &&
+         topSnap.currentFamilyFilter.rootId===currentFamilyFilter.rootId){
+        if(_restoreAndroidTreeSnapshot()) return true;
+      }
+    }
+    // وصلنا لأعلى الشجرة الخارجية → ارجع للشجرة الرئيسية
+    navigateHome();
+    return true;
+  }
+
+  // 6. استعد snapshot محفوظ (داخل الشجرة الرئيسية)
   if(window._ftTreeBackStack && window._ftTreeBackStack.length){
     if(_restoreAndroidTreeSnapshot()) return true;
   }
 
-  // 6. نحن في أعلى الشجرة الرئيسية — اخرج فقط بضغطتين متتاليتين خلال 2 ثانية
+  // 7. نحن في أعلى الشجرة الرئيسية — اخرج فقط بضغطتين متتاليتين خلال 2 ثانية
   var now = Date.now();
   if(now - _lastBackAtRootTime < 2000){
     // الضغطة الثانية → لا نُعيد push → يخرج المتصفح طبيعياً
