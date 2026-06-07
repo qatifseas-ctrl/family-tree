@@ -1480,7 +1480,13 @@ function addPerson(d){
     familyName:d.familyName||'',
     gender:d.gender||'male',
     dob:d.dob||'',
+    dobType:d.dobType||'',
+    dobGregorian:d.dobGregorian||'',
+    dobHijri:d.dobHijri||'',
     dod:d.dod||'',
+    dodType:d.dodType||'',
+    dodGregorian:d.dodGregorian||'',
+    dodHijri:d.dodHijri||'',
     deceased:d.deceased||false,
     parentId:d.parentId||null,
     fatherId:d.fatherId||null,       // ← NEW: links child to external father person record
@@ -1495,7 +1501,7 @@ function addPerson(d){
     notes:d.notes||'',
     isExternal:d.isExternal||false
   };
-  p=normalizePersonDates(p);
+  normalizePersonDates(p);
   people.push(p);expanded[p.id]=false;
   // تحديث الفهارس مباشرةً دون إعادة بناء كامل
   _personMap.set(p.id,p);
@@ -1647,6 +1653,7 @@ function getMaternalAunts(p){
   if(!mp.parentId)return[];
   return people.filter(s=>s.parentId===mp.parentId&&s.id!==mp.id&&s.gender==='female'&&!s.isExternal).sort((a,b)=>(a.sortOrder??9999)-(b.sortOrder??9999));
 }
+
 // Normalize Arabic: unify alef forms, ة→ه, ى/ئ→ي, strip tashkeel
 function normalizeAr(s){
   return (s||'').toLowerCase()
@@ -1655,21 +1662,26 @@ function normalizeAr(s){
 }
 
 // ══════════════════════════════════════════════════════════
-//  دعم التاريخ الميلادي + الهجري (Tabular Islamic Calendar)
+//  دعم الميلادي / الهجري (قراءة، عرض، تحويل، وتخزين مزدوج)
 // ══════════════════════════════════════════════════════════
-const HIJRI_MONTH_NAMES=['محرم','صفر','ربيع الأول','ربيع الثاني','جمادى الأولى','جمادى الآخرة','رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'];
+const HIJRI_MONTH_NAMES = [
+  'محرم','صفر','ربيع الأول','ربيع الثاني','جمادى الأولى','جمادى الآخرة',
+  'رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'
+];
 
-function _pad2(n){return String(n).padStart(2,'0');}
+function _pad2(n){ return String(n).padStart(2,'0'); }
 
 function _normalizeDigits(s){
-  return (s||'').toString()
-    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+  return (s||'')
+    .replace(/[٠-٩]/g,ch=>'٠١٢٣٤٥٦٧٨٩'.indexOf(ch))
+    .replace(/[۰-۹]/g,ch=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(ch))
+    .replace(/[‐‑‒–—−\/\.]/g,'-')
+    .trim();
 }
 
 function _parseISODateParts(s){
   s=_normalizeDigits(s);
-  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if(!m)return null;
   let y=+m[1], mo=+m[2], d=+m[3];
   if(!y||mo<1||mo>12||d<1||d>31)return null;
@@ -1738,15 +1750,21 @@ function _jdnToISO(jd){
 function _gregorianToHijriParts(iso){
   let p=_parseISODateParts(iso);
   if(!p)return null;
+
   let JD=_gregorianToJdn(p.year,p.month,p.day);
+
+  // Tabular Islamic calendar calibrated to match the attached algorithm/example.
   let l = JD - 1948439 + 10632;
   let n = Math.floor((l - 1) / 10631);
+
   l = l - 10631 * n + 354;
+
   let j =
       Math.floor((10985 - l) / 5316) *
       Math.floor((50 * l) / 17719) +
       Math.floor(l / 5670) *
       Math.floor((43 * l) / 15238);
+
   l =
       l
     - Math.floor((30 - j) / 15) *
@@ -1754,18 +1772,22 @@ function _gregorianToHijriParts(iso){
     - Math.floor(j / 16) *
       Math.floor((15238 * j) / 43)
     + 29;
+
   let month = Math.floor((24 * l) / 709);
   let day = l - Math.floor((709 * month) / 24);
   let year = 30 * n + j - 30;
+
   return {year,month,day};
 }
 
 function _hijriToGregorianISO(hijriInput){
   let target=typeof hijriInput==='string' ? _parseHijriDateParts(hijriInput) : hijriInput;
   if(!target)return '';
+
   let loJd=_gregorianToJdn(1700,1,1);
   let hiJd=_gregorianToJdn(2400,12,31);
   let found=null;
+
   while(loJd<=hiJd){
     let midJd=Math.floor((loJd+hiJd)/2);
     let iso=_jdnToISO(midJd);
@@ -1775,6 +1797,7 @@ function _hijriToGregorianISO(hijriInput){
     if(cmp<0) loJd=midJd+1;
     else { found=midJd; hiJd=midJd-1; }
   }
+
   if(found===null)return '';
   let iso=_jdnToISO(found);
   let chk=_gregorianToHijriParts(iso);
@@ -1787,6 +1810,7 @@ function _dateInfoFromPerson(p, field){
   let original=(p[field]||'').trim();
   let greg=(p[field+'Gregorian']||'').trim();
   let hijri=(p[field+'Hijri']||'').trim();
+
   if(!type){
     if(greg && !hijri) type='gregorian';
     else if(hijri && !greg) type='hijri';
@@ -1796,6 +1820,7 @@ function _dateInfoFromPerson(p, field){
     else if(hijri) type='hijri';
     else type='gregorian';
   }
+
   if(type==='gregorian'){
     if(!greg && _parseISODateParts(original)) greg=original;
     if(!hijri && greg){
@@ -1808,10 +1833,12 @@ function _dateInfoFromPerson(p, field){
     if(!greg && hijri) greg=_hijriToGregorianISO(hijri);
     if(!original) original=hijri||greg||'';
   }
+
   let display='';
   if(greg && hijri) display=`${_formatGregorianDisplay(greg)} (${_formatHijriDisplayFromParts(_parseHijriDateParts(hijri))})`;
   else if(greg) display=_formatGregorianDisplay(greg);
   else if(hijri) display=_formatHijriDisplayFromParts(_parseHijriDateParts(hijri));
+
   return {type,original,gregorian:greg,hijri,display};
 }
 
@@ -1835,12 +1862,14 @@ function getPersonDateInfo(p, field){
 function getPersonDateDisplay(p, field){
   let info=_dateInfoFromPerson(p, field);
   if(info.gregorian && info.hijri){
-    return `<div style="display:flex;flex-direction:column;line-height:1.35">
-      <span>${_formatGregorianDisplay(info.gregorian)}</span>
-      <span style="color:var(--text2);opacity:.82">${_formatHijriDisplayFromParts(_parseHijriDateParts(info.hijri))}</span>
+    return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;line-height:1.35;width:100%">
+      <span style="font-size:13px;text-align:left;width:100%">${_formatGregorianDisplay(info.gregorian)}</span>
+      <span style="font-size:13px;color:var(--text2);text-align:left;width:100%">${_formatHijriDisplayFromParts(_parseHijriDateParts(info.hijri))}</span>
     </div>`;
   }
-  return info.display;
+  if(info.gregorian) return `<span style="font-size:13px;display:inline-block;text-align:left">${_formatGregorianDisplay(info.gregorian)}</span>`;
+  if(info.hijri) return `<span style="font-size:13px;display:inline-block;text-align:left">${_formatHijriDisplayFromParts(_parseHijriDateParts(info.hijri))}</span>`;
+  return '';
 }
 
 function getPersonTreeDateYearDisplay(p, field){
@@ -3725,10 +3754,10 @@ function doImport(mode){
   try{
     if(mode==='replace'){
       people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
-      try{normalizeAllPersonDates();}catch(e){}
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
       migrateExternalSpouses();
+      if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();
       _invalidateAll();
       if(people.length)expanded[people[0].id]=true;
       _applyFamilyMetaIfNeeded(d);
@@ -3796,7 +3825,6 @@ function doImport(mode){
       let skipped=incoming.length-trulyNew.length;
       // الدمج: إضافة الجدد فقط
       people=people.concat(trulyNew);
-      try{normalizeAllPersonDates();}catch(e){}
       trulyNew.forEach(p=>{expanded[p.id]=false;});
       _invalidateAll();
       _applyFamilyMetaIfNeeded(d);
@@ -3933,7 +3961,9 @@ function renderNode(p,q,matchIds,contextIds){
   }
   let meta='';
   let birthYear=getPersonTreeDateYearDisplay(p,'dob');
-  if(birthYear)meta+=`<span class="node-meta">${birthYear}</span>`;
+  let deathYear=getPersonTreeDateYearDisplay(p,'dod');
+  if(birthYear)meta+=`<span class="node-meta">م.${birthYear}</span> `;
+  if(deathYear)meta+=`<span class="node-meta">و.${deathYear}</span>`;
 
   // ── وضع الجوال: تبسيط الواجهة ──
   let isMob=document.body.classList.contains('mobile-mode');
@@ -4380,7 +4410,7 @@ function _listLoadMore(offset){
 function toggleNode(id){expanded[id]=!expanded[id];renderTree();}
 function selectNode(e,id){if(e.target.closest('.node-actions')||e.target.closest('.toggle-btn')||e.target.closest('.node-name'))return;expanded[id]=!expanded[id];renderTree();}
 function deletePerson(id){confirmDeleteFromList(id);}
-function row(label,val){return`<div class="detail-row"><span class="detail-label">${label}</span><div class="detail-val">${val}</div></div>`;}
+function row(label,val){return`<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val">${val}</span></div>`;}
 function showPersonDetail(id){
   let p=getPerson(id);if(!p)return;
   let fl=getFullFatherLine(p);
@@ -4486,8 +4516,8 @@ function showPersonDetail(id){
     ${p.title?row('اللقب الشرفي',`<span style="font-weight:600;color:#5b21b6;background:#ede9fe;padding:2px 10px;border-radius:8px;border:1px solid #c4b5fd">${p.title}</span>`):''}
     ${row('الجنس',p.gender==='male'?'ذكر':'أنثى')}
     ${p.familyName?row('اللقب / العائلة',`<span style="font-weight:600;color:var(--text)">${p.familyName}</span>`):''}
-    ${p.dob?row('تاريخ الولادة',getPersonDateDisplay(p,'dob')):''}
-    ${p.deceased&&p.dod?row('تاريخ الوفاة',getPersonDateDisplay(p,'dod')):''}
+    ${getPersonDateDisplay(p,'dob')?row('تاريخ الولادة',getPersonDateDisplay(p,'dob')):''}
+    ${p.deceased&&getPersonDateDisplay(p,'dod')?row('تاريخ الوفاة',getPersonDateDisplay(p,'dod')):''}
     ${p.deceased?row('الحالة',`<span style="color:#2e7d32;display:flex;align-items:center;gap:4px;">${p.gender==='female'?'متوفية — رحمها الله':'متوفى — رحمه الله'} ${crescent('#2e7d32')}</span>`):''}
     ${(()=>{
       // Children under a female parent: show her as mother, father from fatherId or fatherName
@@ -4886,7 +4916,7 @@ function showEditModal(editId,parentId){
     ${motherFieldHtml}
     ${buildCalendarFieldBlock('f','dob','تاريخ الولادة',p)}
     <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="f_deceased" ${(p&&p.deceased)?'checked':''} onchange="toggleDod()"><label for="f_deceased">متوفى</label><span style="display:inline-flex">${crescent('#2e7d32')}</span></div></div>
-    <div class="form-row" id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}">${buildCalendarFieldBlock('f','dod','تاريخ الوفاة',p)}</div>
+    <div id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}">${buildCalendarFieldBlock('f','dod','تاريخ الوفاة',p)}</div>
     <div class="form-row"><label>صورة</label><div class="file-input-btn btn" style="width:100%;justify-content:center;">📷 رفع صورة<input type="file" accept="image/*" onchange="handlePhoto(event)"></div><div id="photoPreview" style="margin-top:6px;"></div></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="f_notes" rows="2" style="resize:vertical">${p?p.notes:''}</textarea></div>
     <div class="section-title">الأزواج / الزوجات
@@ -5572,9 +5602,9 @@ function saveModal(editId,parentId){
   let gender=document.getElementById('f_gender').value;
   let parentEl=document.getElementById('f_parent');
   let pid=parentEl?(parentEl.value||''):'';
-  let dobData=readCalendarField('f','dob');
   let deceased=document.getElementById('f_deceased').checked;
-  let dodData=readCalendarField('f','dod');
+  let dobData=readCalendarField('f','dob');
+  let dodData=deceased?readCalendarField('f','dod'):{type:'gregorian',original:'',gregorian:'',hijri:''};
   let notes=document.getElementById('f_notes').value.trim();
   let motherIdEl=document.getElementById('f_mother_id');
   let motherTextEl=document.getElementById('f_mother');
@@ -5592,6 +5622,23 @@ function saveModal(editId,parentId){
     var currentId=_savedPersonId;
     var currentPerson=currentId?getPerson(currentId):null;
     if(!currentPerson)return;
+    if(currentId===_savedPersonId){
+      currentPerson={
+        ...currentPerson,
+        name:name,
+        familyName:familyName,
+        gender:gender,
+        deceased:deceased,
+        dob:dobData.original||'',
+        dobType:dobData.type||'gregorian',
+        dobGregorian:dobData.gregorian||'',
+        dobHijri:dobData.hijri||'',
+        dod:dodData.original||'',
+        dodType:dodData.type||'gregorian',
+        dodGregorian:dodData.gregorian||'',
+        dodHijri:dodData.hijri||''
+      };
+    }
     var already=extPerson.spouses.find(function(s){return s.personId===currentId||normalizeAr(s.name||'')===normalizeAr(currentPerson.name);});
     if(!already){
       extPerson.spouses.push({
@@ -5645,7 +5692,8 @@ function saveModal(editId,parentId){
 
   if(editId){
     let p=getPerson(editId);
-    Object.assign(p,{name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,spouses:normalizedSpouses});
+    Object.assign(p,{name,familyName,title,gender,dob:dobData.original||'',dobType:dobData.type||'gregorian',dobGregorian:dobData.gregorian||'',dobHijri:dobData.hijri||'',deceased,dod:dodData.original||'',dodType:dodData.type||'gregorian',dodGregorian:dodData.gregorian||'',dodHijri:dodData.hijri||'',notes,motherId,motherName,spouses:normalizedSpouses});
+    normalizePersonDates(p);
     if(pid!==undefined)p.parentId=pid?parseInt(pid):null;
     if(tempPhoto==='__deleted__')p.photo=null;
     else if(tempPhoto!==null)p.photo=tempPhoto;
@@ -5672,7 +5720,7 @@ function saveModal(editId,parentId){
     let actualParent=parentId||null;
     if(pid)actualParent=parseInt(pid);
     if(parentId&&!pid)actualParent=parentId;
-    let np=addPerson({name,familyName,title,gender,dob:dobData.original,dobType:dobData.type,dobGregorian:dobData.gregorian,dobHijri:dobData.hijri,deceased,dod:dodData.original,dodType:dodData.type,dodGregorian:dodData.gregorian,dodHijri:dodData.hijri,notes,motherId,motherName,
+    let np=addPerson({name,familyName,title,gender,dob:dobData.original||'',dobType:dobData.type||'gregorian',dobGregorian:dobData.gregorian||'',dobHijri:dobData.hijri||'',deceased,dod:dodData.original||'',dodType:dodData.type||'gregorian',dodGregorian:dodData.gregorian||'',dodHijri:dodData.hijri||'',notes,motherId,motherName,
       parentId:actualParent||null,
       sortOrder:window._insertAtPos!=null?-1:9999,
       spouses:normalizedSpouses,photo:tempPhoto});
@@ -7957,7 +8005,7 @@ function replaceFamilyUpdate(){
   people=data.people;nextId=data.nextId||1;relPairs=data.relPairs||[];
   if(data.myPersonId){myPersonId=parseInt(data.myPersonId);saveMyPerson();}
   expanded={};people.forEach(p=>{expanded[p.id]=false;});
-  migrateExternalSpouses();if(people.length)expanded[people[0].id]=true;
+  migrateExternalSpouses();if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();if(people.length)expanded[people[0].id]=true;
   _invalidateAll();
   saveData();renderAll();updateMyPersonBtn();
   closeModal();
@@ -8409,7 +8457,6 @@ function _restoreMergeState(snapshot){
   if(!snapshot) return false;
 
   people = JSON.parse(JSON.stringify(snapshot.people || []));
-  try{normalizeAllPersonDates();}catch(e){}
   relPairs = JSON.parse(JSON.stringify(snapshot.relPairs || []));
   nextId = snapshot.nextId || 1;
   if(typeof myPersonId !== 'undefined'){
@@ -8582,7 +8629,7 @@ async function doCloudRestore(mode){
       people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
-      migrateExternalSpouses();if(people.length)expanded[people[0].id]=true;
+      migrateExternalSpouses();if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();if(people.length)expanded[people[0].id]=true;
       // إعادة ضبط hashes الصور بعد الاستبدال الكامل
       let newH={};people.forEach(p=>{if(p.photo)newH[p.id]=p.photo.length;});_saveSyncedHashes(newH);
       _markDeviceInit();
@@ -8991,10 +9038,9 @@ async function initCloud(){
         let localCount=people.length;
         if(localCount===0){
           people=cloudData.people;nextId=cloudData.nextId||1;relPairs=cloudData.relPairs||[];
-          try{normalizeAllPersonDates();}catch(e){}
           if(cloudData.myPersonId){myPersonId=parseInt(cloudData.myPersonId);saveMyPerson();}
           expanded={};people.forEach(p=>{expanded[p.id]=false;});
-          migrateExternalSpouses();
+          migrateExternalSpouses();if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();
           if(people.length)expanded[people[0].id]=true;
           _invalidateAll();
           _markDeviceInit(); // ✅ إصلاح 1: تسجيل الجهاز كمُهيَّأ بعد التحميل البكر
@@ -9152,7 +9198,6 @@ function saveData(){
   // ── الصور تُحفظ في مخزن IDB منفصل — لا تُضمَّن في payload الرئيسي ──
   // هذا يحل مشكلة: localStorage يفشل بصمت بسبب حجم الصور (5MB)
   // وIDB الرئيسي يبقى خفيفاً قابلاً للقراءة السريعة
-  try{normalizeAllPersonDates();}catch(e){}
   var peopleNoPhotos=people.map(function(p){
     if(!p.photo)return p;
     var c=Object.assign({},p);delete c.photo;return c;
@@ -9418,9 +9463,9 @@ deletePerson=function(id){
     var idbData=await _idbLoad();
     if(idbData&&idbData.people&&idbData.people.length){
       people=idbData.people;nextId=idbData.nextId||1;relPairs=idbData.relPairs||[];
-        try{normalizeAllPersonDates();}catch(e){}
       people.forEach(function(p){expanded[p.id]=false;});
       migrateExternalSpouses();
+      if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();
       _markDeviceInit();
       // ── استعادة الصور من مخزنها المنفصل ──
       await _mergePhotosFromIDB();
@@ -9435,9 +9480,9 @@ deletePerson=function(id){
       var lsData=_lsLoad();
       if(lsData&&lsData.people&&lsData.people.length){
         people=lsData.people;nextId=lsData.nextId||1;relPairs=lsData.relPairs||[];
-        try{normalizeAllPersonDates();}catch(e){}
         people.forEach(function(p){expanded[p.id]=false;});
         migrateExternalSpouses();
+        if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();
         _markDeviceInit();
         // ترحيل البيانات من localStorage إلى IDB
         _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
@@ -9461,10 +9506,10 @@ deletePerson=function(id){
           var d=JSON.parse(new TextDecoder().decode(bytes));
           if(d.people&&d.people.length){
             people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
-            try{normalizeAllPersonDates();}catch(e){}
             if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
             people.forEach(function(p){expanded[p.id]=false;});
             migrateExternalSpouses();
+            if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();
             // حفظ في IDB وlocalStorage حتى تصبح هي المصدر في الزيارات التالية
             _idbSave({people:people,relPairs:relPairs,nextId:nextId}).catch(function(){});
             _lsSave({people:people,relPairs:relPairs,nextId:nextId});
@@ -10437,7 +10482,7 @@ async function _doDownload(forceReplace){
       people=d.people;nextId=d.nextId||1;relPairs=d.relPairs||[];
       if(d.myPersonId){myPersonId=parseInt(d.myPersonId);saveMyPerson();}
       expanded={};people.forEach(p=>{expanded[p.id]=false;});
-      migrateExternalSpouses();if(people.length)expanded[people[0].id]=true;
+      migrateExternalSpouses();if(typeof normalizeAllPersonDates==='function')normalizeAllPersonDates();if(people.length)expanded[people[0].id]=true;
       var newH2={};people.forEach(p=>{if(p.photo)newH2[p.id]=p.photo.length;});_saveSyncedHashes(newH2);
       _markDeviceInit();saveData();_persistPhotosToIDB().catch(()=>{});
       renderAll();updateMyPersonBtn();_setLastSync();
