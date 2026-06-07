@@ -6090,23 +6090,24 @@ function _handleAndroidBack(){
   // 1. أغلق أي طبقة مفتوحة (modal / sheet / بحث)
   if(_closeBackTarget()) return true;
 
-  // 2. إذا كان المستخدم scrolled → ارجع للأعلى أولاً
+  // 2. ارجع خطوة تنقل — navStack أو currentFamilyFilter
+  // يأتي قبل scroll-to-top عمداً: إذا كان المستخدم في شجرة خارجية يخرج منها مباشرة
+  // للموضع الأصلي بدلاً من التصعيد داخلها أولاً
+  if(navStack.length>0 || currentFamilyFilter){
+    navigateBack();
+    return true;
+  }
+
+  // 3. إذا كان المستخدم scrolled في الشجرة الرئيسية → ارجع للأعلى أولاً
   if(window.scrollY > 120){
     window.scrollTo({top:0, behavior:'smooth'});
     return true;
   }
 
-  // 3. ارجع للتاب الرئيسي إن كنا في تاب آخر
+  // 4. ارجع للتاب الرئيسي إن كنا في تاب آخر
   if(_getActiveTabName()!=='tree'){
     let treeTab=_getTabElementByName('tree');
     if(treeTab) switchTab('tree',treeTab);
-    return true;
-  }
-
-  // 4. ارجع خطوة تنقل — navStack أو currentFamilyFilter
-  // navigateBack() تُعيد المستخدم للمكان الذي جاء منه بالضبط (مع scrollY المحفوظ)
-  if(navStack.length>0 || currentFamilyFilter){
-    navigateBack();
     return true;
   }
 
