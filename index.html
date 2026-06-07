@@ -1155,12 +1155,15 @@ function openMobSheet(id){
   if(!sheet||!overlay)return;
   nameEl.textContent=p.name+(p.familyName?' '+p.familyName:'');
   let hasChildren=getChildrenForNode(id).length>0;
+  let isExtFemale=(p.isExternal===true&&p.gender==='female');
   let btns=[
     {icon:'📋',label:'البيانات',action:`closeMobSheet();showPersonDetail(${id})`},
     {icon:'✏️',label:'تعديل',action:`closeMobSheet();openEditModal(${id})`},
-    {icon:'➕',label:'إضافة ابن',action:`closeMobSheet();openAddModal(${id})`},
+    ...(isExtFemale?[]:[{icon:'➕',label:'إضافة ابن',action:`closeMobSheet();openAddModal(${id})`}]),
     {icon:'🌳',label:'انتقال',action:`closeMobSheet();navigateToPerson(${id})`},
   ];
+  if(p.parentId) btns.splice(isExtFemale?2:3,0,{icon:'👥',label:'إضافة أخ/أخت',action:`closeMobSheet();openAddModal(${p.parentId})`});
+  if(p.isExternal===true&&!p.parentId) btns.splice(isExtFemale?2:3,0,{icon:'👨‍👩‍👦',label:'إضافة والد/والدة',action:`closeMobSheet();openAddParentModal(${id})`});
   if(hasChildren) btns.push({icon:'⇅',label:'الترتيب',action:`closeMobSheet();openReorderModal(${id})`});
   btns.push({icon:'🗑',label:'حذف',action:`closeMobSheet();confirmDeleteFromList(${id})`,cls:'danger'});
   btnsEl.innerHTML=btns.map(b=>`
@@ -1408,6 +1411,7 @@ let _personMap   = new Map(); // id → person
 let _childrenMap = new Map(); // parentId → [children]
 let _relNumsMap  = new Map(); // personId → [pairNumbers]
 let _migratedMap = new Map(); // motherId → count of children where motherId set but parentId differs
+let _wrongExtFemMap = new Map(); // externalFemaleId → count of children wrongly placed under her via parentId
 let _ancestorMapCache = new Map(); // startId → ancestorsMap
 let _myKinCache  = new Map(); // targetId → kinship result
 let _treeOrderCache = null;  // مخزن مؤقت لترتيب الشجرة
@@ -1416,6 +1420,7 @@ function _rebuildIndexes(){
   _personMap.clear();
   _childrenMap.clear();
   _migratedMap.clear();
+  _wrongExtFemMap.clear();
   people.forEach(p=>{
     _personMap.set(p.id,p);
     let ch=_childrenMap.get(p.parentId);
@@ -1423,6 +1428,13 @@ function _rebuildIndexes(){
     ch.push(p);
     if(p.motherId&&p.motherId!==p.parentId){
       _migratedMap.set(p.motherId,(_migratedMap.get(p.motherId)||0)+1);
+    }
+    // track children wrongly placed under an external female via parentId
+    if(p.parentId){
+      let par=_personMap.get(p.parentId);
+      if(par&&par.isExternal&&par.gender==='female'){
+        _wrongExtFemMap.set(par.id,(_wrongExtFemMap.get(par.id)||0)+1);
+      }
     }
   });
   _rebuildRelNums();
@@ -1509,6 +1521,12 @@ function addPerson(d){
   if(p.motherId&&p.motherId!==p.parentId){
     _migratedMap.set(p.motherId,(_migratedMap.get(p.motherId)||0)+1);
   }
+  if(p.parentId){
+    let par=getPerson(p.parentId);
+    if(par&&par.isExternal&&par.gender==='female'){
+      _wrongExtFemMap.set(par.id,(_wrongExtFemMap.get(par.id)||0)+1);
+    }
+  }
   _ancestorMapCache.clear();_myKinCache.clear();_treeOrderCache=null;
   return p;
 }
@@ -1519,14 +1537,13 @@ function getChildrenForNode(id){
   let p=getPerson(id);
   let direct=(_childrenMap.get(id)||[]).slice().sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
   if(p&&p.isExternal){
-    let extra=[];
-    if(p.gender==='male'){
-      extra=people.filter(c=>c.fatherId===id&&c.parentId!==id)
-        .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-    } else {
-      extra=people.filter(c=>c.motherId===id&&c.parentId!==id)
-        .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+    if(p.gender==='female'){
+      // الأنثى الخارجية: لا تعرض أبناء تحتها — أبناؤها يظهرون في شجرة الأب فقط
+      return [];
     }
+    // الذكر الخارجي: يضم أبناءه عبر fatherId أيضاً
+    let extra=people.filter(c=>c.fatherId===id&&c.parentId!==id)
+      .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
     return [...direct,...extra];
   }
   return direct;
@@ -3888,6 +3905,8 @@ function renderNode(p,q,matchIds,contextIds){
   let children=getChildrenForNode(p.id),hasChildren=children.length>0,isExp=expanded[p.id];
   // استخدام الفهرس بدلاً من filter O(n)
   let _migratedCount=(p.gender==='female')?(_migratedMap.get(p.id)||0):0;
+  // عدد الأبناء الموضوعين خطأ تحت الأنثى الخارجية عبر parentId
+  let _wrongExtFemCount=(p.isExternal&&p.gender==='female')?(_wrongExtFemMap.get(p.id)||0):0;
   // تمييز النتائج: الشخص المطابق = search-match، الشخص النشط = highlighted
   let isMatch=q&&matchesFullName(p,q);
   let isActive=_searchActiveId===p.id;
@@ -3959,6 +3978,11 @@ function renderNode(p,q,matchIds,contextIds){
     let migBadge=`<span style="font-size:10px;color:#7c3aed;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="لديها ${_migratedCount} ابن/ابنة في شجرة أزواجها" onclick="event.stopPropagation();showPersonDetail(${p.id})">🌿 ${_migratedCount}</span>`;
     spInfo=(spInfo?spInfo+' ':'')+migBadge;
   }
+  // شارة تحذير: أبناء موضوعون خطأ تحت الأنثى الخارجية عبر parentId
+  if(_wrongExtFemCount>0){
+    let wrongBadge=`<span style="font-size:10px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="يوجد ${_wrongExtFemCount} ابن/ابنة مسجلون بشكل خاطئ تحتها — يجب نقلهم لشجرة الأب" onclick="event.stopPropagation();showPersonDetail(${p.id})">⚠️ ${_wrongExtFemCount} غير منقول</span>`;
+    spInfo=(spInfo?spInfo+' ':'')+wrongBadge;
+  }
   let meta='';
   let birthYear=getPersonTreeDateYearDisplay(p,'dob');
   let deathYear=getPersonTreeDateYearDisplay(p,'dod');
@@ -3977,7 +4001,7 @@ function renderNode(p,q,matchIds,contextIds){
     ?'' // الجوال: بطاقة نظيفة بالكامل
     :`<div class="node-actions" onclick="event.stopPropagation()">
         <button class="act-btn" onclick="openEditModal(${p.id})" title="تعديل">✏</button>
-        <button class="act-btn" onclick="openAddModal(${p.id})" title="إضافة ابن">+</button>
+        ${(p.isExternal&&p.gender==='female')?`<button class="act-btn" title="الأبناء يُضافون في شجرة الأب" style="opacity:.4;cursor:not-allowed" onclick="event.stopPropagation()" disabled>+</button>`:`<button class="act-btn" onclick="openAddModal(${p.id})" title="إضافة ابن">+</button>`}
         ${hasChildren?`<button class="act-btn" onclick="openReorderModal(${p.id})" title="ترتيب الأبناء">⇅</button>`:''}
         <button class="act-btn" style="color:#ef4444" onclick="deletePerson(${p.id})" title="حذف">✕</button>
       </div>`;
@@ -4606,7 +4630,9 @@ function showPersonDetail(id){
       <button class="btn" onclick="closeModal()">إغلاق</button>
       <button class="btn" onclick="closeModal();navigateToPerson(${p.id})">🌳 الشجرة</button>
       <button class="btn primary" onclick="closeModal();openEditModal(${p.id})">✏️ تعديل</button>
-      <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن</button>
+      ${!(p.isExternal&&p.gender==='female')?`<button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن</button>`:''}
+      ${p.parentId?`<button class="btn" style="background:#ecfdf5;border-color:#6ee7b7;color:#065f46" onclick="closeModal();openAddModal(${p.parentId})">➕ إضافة أخ/أخت</button>`:''}
+      ${(p.isExternal===true&&!p.parentId)?`<button class="btn" style="background:#fff7ed;border-color:#fdba74;color:#9a3412" onclick="closeModal();openAddParentModal(${p.id})">➕ إضافة والد/والدة</button>`:''}
       ${getChildrenForNode(p.id).length?`<button class="btn" onclick="closeModal();openReorderModal(${p.id})">⇅ ترتيب</button>`:''}
       <button class="btn" style="color:#ef4444;border-color:#fca5a5" onclick="closeModal();confirmDeleteFromList(${p.id})">🗑 حذف</button>
     </div>
@@ -4617,6 +4643,59 @@ function showPersonDetail(id){
   if(window._updateFabMobileMode){
     setTimeout(()=>window._updateFabMobileMode(),50);
   }
+}
+
+function openAddParentModal(childId){
+  let child=getPerson(childId);if(!child)return;
+  let modal=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:400px">
+    <h3 style="margin-bottom:16px">➕ إضافة والد/والدة لـ ${child.name}</h3>
+    <div style="margin-bottom:12px">
+      <label style="display:block;margin-bottom:4px;font-weight:600">الاسم *</label>
+      <input type="text" id="ap_name" placeholder="اسم الوالد/الوالدة" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--color-background-secondary,#f9fafb);color:var(--text)">
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;margin-bottom:4px;font-weight:600">اللقب / العائلة</label>
+      <input type="text" id="ap_familyName" placeholder="اللقب (اختياري)" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--color-background-secondary,#f9fafb);color:var(--text)">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:4px;font-weight:600">الجنس</label>
+      <select id="ap_gender" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--color-background-secondary,#f9fafb);color:var(--text)">
+        <option value="male">ذكر (أب)</option>
+        <option value="female">أنثى (أم)</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+      <button class="btn primary" onclick="_saveAddParent(${childId})">حفظ</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
+  document.getElementById('ap_name').focus();
+}
+
+function _saveAddParent(childId){
+  let child=getPerson(childId);if(!child)return;
+  let name=(document.getElementById('ap_name').value||'').trim();
+  if(!name){alert('يرجى إدخال الاسم');return;}
+  let familyName=(document.getElementById('ap_familyName').value||'').trim();
+  let gender=document.getElementById('ap_gender').value||'male';
+  let newParent=addPerson({
+    name:name,
+    familyName:familyName,
+    gender:gender,
+    parentId:null,
+    isExternal:true,
+    spouses:[],
+    deceased:false,
+    sortOrder:9999
+  });
+  child.parentId=newParent.id;
+  saveData();
+  renderAll();
+  closeModal();
+  showPersonDetail(childId);
 }
 
 
@@ -4762,6 +4841,57 @@ function openAddModal(pid){
   window._editGender=par?par.gender:'male';
   window._inheritedFamilyName=par?(par.childrenFamilyName||par.familyName||''):'';
   showEditModal(null,pid);
+}
+function openAddParentModal(childId){
+  let child=getPerson(childId);if(!child)return;
+  let modal=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:400px">
+    <h3 style="margin-bottom:16px">➕ إضافة والد/والدة لـ ${child.name}</h3>
+    <div style="margin-bottom:12px">
+      <label style="display:block;margin-bottom:4px;font-weight:600">الاسم *</label>
+      <input type="text" id="ap_name" placeholder="اسم الوالد/الوالدة" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--color-background-secondary,#f9fafb);color:var(--text)">
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;margin-bottom:4px;font-weight:600">اللقب / العائلة</label>
+      <input type="text" id="ap_familyName" placeholder="اللقب (اختياري)" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--color-background-secondary,#f9fafb);color:var(--text)">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:4px;font-weight:600">الجنس</label>
+      <select id="ap_gender" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--color-background-secondary,#f9fafb);color:var(--text)">
+        <option value="male">ذكر (أب)</option>
+        <option value="female">أنثى (أم)</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+      <button class="btn primary" onclick="_saveAddParent(${childId})">حفظ</button>
+    </div>
+  </div></div>`;
+  document.getElementById('modalContainer').innerHTML=modal;
+  _androidBackGuardModalOpen();
+  document.getElementById('ap_name').focus();
+}
+function _saveAddParent(childId){
+  let child=getPerson(childId);if(!child)return;
+  let name=(document.getElementById('ap_name').value||'').trim();
+  if(!name){alert('يرجى إدخال الاسم');return;}
+  let familyName=(document.getElementById('ap_familyName').value||'').trim();
+  let gender=document.getElementById('ap_gender').value||'male';
+  let newParent=addPerson({
+    name:name,
+    familyName:familyName,
+    gender:gender,
+    parentId:null,
+    isExternal:true,
+    spouses:[],
+    deceased:false,
+    sortOrder:9999
+  });
+  child.parentId=newParent.id;
+  saveData();
+  renderAll();
+  closeModal();
+  showPersonDetail(childId);
 }
 function openEditModal(id){
   currentAddParentId=null;
