@@ -345,7 +345,8 @@ body {
 }
 #app{padding:16px;max-width:900px;margin:0 auto;}
 h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-align:center;}
-.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;border-radius:8px;background:var(--card-bg);border:1px solid var(--card-border);font-size:12px;color:var(--text2);transition:background .25s,border-color .25s;}
+.legend{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;border-radius:8px;background:var(--card-bg);border:1px solid var(--card-border);font-size:12px;color:var(--text2);transition:background .25s,border-color .25s;box-sizing:border-box;width:100%;}
+.legend-spacer{flex:1;min-width:0;}
 .legend-item{display:flex;align-items:center;gap:5px;}
 .toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
 .toolbar input{padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);color:var(--text);font-size:14px;transition:background .25s,border-color .25s,color .2s;}
@@ -1028,19 +1029,17 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   </div>
   <div id="saveToast" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none;">✔ تم الحفظ</div>
   <div class="legend">
-    <div class="legend-item"><div class="gender-dot male-dot"></div> ذكر</div>
-    <div class="legend-item"><div class="gender-dot female-dot"></div> أنثى</div>
-    <button id="statsToggleBtn" onclick="toggleStats()" title="إظهار/إخفاء الإحصائيات" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:6px;background:var(--card-bg);color:var(--text);font-size:14px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;line-height:1;">📊</button>
-    <div class="legend-item" style="background:#e8f5e9;padding:2px 6px;border-radius:4px;">هلال أخضر = متوفى</div>
-    <div class="legend-item"><span class="status-dot dot-divorced">م</span> = مطلق/ة</div>
-    <div class="legend-item"><span style="font-size:13px">🔗</span> متزوج/ة من شخص في الشجرة</div>
-    <button class="btn" id="myPersonBtn" onclick="openMyPersonPicker()" style="margin-right:auto;font-size:12px;padding:4px 10px;white-space:nowrap">👤 أنا في الشجرة</button>
-    <button id="themeToggleBtn" onclick="toggleTheme()" title="تبديل المظهر" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);cursor:pointer;flex-shrink:0;transition:background .15s;display:flex;align-items:center;justify-content:center;line-height:1;"><img id="themeToggleIcon" src="" alt="theme" style="width:20px;height:20px;display:block;" /></button>
     <button id="mobileModeBtn" class="mobile-mode-btn" onclick="toggleMobileMode()" title="وضع الجوال: شجرة أخف وأسرع">📱 وضع الجوال</button>
+    <button id="themeToggleBtn" onclick="toggleTheme()" title="تبديل المظهر" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);cursor:pointer;flex-shrink:0;transition:background .15s;display:flex;align-items:center;justify-content:center;line-height:1;"><span id="themeToggleIcon" style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;"></span></button>
+    <button class="btn" id="myPersonBtn" onclick="openMyPersonPicker()" style="font-size:12px;padding:4px 10px;white-space:nowrap;flex-shrink:0;">👤 أنا في الشجرة</button>
+    <div class="legend-spacer"></div>
+    <button id="statsToggleBtn" onclick="toggleStats()" title="إظهار/إخفاء الإحصائيات" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:6px;background:var(--card-bg);color:var(--text);font-size:14px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;line-height:1;">📊</button>
+    <button id="infoToggleBtn" onclick="toggleInfo()" title="دليل الرموز والمؤشرات" aria-label="دليل الرموز" aria-expanded="false" aria-controls="infoBar" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:6px;background:var(--card-bg);color:var(--text);font-size:14px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;line-height:1;">ⓘ</button>
   </div>
 
   <!-- Stats Bar -->
   <div id="statsBar" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
+  <div id="infoBar" role="region" aria-label="دليل الرموز" style="display:none;margin-bottom:12px;"></div>
 
   <div class="toolbar">
     <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
@@ -1206,13 +1205,17 @@ function _mobSheetSwipe(el){
    - First launch: detects system preference and saves it.
    - Subsequent launches: loads saved preference directly.
    - Toggle button shows the OPPOSITE theme icon (click to switch).
-     Light icon: https://code.visualstudio.com/assets/icons/theme-light.svg
-     Dark  icon: https://code.visualstudio.com/assets/icons/theme-dark.svg
+   - Icons are embedded inline SVG — no external URL dependency.
 ══════════════════════════════════════════════════════════ */
 (function(){
   var THEME_KEY='ft_theme_v1';
-  var ICON_LIGHT='https://code.visualstudio.com/assets/icons/theme-light.svg';
-  var ICON_DARK='https://code.visualstudio.com/assets/icons/theme-dark.svg';
+
+  // ── Inline SVG icons — fully self-contained, no network request ──
+  // Sun icon: shown when dark mode is active (click to go light)
+  var ICON_SUN='<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  // Moon icon: shown when light mode is active (click to go dark)
+  var ICON_MOON='<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
   var _current='light';
 
   function applyTheme(theme){
@@ -1231,24 +1234,25 @@ function _mobSheetSwipe(el){
 
   function updateBtn(){
     var btn=document.getElementById('themeToggleBtn');
-    var img=document.getElementById('themeToggleIcon');
-    if(!btn||!img)return;
+    var iconEl=document.getElementById('themeToggleIcon');
+    if(!btn||!iconEl)return;
 
+    var isDark=_current==='dark';
     // Show the OPPOSITE icon — pressing it switches to that theme
-    if(_current==='dark'){
-      img.src=ICON_LIGHT;
-      img.alt='Light theme';
+    if(isDark){
+      iconEl.innerHTML=ICON_SUN;
       btn.title='التبديل إلى الوضع الفاتح';
     } else {
-      img.src=ICON_DARK;
-      img.alt='Dark theme';
+      iconEl.innerHTML=ICON_MOON;
       btn.title='التبديل إلى الوضع الداكن';
     }
 
     // Visual feedback for current dark state
-    var isDark=_current==='dark';
     btn.style.background=isDark?'#374151':'';
     btn.style.borderColor=isDark?'#4b5563':'';
+    // Tint the SVG stroke/fill to match theme
+    var svgEl=iconEl.querySelector('svg');
+    if(svgEl) svgEl.style.color=isDark?'#fbbf24':'#374151';
   }
 
   // Toggle between light and dark
@@ -3363,6 +3367,14 @@ document.addEventListener('keydown',function(e){
     closeModal();
     return;
   }
+  if(e.key==='Escape' && _statsVisible){
+    toggleStats();
+    return;
+  }
+  if(e.key==='Escape' && _infoVisible){
+    toggleInfo();
+    return;
+  }
   if(e.key==='Escape'&&_lastSearchQ&&!modalOpen){
     // لا تمسح إذا كانت لوحة MSS مفتوحة (mssInputKey تتولى ذلك بـ stopPropagation)
     let sheet=document.getElementById('mss-sheet');
@@ -3448,16 +3460,97 @@ function toggleStats(){
   _statsVisible = !_statsVisible;
   let statsBar = document.getElementById('statsBar');
   let btn = document.getElementById('statsToggleBtn');
-  
+
   if(_statsVisible){
+    renderStats();
     statsBar.style.display = 'grid';
-    btn.style.background = 'var(--primary-color)';
+    btn.style.background = '#3b82f6';
     btn.style.color = 'white';
+    setTimeout(function(){
+      document.addEventListener('click', _closeStatsOnOutside, {capture:true});
+    }, 0);
   } else {
     statsBar.style.display = 'none';
     btn.style.background = 'var(--card-bg)';
     btn.style.color = 'var(--text)';
+    document.removeEventListener('click', _closeStatsOnOutside, {capture:true});
   }
+}
+
+function _closeStatsOnOutside(e){
+  let statsBar = document.getElementById('statsBar');
+  let btn = document.getElementById('statsToggleBtn');
+  if(statsBar && btn && !statsBar.contains(e.target) && !btn.contains(e.target)){
+    _statsVisible = true; // will be flipped by toggleStats
+    toggleStats();
+    document.removeEventListener('click', _closeStatsOnOutside, {capture:true});
+  }
+}
+
+let _infoVisible = false; // حالة ظهور دليل الرموز
+
+function toggleInfo(){
+  _infoVisible = !_infoVisible;
+  let infoBar = document.getElementById('infoBar');
+  let btn = document.getElementById('infoToggleBtn');
+
+  if(_infoVisible){
+    renderInfo();
+    infoBar.style.display = 'block';
+    btn.style.background = '#3b82f6';
+    btn.style.color = 'white';
+    btn.setAttribute('aria-expanded','true');
+    setTimeout(function(){
+      document.addEventListener('click', _closeInfoOnOutside, {capture:true});
+    }, 0);
+  } else {
+    infoBar.style.display = 'none';
+    btn.style.background = 'var(--card-bg)';
+    btn.style.color = 'var(--text)';
+    btn.setAttribute('aria-expanded','false');
+    document.removeEventListener('click', _closeInfoOnOutside, {capture:true});
+  }
+}
+
+function _closeInfoOnOutside(e){
+  let infoBar = document.getElementById('infoBar');
+  let btn = document.getElementById('infoToggleBtn');
+  if(infoBar && btn && !infoBar.contains(e.target) && !btn.contains(e.target)){
+    _infoVisible = true; // will be flipped by toggleInfo
+    toggleInfo();
+    document.removeEventListener('click', _closeInfoOnOutside, {capture:true});
+  }
+}
+
+function renderInfo(){
+  let crescentSvg = crescent('#2e7d32');
+  let infoBar = document.getElementById('infoBar');
+  infoBar.innerHTML = `
+    <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:8px;padding:12px 16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;letter-spacing:.02em;">دليل الرموز والمؤشرات</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px 20px;">
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
+          <div style="width:22px;height:16px;border-radius:4px;background:#3b82f6;flex-shrink:0;border:1px solid rgba(0,0,0,.08);"></div>
+          <span>ذكر</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
+          <div style="width:22px;height:16px;border-radius:4px;background:#ec4899;flex-shrink:0;border:1px solid rgba(0,0,0,.08);"></div>
+          <span>أنثى</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
+          <span style="display:inline-flex;align-items:center;">${crescentSvg}</span>
+          <span>متوفى</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
+          <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fed7aa;color:#9a3412;border:1px solid #f97316;font-weight:600;flex-shrink:0;">م</span>
+          <span>مطلق/ة</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
+          <span style="font-size:13px;line-height:1;">🔗</span>
+          <span>متزوج/ة من شخص في الشجرة</span>
+        </div>
+      </div>
+    </div>`;
 }
 function renderStats(){
   let total=people.length;
@@ -3501,14 +3594,23 @@ function exportData(){
         htmlAttrs+=' '+a.name+'="'+a.value.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"';
       });
 
-      // ── 3. Get clean #app (pre-render, from _HTML_TEMPLATE via DOMParser) ──
+      // ── 3. Get clean #app — always from live DOM so toolbar order is preserved ──
       var cleanAppHTML='';
       try{
-        var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-        var tApp=tDoc.getElementById('app');
-        if(tApp)cleanAppHTML=tApp.outerHTML;
-      }catch(ex){}
-      if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+        var liveApp=document.getElementById('app');
+        var cloned=liveApp.cloneNode(true);
+        var sBar=cloned.querySelector('#statsBar');
+        if(sBar)sBar.style.display='none';
+        var iBar=cloned.querySelector('#infoBar');
+        if(iBar){iBar.style.display='none';iBar.innerHTML='';}
+        var stBtn=cloned.querySelector('#statsToggleBtn');
+        if(stBtn){stBtn.style.background='';stBtn.style.color='';}
+        var itBtn=cloned.querySelector('#infoToggleBtn');
+        if(itBtn){itBtn.style.background='';itBtn.style.color='';itBtn.setAttribute('aria-expanded','false');}
+        cleanAppHTML=cloned.outerHTML;
+      }catch(ex){
+        cleanAppHTML=document.getElementById('app').outerHTML;
+      }
 
       // ── 4. Get exact main script source (last script element = main app) ──
       var mainSrc=document.scripts[document.scripts.length-1].textContent;
@@ -4987,8 +5089,12 @@ function showEditModal(editId,parentId){
   `<div class="form-row">
     <label>الأم</label>
     <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center;">
-      <input type="checkbox" id="f_mother_intree" ${currentMotherId?'checked':''} onchange="toggleMotherMode()">
-      <label for="f_mother_intree" style="font-size:12px;color:var(--text2)">ربط بشخص في الشجرة</label>
+      <button type="button" id="f_mother_intree_btn"
+        onclick="toggleMotherMode()"
+        style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
+        ${currentMotherId?'background:#ede9fe!important;color:#5b21b6;border-color:#8b5cf6;box-shadow:0 0 0 3px #8b5cf61a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        title="اضغط للتبديل">🔗 ربط بشخص في الشجرة</button>
+      <input type="hidden" id="f_mother_intree" value="${currentMotherId?'1':'0'}">
     </div>
     <div id="f_mother_tree_wrap" style="display:${currentMotherId?'block':'none'}">
       <div style="position:relative;">
@@ -5045,12 +5151,20 @@ function showEditModal(editId,parentId){
     </div>
     ${motherFieldHtml}
     ${buildCalendarFieldBlock('f','dob','تاريخ الولادة',p)}
-    <div class="form-row"><div class="checkbox-row"><input type="checkbox" id="f_deceased" ${(p&&p.deceased)?'checked':''} onchange="toggleDod()"><label for="f_deceased">متوفى</label><span style="display:inline-flex">${crescent('#2e7d32')}</span></div></div>
+    <div class="form-row"><div style="display:flex;gap:6px;align-items:center;">
+      <button type="button" id="f_deceased_btn"
+        onclick="toggleDeceasedBtn()"
+        style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
+        ${(p&&p.deceased)?'background:#d1fae5!important;color:#065f46;border-color:#10b981;box-shadow:0 0 0 3px #10b9811a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        title="اضغط للتبديل"><span style="display:inline-flex">${crescent('#2e7d32')}</span> متوفى</button>
+      <input type="hidden" id="f_deceased" value="${(p&&p.deceased)?'1':'0'}">
+    </div></div>
     <div id="dodRow" style="display:${(p&&p.deceased)?'block':'none'}">${buildCalendarFieldBlock('f','dod','تاريخ الوفاة',p)}</div>
     <div class="form-row"><label>صورة</label><div class="file-input-btn btn" style="width:100%;justify-content:center;">📷 رفع صورة<input type="file" accept="image/*" onchange="handlePhoto(event)"></div><div id="photoPreview" style="margin-top:6px;"></div></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="f_notes" rows="2" style="resize:vertical">${p?p.notes:''}</textarea></div>
     <div class="section-title">الأزواج / الزوجات
-      ${(window._editGender==='female')?`<span style="font-size:11px;font-weight:400;color:#5b21b6;background:#ede9fe;padding:2px 7px;border-radius:6px;margin-right:8px;">💡 أضف الأزواج ثم أضف أبناءهم في شجرة كل زوج</span>`:``}
+      <span style="font-size:11px;font-weight:400;color:#5b21b6;background:#ede9fe;padding:2px 7px;border-radius:6px;margin-right:8px;">💡 أضف الأزواج ثم أضف أبناءهم في شجرة كل زوج</span>
+      <span style="font-size:11px;font-weight:400;color:#0369a1;background:#e0f2fe;padding:2px 7px;border-radius:6px;margin-right:4px;">🔒 جنس الزوج/ة يُحدَّد تلقائياً</span>
     </div>
     <div id="spousesList"></div>
     <button class="add-sub-btn" onclick="addSpouseRow()">+ إضافة زوج/ة</button>
@@ -5165,12 +5279,22 @@ function handlePhoto(e){
   r.readAsDataURL(f);
 }
 function toggleMotherMode(){
-  let cb=document.getElementById('f_mother_intree');
+  let hidden=document.getElementById('f_mother_intree');
+  let btn=document.getElementById('f_mother_intree_btn');
   let treeWrap=document.getElementById('f_mother_tree_wrap');
   let textWrap=document.getElementById('f_mother_text_wrap');
-  if(!cb)return;
-  if(cb.checked){treeWrap.style.display='block';textWrap.style.display='none';}
-  else{treeWrap.style.display='none';textWrap.style.display='block';document.getElementById('f_mother_id').value='';}
+  if(!hidden)return;
+  let isActive=hidden.value==='1';
+  let newActive=!isActive;
+  hidden.value=newActive?'1':'0';
+  if(newActive){
+    treeWrap.style.display='block';textWrap.style.display='none';
+    if(btn){btn.style.background='#ede9fe';btn.style.color='#5b21b6';btn.style.borderColor='#8b5cf6';btn.style.boxShadow='0 0 0 3px #8b5cf61a';}
+  } else {
+    treeWrap.style.display='none';textWrap.style.display='block';
+    document.getElementById('f_mother_id').value='';
+    if(btn){btn.style.background='none';btn.style.color='var(--text2,#6b7280)';btn.style.borderColor='var(--card-border,#e5e7eb)';btn.style.boxShadow='';}
+  }
 }
 function motherTreeSearch(q){
   let res=document.getElementById('f_mother_results');if(!res)return;
@@ -5251,7 +5375,27 @@ function selectParentFromTree(id){
     }
   }
 }
-function toggleDod(){document.getElementById('dodRow').style.display=document.getElementById('f_deceased').checked?'block':'none';}
+function toggleDod(){
+  let hidden=document.getElementById('f_deceased');
+  if(!hidden)return;
+  document.getElementById('dodRow').style.display=hidden.value==='1'?'block':'none';
+}
+function toggleDeceasedBtn(){
+  let hidden=document.getElementById('f_deceased');
+  let btn=document.getElementById('f_deceased_btn');
+  if(!hidden)return;
+  let newActive=hidden.value!=='1';
+  hidden.value=newActive?'1':'0';
+  let dodRow=document.getElementById('dodRow');
+  if(dodRow)dodRow.style.display=newActive?'block':'none';
+  if(btn){
+    if(newActive){
+      btn.style.background='#d1fae5';btn.style.color='#065f46';btn.style.borderColor='#10b981';btn.style.boxShadow='0 0 0 3px #10b9811a';
+    } else {
+      btn.style.background='none';btn.style.color='var(--text2,#6b7280)';btn.style.borderColor='var(--card-border,#e5e7eb)';btn.style.boxShadow='';
+    }
+  }
+}
 function addSpouseRow(){
   // Default: external spouse for females, ask for males too
   let isCurrentlyFemale=(window._editGender==='female');
@@ -5271,35 +5415,64 @@ function renderSpouseRows(){
     let linkedPerson=s.personId?getPerson(s.personId):null;
     // ── Determine if external ──
     let isExt=s.isExternal!==false; // default true (most spouses are external)
-    // ── Status chips ──
-    let gIcon=s.gender==='male'?'♂':'♀';
-    // ── Main fields row ──
-    let mainRow=`<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+    // ── Spouse gender label ──
+    let spouseGenderLabel = s.gender === 'male' ? 'ذكر ♂' : 'أنثى ♀';
+    let spouseGenderColor = s.gender === 'male' ? '#1d4ed8' : '#be185d';
+    let spouseGenderBg = s.gender === 'male' ? '#dbeafe' : '#fce7f3';
+
+    // ── Row 1: name inputs ──
+    let inputRow=`<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
       <input placeholder="الاسم" value="${s.name||''}" oninput="editingSpouses[${i}].name=this.value;renderChildRows()" style="flex:1;min-width:90px;font-weight:500;">
       <input placeholder="اللقب / العائلة" value="${s.familyName||''}" oninput="editingSpouses[${i}].familyName=this.value" style="width:96px;">
-      <select onchange="editingSpouses[${i}].gender=this.value;renderSpouseRows()"><option value="female" ${s.gender==='female'?'selected':''}>أنثى ♀</option><option value="male" ${s.gender==='male'?'selected':''}>ذكر ♂</option></select>
-      <input type="date" value="${s.dob||''}" oninput="editingSpouses[${i}].dob=this.value" style="max-width:130px;font-size:11px" title="تاريخ الميلاد">
-      <label style="font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;" title="مطلق/ة"><input type="checkbox" ${s.divorced?'checked':''} onchange="editingSpouses[${i}].divorced=this.checked"> م</label>
-      <label style="font-size:11px;display:flex;align-items:center;gap:3px;" title="متوفى"><input type="checkbox" ${s.deceased?'checked':''} onchange="editingSpouses[${i}].deceased=this.checked"><span style="display:inline-flex">${crescent('#2e7d32')}</span></label>
       <button class="remove-btn" onclick="removeSpouseRow(${i})" title="حذف">✕</button>
     </div>`;
-    // ── External spouse toggle section ──
+
+    // ── Row 2: status toggle pills (no raw checkboxes) ──
+    let statusRow=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+      <span title="الجنس يُحدَّد تلقائياً بناءً على جنس الشخص" style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:${spouseGenderBg};color:${spouseGenderColor};border:1px solid ${spouseGenderColor}30;white-space:nowrap;cursor:default;" title="الجنس محدد تلقائياً ولا يمكن تعديله">${spouseGenderLabel} 🔒</span>
+      <button type="button"
+        onclick="editingSpouses[${i}].divorced=!editingSpouses[${i}].divorced;renderSpouseRows()"
+        style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
+        ${s.divorced?'background:#fef3c7!important;color:#92400e;border-color:#f59e0b;box-shadow:0 0 0 3px #f59e0b1a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        title="اضغط للتبديل">💔 مطلق/ة</button>
+      <button type="button"
+        onclick="editingSpouses[${i}].deceased=!editingSpouses[${i}].deceased;renderSpouseRows()"
+        style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
+        ${s.deceased?'background:#d1fae5!important;color:#065f46;border-color:#10b981;box-shadow:0 0 0 3px #10b9811a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        title="اضغط للتبديل">${crescent('#2e7d32')} متوفى/ة</button>
+    </div>`;
+
+    let mainRow = inputRow + statusRow;
+
+    // ── External toggle: styled button, no raw checkbox ──
+    let extToggleBtn=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:${isExt?'8px':'0'};">
+      <button type="button"
+        onclick="toggleSpouseExternal(${i},${!isExt})"
+        style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .2s;
+        ${isExt?'background:#ede9fe;color:#5b21b6;border-color:#8b5cf6;':'background:#dbeafe;color:#1d4ed8;border-color:#3b82f6;'}"
+        title="اضغط للتبديل بين الخارجي والداخلي">
+        ${isExt?'🏠 من خارج العائلة':'🔗 من داخل الشجرة'}
+        <span style="font-size:10px;padding:1px 5px;border-radius:6px;font-weight:400;
+          ${isExt?'background:#c4b5fd;color:#3b0764;':'background:#d1fae5;color:#065f46;'}">
+          ${isExt?'خارجي':'داخلي'}
+        </span>
+      </button>
+      ${isExt?`<button type="button"
+        onclick="editingSpouses[${i}].forceTreeBtn=!editingSpouses[${i}].forceTreeBtn;renderSpouseRows()"
+        style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .2s;
+        ${s.forceTreeBtn?'background:#ede9fe;color:#5b21b6;border-color:#8b5cf6;box-shadow:0 0 0 3px #8b5cf61a;':'background:transparent;color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        title="إظهار زر الشجرة دائماً بجانب اسم الزوج">
+        🌳 زر الشجرة${s.forceTreeBtn?' ✓':''}
+      </button>`:''}
+    </div>`;
+
+    // ── External spouse section ──
     let extSection=`<div class="${isExt?'ext-spouse-wrap':''}">
-      <label class="ext-spouse-label" title="إذا كان هذا الزوج/ة ينتمي لعائلة خارج هذه الشجرة">
-        <input type="checkbox" ${isExt?'checked':''} onchange="toggleSpouseExternal(${i},this.checked)">
-        <span>${isExt?'🏠 من خارج العائلة':'🔗 من داخل الشجرة'}</span>
-        ${isExt?'<span style="font-size:10px;background:#c4b5fd;color:#3b0764;padding:1px 6px;border-radius:8px;font-weight:400;margin-right:2px">خارجي</span>':'<span style="font-size:10px;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:8px;font-weight:400;margin-right:2px">داخلي</span>'}
-      </label>
+      ${extToggleBtn}
       ${isExt?`
       <div class="ext-spouse-info">
         <span>ℹ️</span>
         <span>سيُحفظ كشخص في قاعدة البيانات لكن <strong>لا يظهر في الشجرة الرئيسية</strong>. يمكنك فتح شجرة عائلته بالضغط على 🌳 بجانب اسمه.</span>
-      </div>
-      <div style="margin-bottom:6px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#5b21b6;cursor:pointer;" title="يُظهر زر 🌳 بنفسجي بجانب اسم الزوج في الشجرة حتى لو لم تُسجَّل له عائلة بعد">
-          <input type="checkbox" ${s.forceTreeBtn?'checked':''} onchange="editingSpouses[${i}].forceTreeBtn=this.checked" style="accent-color:#7c3aed">
-          إظهار زر 🌳 للانتقال إلى شجرة عائلته
-        </label>
       </div>
       ${linkedPerson?`
         <div class="ext-linked-chip">
@@ -5371,7 +5544,9 @@ function linkSpouseToPerson(idx,pid){
   editingSpouses[idx].personId=pid;
   editingSpouses[idx].name=editingSpouses[idx].name||p.name;
   editingSpouses[idx].familyName=editingSpouses[idx].familyName||p.familyName||'';
-  editingSpouses[idx].gender=p.gender;
+  // Gender is always opposite of the person being edited — do not override it
+  let correctSpouseGender=(window._editGender==='female')?'male':'female';
+  editingSpouses[idx].gender=correctSpouseGender;
   editingSpouses[idx].deceased=p.deceased||false;
   renderSpouseRows();renderChildRows();
 }
@@ -5658,8 +5833,10 @@ function _autoFillMotherFromSpouse(editId, parentId){
     var treeWrap=document.getElementById('f_mother_tree_wrap');
     var textWrap=document.getElementById('f_mother_text_wrap');
     if(!cb)return;
-    if(!cb.checked){
-      cb.checked=true;
+    if(cb.value!=='1'){
+      cb.value='1';
+      let btn=document.getElementById('f_mother_intree_btn');
+      if(btn){btn.style.background='#ede9fe';btn.style.color='#5b21b6';btn.style.borderColor='#8b5cf6';btn.style.boxShadow='0 0 0 3px #8b5cf61a';}
       if(treeWrap)treeWrap.style.display='block';
       if(textWrap)textWrap.style.display='none';
     }
@@ -5732,7 +5909,7 @@ function saveModal(editId,parentId){
   let gender=document.getElementById('f_gender').value;
   let parentEl=document.getElementById('f_parent');
   let pid=parentEl?(parentEl.value||''):'';
-  let deceased=document.getElementById('f_deceased').checked;
+  let deceased=document.getElementById('f_deceased').value==='1';
   let dobData=readCalendarField('f','dob');
   let dodData=deceased?readCalendarField('f','dod'):{type:'gregorian',original:'',gregorian:'',hijri:''};
   let notes=document.getElementById('f_notes').value.trim();
@@ -8936,11 +9113,20 @@ async function exportFamilyCopy(){
 
     var cleanAppHTML='';
     try{
-      var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-      var tApp=tDoc.getElementById('app');
-      if(tApp)cleanAppHTML=tApp.outerHTML;
-    }catch(ex){}
-    if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+      var liveApp=document.getElementById('app');
+      var cloned=liveApp.cloneNode(true);
+      var sBar=cloned.querySelector('#statsBar');
+      if(sBar)sBar.style.display='none';
+      var iBar=cloned.querySelector('#infoBar');
+      if(iBar){iBar.style.display='none';iBar.innerHTML='';}
+      var stBtn=cloned.querySelector('#statsToggleBtn');
+      if(stBtn){stBtn.style.background='';stBtn.style.color='';}
+      var itBtn=cloned.querySelector('#infoToggleBtn');
+      if(itBtn){itBtn.style.background='';itBtn.style.color='';itBtn.setAttribute('aria-expanded','false');}
+      cleanAppHTML=cloned.outerHTML;
+    }catch(ex){
+      cleanAppHTML=document.getElementById('app').outerHTML;
+    }
 
     // الكود المصدري — تعديل الثوابت
     var mainSrc=document.scripts[document.scripts.length-1].textContent;
@@ -9392,11 +9578,20 @@ function _buildSaveHTML(){
   });
   var cleanAppHTML='';
   try{
-    var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+_HTML_TEMPLATE,'text/html');
-    var tApp=tDoc.getElementById('app');
-    if(tApp)cleanAppHTML=tApp.outerHTML;
-  }catch(ex){}
-  if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+    var liveApp=document.getElementById('app');
+    var cloned=liveApp.cloneNode(true);
+    var sBar=cloned.querySelector('#statsBar');
+    if(sBar)sBar.style.display='none';
+    var iBar=cloned.querySelector('#infoBar');
+    if(iBar){iBar.style.display='none';iBar.innerHTML='';}
+    var stBtn=cloned.querySelector('#statsToggleBtn');
+    if(stBtn){stBtn.style.background='';stBtn.style.color='';}
+    var itBtn=cloned.querySelector('#infoToggleBtn');
+    if(itBtn){itBtn.style.background='';itBtn.style.color='';itBtn.setAttribute('aria-expanded','false');}
+    cleanAppHTML=cloned.outerHTML;
+  }catch(ex){
+    cleanAppHTML=document.getElementById('app').outerHTML;
+  }
   var mainSrc=document.scripts[document.scripts.length-1].textContent;
   // تضمين إعدادات السحابة
   if(CLOUD_CONFIG.KEY_HEX&&CLOUD_CONFIG.GITHUB_PAT){
@@ -12204,11 +12399,20 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     /* cleanAppHTML */
     var cleanAppHTML='';
     try{
-      var tDoc=(new DOMParser()).parseFromString('<!DOCTYPE html>\n'+window._HTML_TEMPLATE,'text/html');
-      var tApp=tDoc.getElementById('app');
-      if(tApp)cleanAppHTML=tApp.outerHTML;
-    }catch(ex){}
-    if(!cleanAppHTML)cleanAppHTML=document.getElementById('app').outerHTML;
+      var liveApp=document.getElementById('app');
+      var cloned=liveApp.cloneNode(true);
+      var sBar=cloned.querySelector('#statsBar');
+      if(sBar)sBar.style.display='none';
+      var iBar=cloned.querySelector('#infoBar');
+      if(iBar){iBar.style.display='none';iBar.innerHTML='';}
+      var stBtn=cloned.querySelector('#statsToggleBtn');
+      if(stBtn){stBtn.style.background='';stBtn.style.color='';}
+      var itBtn=cloned.querySelector('#infoToggleBtn');
+      if(itBtn){itBtn.style.background='';itBtn.style.color='';itBtn.setAttribute('aria-expanded','false');}
+      cleanAppHTML=cloned.outerHTML;
+    }catch(ex){
+      cleanAppHTML=document.getElementById('app').outerHTML;
+    }
 
     var htmlAttrs=document.documentElement.getAttribute('dir')?' dir="'+document.documentElement.getAttribute('dir')+'"':'';
 
