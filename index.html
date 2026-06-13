@@ -174,6 +174,20 @@
   --clr-amber-bg:       #fef3c7;
   --clr-amber-text:     #92400e;
 
+  /* ── Extended badge/tag families (theme-aware) ──
+     تُستخدم لشارات مثل: مصاهرة، قرابة مباشرة، الزوجة (أنثى)،
+     روابط كاشف القرابة، شارات الطلاق — كل عائلة لها نسخة فاتحة وداكنة */
+  --clr-purple-text:    #5b21b6;  /* نص شارات المصاهرة/الزواج */
+  --clr-green-text:     #065f46;  /* نص شارات القرابة المباشرة/المتوفى */
+  --clr-pink-bg:        #fce7f3;  /* خلفية تمييز الأنثى في كاشف القرابة */
+  --clr-pink-text:      #be185d;
+  --clr-pink-border:    #ec4899;
+  --clr-cyan-bg:        #e0f2fe;  /* خلفية رقاقة "عرض شجرة الزوج/ة" */
+  --clr-cyan-text:      #0c4a6e;
+  --clr-cyan-border:    #38bdf8;
+  --clr-divorce-bg:     #fff7ed;  /* خلفية شارة "طلاق" */
+  --clr-divorce-text:   #c2410c;
+
   /* ── Light Theme (default) ── */
   --bg:               #f3f4f6;
   --bg-secondary:     #f9fafb;
@@ -245,6 +259,18 @@
   --clr-green-bg:     #064e3b;
   --clr-red-bg:       #450a0a;
 
+  /* ── Extended badge/tag families (dark values) ── */
+  --clr-purple-text:    #c4b5fd;
+  --clr-green-text:     #6ee7b7;
+  --clr-pink-bg:        #4a1942;
+  --clr-pink-text:      #f9a8d4;
+  --clr-pink-border:    #f472b6;
+  --clr-cyan-bg:        #0c2d3d;
+  --clr-cyan-text:      #7dd3fc;
+  --clr-cyan-border:    #38bdf8;
+  --clr-divorce-bg:     #431407;
+  --clr-divorce-text:   #fdba74;
+
   --ext-wrap-bg:        linear-gradient(135deg,#2e1065 0%,#3b0764 100%);
   --ext-wrap-border:    #7c3aed;
   --ext-label-color:    #c4b5fd;
@@ -299,6 +325,18 @@
     --clr-amber-text:   #fcd34d;
     --clr-green-bg:     #064e3b;
     --clr-red-bg:       #450a0a;
+
+    /* ── Extended badge/tag families (dark values) ── */
+    --clr-purple-text:    #c4b5fd;
+    --clr-green-text:     #6ee7b7;
+    --clr-pink-bg:        #4a1942;
+    --clr-pink-text:      #f9a8d4;
+    --clr-pink-border:    #f472b6;
+    --clr-cyan-bg:        #0c2d3d;
+    --clr-cyan-text:      #7dd3fc;
+    --clr-cyan-border:    #38bdf8;
+    --clr-divorce-bg:     #431407;
+    --clr-divorce-text:   #fdba74;
 
     --ext-wrap-bg:        linear-gradient(135deg,#2e1065 0%,#3b0764 100%);
     --ext-wrap-border:    #7c3aed;
@@ -366,7 +404,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .node-header.search-active-node{
   outline:3px solid #f59e0b;
   outline-offset:2px;
-  background:linear-gradient(135deg,#fef3c7,#fde68a);
+  background:linear-gradient(135deg,var(--clr-amber-bg),#fde68a);
   box-shadow:0 0 0 3px rgba(245,158,11,.22),0 6px 16px rgba(245,158,11,.18);
   animation:pulseActive 1.2s ease-in-out 2;
 }
@@ -392,7 +430,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .srp-item:last-child{border:none;}
 .srp-item:hover{background:var(--bg-secondary);}
 .srp-item.srp-active{
-  background:linear-gradient(135deg,var(--clr-accent-bg),#eff6ff);
+  background:var(--clr-accent-bg);
   border-right:4px solid var(--clr-accent);
   box-shadow:inset 0 0 0 1px rgba(59,130,246,.15),0 2px 10px rgba(59,130,246,.10);
 }
@@ -402,7 +440,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .srp-more{padding:7px 14px;font-size:11px;color:var(--text2);text-align:center;background:var(--bg-secondary);}
 /* context-mode: dim non-ancestors outside match zone */
 .node-header.ctx-dim{opacity:.35;}
-.node-header.ctx-context{outline:1px dashed #e5e7eb;}
+.node-header.ctx-context{outline:1px dashed var(--card-border);}
 .toggle-btn{width:18px;height:18px;border-radius:4px;border:1px solid var(--card-border);background:var(--bg-secondary);color:var(--text);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .gender-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .male-dot{background:var(--male);}.female-dot{background:var(--female);}
@@ -410,7 +448,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .node-meta{font-size:11px;color:var(--text2);}
 .spouse-chip{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--text2);}
 .status-dot{font-size:9px;padding:1px 4px;border-radius:3px;flex-shrink:0;}
-.dot-divorced{background:#fed7aa;color:#9a3412;border:1px solid #f97316;}
+.dot-divorced{background:var(--clr-divorce-bg);color:var(--clr-divorce-text);border:1px solid #f97316;}
 .dot-deceased-spouse{display:inline-flex;align-items:center;}
 .deceased-icon{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;flex-shrink:0;}
 .rel-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;flex-shrink:0;cursor:pointer;}
@@ -437,7 +475,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .person-list{display:flex;flex-direction:column;gap:6px;}
 .list-tools{position:sticky;top:0;z-index:6;background:var(--card-bg);border-bottom:1px solid var(--card-border);padding:10px 12px 8px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
 .list-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.list-title .title-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:999px;background:#ede9fe;color:#5b21b6;border:1px solid #8b5cf6}
+.list-title .title-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--clr-purple-bg);color:var(--clr-purple-text);border:1px solid #8b5cf6}
 .list-title .title-text{font-size:13px;font-weight:700;color:var(--text)}
 .list-search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .list-search-box{position:relative;flex:1;min-width:220px}
@@ -453,7 +491,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .list-sort-bar .btn{font-size:11px;padding:2px 10px}
 .list-sort-bar .meta{margin-right:auto;font-size:11px;color:var(--text2)}
 .list-card-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
-.list-go-tree{padding:4px 8px;border:1px solid #8b5cf6;border-radius:8px;background:#ede9fe;color:#5b21b6;font-size:11px;cursor:pointer}
+.list-go-tree{padding:4px 8px;border:1px solid #8b5cf6;border-radius:8px;background:var(--clr-purple-bg);color:var(--clr-purple-text);font-size:11px;cursor:pointer}
 .list-go-tree:hover{background:#ddd6fe}
 .list-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .list-card-main{flex:1;min-width:0}
@@ -492,7 +530,7 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .kin-rel-sub{font-size:12px;color:var(--text2);}
 .kin-tree-wrap{padding:16px;background:var(--color-background-secondary,#f9fafb);overflow-x:auto;}
 .kin-tree{display:flex;flex-direction:column;align-items:center;gap:0;}
-.kin-lca{border:2px solid #f59e0b;border-radius:10px;padding:8px 16px;background:#fef3c7;color:#92400e;font-size:13px;font-weight:600;text-align:center;min-width:120px;position:relative;}
+.kin-lca{border:2px solid #f59e0b;border-radius:10px;padding:8px 16px;background:var(--clr-amber-bg);color:var(--clr-amber-text);font-size:13px;font-weight:600;text-align:center;min-width:120px;position:relative;}
 .kin-lca::after{content:'👑';position:absolute;top:-12px;right:50%;transform:translateX(50%);font-size:14px;}
 .kin-branches{display:flex;gap:32px;align-items:flex-start;margin-top:0;}
 .kin-branch{display:flex;flex-direction:column;align-items:center;gap:0;min-width:100px;}
@@ -501,27 +539,27 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .kin-connector-fork::before{content:'';display:block;width:50%;height:18px;border-bottom:2px solid var(--card-border);border-right:2px solid var(--card-border);border-radius:0 0 6px 0;}
 .kin-connector-fork::after{content:'';display:block;width:50%;height:18px;border-bottom:2px solid var(--card-border);border-left:2px solid var(--card-border);border-radius:0 0 0 6px;}
 .kin-person-box{border:1px solid var(--card-border);border-radius:8px;padding:6px 12px;background:var(--card-bg);font-size:12px;text-align:center;min-width:90px;max-width:130px;}
-.kin-person-box.highlight-a{border-color:#3b82f6;background:#dbeafe;color:#1d4ed8;font-weight:600;}
-.kin-person-box.highlight-b{border-color:#ec4899;background:#fce7f3;color:#be185d;font-weight:600;}
+.kin-person-box.highlight-a{border-color:#3b82f6;background:var(--clr-accent-bg);color:var(--clr-accent-text);font-weight:600;}
+.kin-person-box.highlight-b{border-color:var(--clr-pink-border);background:var(--clr-pink-bg);color:var(--clr-pink-text);font-weight:600;}
 .kin-person-box .gen-label{font-size:10px;opacity:.7;display:block;margin-top:1px;}
 .kin-no-rel{text-align:center;padding:24px;color:var(--text2);font-size:14px;}
 .kin-stats{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--card-border);background:var(--card-bg);}
 .kin-stat{font-size:12px;color:var(--text2);background:var(--color-background-secondary,#f9fafb);border:1px solid var(--card-border);border-radius:6px;padding:4px 10px;}
 .reorder-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);margin-bottom:6px;cursor:grab;user-select:none;}
-.kin-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;flex-shrink:0;white-space:nowrap;}
-.kin-badge.close{background:#dbeafe;color:#1e40af;border-color:#93c5fd;}
-.kin-badge.direct{background:#d1fae5;color:#065f46;border-color:#6ee7b7;}
+.kin-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 6px;border-radius:10px;background:var(--clr-amber-bg);color:var(--clr-amber-text);border:1px solid #f59e0b;flex-shrink:0;white-space:nowrap;}
+.kin-badge.close{background:var(--clr-accent-bg);color:var(--clr-accent-text);border-color:#93c5fd;}
+.kin-badge.direct{background:var(--clr-green-bg);color:var(--clr-green-text);border-color:#6ee7b7;}
 .my-marker{display:inline-flex;align-items:center;font-size:10px;padding:1px 6px;border-radius:10px;background:#7c3aed;color:#fff;border:1px solid #7c3aed;flex-shrink:0;}
 .kin-mini-tree{margin:10px 0 4px;padding:10px 12px;background:var(--color-background-secondary,#f9fafb);border:1px solid var(--card-border);border-radius:8px;}
 .kin-mini-tree .kmt-title{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;}
 .kmt-path{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;font-size:12px;}
 .kmt-node{padding:3px 8px;border-radius:6px;font-weight:500;}
 .kmt-node.me{background:#7c3aed;color:#fff;}
-.kmt-node.them{background:#f59e0b;color:#fff;}
+.kmt-node.them{background:#f59e0b;color:#78350f;}
 .kmt-node.anc{background:var(--card-bg);border:1px solid var(--card-border);color:var(--text);}
 .kmt-arrow{color:var(--text2);font-size:11px;}
 .kmt-via{font-size:10px;color:var(--text2);}
-.reorder-item.drag-over{border-color:#3b82f6;background:#eff6ff;}
+.reorder-item.drag-over{border-color:#3b82f6;background:var(--clr-accent-bg);}
 #searchClearBtn{opacity:0;pointer-events:none;transition:opacity .15s;}
 #searchBox:not(:placeholder-shown)~#searchClearBtn,
 .search-has-value #searchClearBtn{opacity:1;pointer-events:auto;}
@@ -536,12 +574,10 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .insert-zone:hover{opacity:1;}
 .insert-zone hr{flex:1;border:none;border-top:1px dashed #3b82f6;}
 .insert-btn{font-size:10px;padding:2px 8px;border:1px dashed #3b82f6;border-radius:4px;background:transparent;color:#3b82f6;cursor:pointer;white-space:nowrap;flex-shrink:0;}
-.insert-btn:hover{background:#eff6ff;}
-.me-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;background:#fef9c3;border:1px solid #fbbf24;color:#92400e;font-size:10px;font-weight:600;flex-shrink:0;}
-.kin-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#e0f2fe;border:1px solid #38bdf8;color:#0c4a6e;font-size:11px;flex-shrink:0;cursor:pointer;}
+.insert-btn:hover{background:var(--clr-accent-bg);}
+.me-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;background:var(--clr-amber-bg);border:1px solid #fbbf24;color:var(--clr-amber-text);font-size:10px;font-weight:600;flex-shrink:0;}
+.kin-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:var(--clr-cyan-bg);border:1px solid #38bdf8;color:var(--clr-cyan-text);font-size:11px;flex-shrink:0;cursor:pointer;}
 .kin-chip:hover{background:#bae6fd;}
-/*.me-selector-btn{padding:6px 12px;border:1px solid #fbbf24;border-radius:8px;background:#fef9c3;color:#92400e;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;}*/
-.me-selector-btn:hover{background:#fef08a;}
 /* ── Navigation Breadcrumb ── */
 .nav-breadcrumb{display:flex;align-items:center;gap:6px;padding:9px 14px;background:var(--card-bg);border:1px solid #8b5cf6;border-radius:10px;margin-bottom:12px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(124,58,237,.1);}
 .nav-crumb-item{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer;padding:3px 8px;border-radius:6px;border:1px solid transparent;transition:all .15s;}
@@ -549,27 +585,22 @@ h1{font-size:20px;font-weight:600;color:var(--text);margin-bottom:16px;text-alig
 .nav-crumb-item.active{color:#7c3aed;font-weight:600;cursor:default;}
 .nav-crumb-item.active:hover{background:transparent;border-color:transparent;}
 .nav-crumb-sep{color:var(--text2);font-size:11px;flex-shrink:0;}
-.nav-back-btn{margin-right:auto;padding:4px 12px;border:1px solid #8b5cf6;border-radius:7px;background:#ede9fe;color:#7c3aed;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.nav-back-btn{margin-right:auto;padding:4px 12px;border:1px solid #8b5cf6;border-radius:7px;background:var(--clr-purple-bg);color:#7c3aed;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .nav-back-btn:hover{background:#ddd6fe;}
 /* ── Spouse Chip (clickable variant) ── */
-.spouse-chip-linked{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:#5b21b6;background:#ede9fe;border:1px solid #8b5cf6;border-radius:6px;padding:2px 7px;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.spouse-chip-linked{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--clr-purple-text);background:var(--clr-purple-bg);border:1px solid #8b5cf6;border-radius:6px;padding:2px 7px;cursor:pointer;transition:all .15s;flex-shrink:0;}
 .spouse-chip-linked:hover{background:#ddd6fe;box-shadow:0 1px 4px rgba(124,58,237,.2);}
 .spouse-chip-linked .sp-tree-icon{font-size:10px;opacity:.8;}
 /* ── Spouse Real-Person toggle in form ── */
 .spouse-real-btn{padding:3px 7px;border:1px dashed #7c3aed;border-radius:6px;background:transparent;color:#7c3aed;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;}
-.spouse-real-btn:hover{background:#ede9fe;}
-.spouse-real-btn.linked{border-style:solid;background:#ede9fe;color:#5b21b6;}
+.spouse-real-btn:hover{background:var(--clr-purple-bg);}
+.spouse-real-btn.linked{border-style:solid;background:var(--clr-purple-bg);color:var(--clr-purple-text);}
 /* ── Family context banner ── */
-.family-context-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#ede9fe,#faf5ff);border:1px solid #8b5cf6;border-radius:10px;margin-bottom:12px;}
+.family-context-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,var(--clr-purple-bg),var(--card-bg));border:1px solid #8b5cf6;border-radius:10px;margin-bottom:12px;}
 .family-context-banner .ctx-icon{font-size:20px;}
 .family-context-banner .ctx-info{flex:1;min-width:0;}
-.family-context-banner .ctx-title{font-size:13px;font-weight:600;color:#5b21b6;}
+.family-context-banner .ctx-title{font-size:13px;font-weight:600;color:var(--clr-purple-text);}
 .family-context-banner .ctx-sub{font-size:11px;color:#7c3aed;margin-top:2px;}
-body {font-family: Tahoma; background: var(--bg);}
-.person{border-radius:12px;padding:10px;margin:6px;display:inline-block;min-width:120px;text-align:center}
-.person.male{background:#e3f2fd;border:1px solid #2196f3}
-.person.female{background:#fce4ec;border:1px solid #e91e63}
-.person:hover{box-shadow:0 4px 10px rgba(0,0,0,.15)}
 
 /* ═══════════════════════════════════════════════════
    SMART EXTERNAL SPOUSE UI
@@ -602,11 +633,11 @@ body {font-family: Tahoma; background: var(--bg);}
   padding:5px 12px;border-radius:8px;font-size:12px;font-weight:500;
   cursor:pointer;transition:all .15s;border:1.5px solid;white-space:nowrap;
 }
-.ext-action-btn.link { background:#ede9fe;color:#5b21b6;border-color:#8b5cf6; }
+.ext-action-btn.link { background:var(--clr-purple-bg);color:var(--clr-purple-text);border-color:#8b5cf6; }
 .ext-action-btn.link:hover { background:#ddd6fe; }
-.ext-action-btn.create { background:#fff;color:#059669;border-color:#10b981; }
-.ext-action-btn.create:hover { background:#d1fae5; }
-.ext-action-btn.view { background:#dbeafe;color:#1d4ed8;border-color:#3b82f6; }
+.ext-action-btn.create { background:var(--clr-green-bg);color:var(--color-text-success);border-color:#10b981; }
+.ext-action-btn.create:hover { background:#a7f3d0; }
+.ext-action-btn.view { background:var(--clr-accent-bg);color:var(--clr-accent-text);border-color:#3b82f6; }
 .ext-action-btn.view:hover { background:#bfdbfe; }
 .ext-linked-chip {
   display:flex;align-items:center;gap:7px;padding:7px 10px;
@@ -657,15 +688,15 @@ body {font-family: Tahoma; background: var(--bg);}
 /* Quick tree-open button on spouse */
 .sp-tree-nav {
   display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
-  background:#ede9fe;border:1px solid #8b5cf6;border-radius:6px;
-  color:#5b21b6;font-size:11px;font-weight:600;cursor:pointer;
+  background:var(--clr-purple-bg);border:1px solid #8b5cf6;border-radius:6px;
+  color:var(--clr-purple-text);font-size:11px;font-weight:600;cursor:pointer;
   transition:all .15s;flex-shrink:0;
 }
 .sp-tree-nav:hover { background:#ddd6fe;box-shadow:0 2px 6px rgba(124,58,237,.2); }
 /* External badge in tree node */
 .ext-family-badge {
   display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 6px;
-  border-radius:8px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;flex-shrink:0;
+  border-radius:8px;background:var(--clr-amber-bg);color:var(--clr-amber-text);border:1px solid #f59e0b;flex-shrink:0;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -838,6 +869,38 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
 .field-mic-btn:hover{opacity:.9!important;}
 .field-mic-btn.voice-active{animation:fieldVoicePulse .7s ease-in-out infinite;}
 @keyframes fieldVoicePulse{0%,100%{opacity:.5;}50%{opacity:1;transform:translateY(-50%) scale(1.25);}}
+
+/* ═══════════════════════════════════════════════════
+   تحسينات بصرية خاصة بالوضع الداكن — Dark Theme Refinements
+   عناصر "بقعة ضوء فاتحة" أو حالات Hover الفاتحة كانت تبقى
+   بألوانها الفاتحة الأصلية فوق خلفية داكنة، فتُحدث وهجاً
+   حاداً يسبب إجهاداً بصرياً. نُخفّفها هنا لتناسب الخلفية الداكنة
+   مع الإبقاء على تأثير "التمييز/الإبراز" المقصود.
+═══════════════════════════════════════════════════ */
+
+/* بقعة نتيجة البحث النشطة: تدرّج كهرماني هادئ بدل التدرّج الفاتح الحاد */
+[data-theme="dark"] .node-header.search-active-node{
+  background:linear-gradient(135deg,var(--clr-amber-bg),#5c2d0c);
+}
+
+/* حالات Hover الفاتحة (بنفسجي/أزرق/سماوي) تتحول إلى درجة أعمق وأكثر دفئاً
+   من ألوان الشِّعار، بدل الوميض الفاتح الذي كان يظهر فوق الخلفية الداكنة */
+[data-theme="dark"] .list-go-tree:hover,
+[data-theme="dark"] .nav-back-btn:hover,
+[data-theme="dark"] .spouse-chip-linked:hover,
+[data-theme="dark"] .ext-action-btn.link:hover,
+[data-theme="dark"] .sp-tree-nav:hover{
+  background:#4c1d95;
+}
+[data-theme="dark"] .ext-action-btn.view:hover{
+  background:#1e3a8a;
+}
+[data-theme="dark"] .kin-chip:hover{
+  background:#155e75;
+}
+[data-theme="dark"] .ext-action-btn.create:hover{
+  background:#065f46;
+}
 
 </style>
 
@@ -1012,7 +1075,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
       <div style="font-weight:600">أضف التطبيق للشاشة الرئيسية للحفظ الدائم</div>
       <div style="font-size:11px;opacity:.9" id="installHint"></div>
     </div>
-    <button onclick="doInstallPWA()" id="installBtn" style="padding:5px 14px;background:#fff;color:#1e40af;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">➕ تثبيت</button>
+    <button onclick="doInstallPWA()" id="installBtn" style="padding:5px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">➕ تثبيت</button>
     <button onclick="dismissInstallBanner()" style="padding:5px 10px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap">✕</button>
   </div>
 
@@ -1024,7 +1087,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
       <div style="font-weight:600">☁️ الحفظ السحابي غير مفعّل في هذه النسخة</div>
       <div style="font-size:11px;opacity:.85">إذا كنت المالك: اضغط ⚙️ إعداد — إذا كنت ضيفاً: استخدم 📤 تصدير JSON وأرسله للمالك</div>
     </div>
-    <button onclick="openCloudSetup()" style="padding:5px 14px;background:#fff;color:#1e40af;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⚙️ إعداد (المالك)</button>
+    <button onclick="openCloudSetup()" style="padding:5px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⚙️ إعداد (المالك)</button>
     <button onclick="closeBannerForever()" style="padding:5px 10px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap">✕ إغلاق</button>
   </div>
   <div id="saveToast" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none;">✔ تم الحفظ</div>
@@ -1044,7 +1107,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   <div class="toolbar">
     <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
     <button class="btn" id="searchTriggerBtn" onclick="openSearchPanel()" style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-start;color:var(--text2);font-size:13px;overflow:hidden;padding:8px 14px;"><span style="font-size:15px;flex-shrink:0">🔍</span><span id="searchBtnLabel" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">ابحث عن أي شخص...</span><span title="بحث صوتي" onclick="event.stopPropagation();startVoiceSearch()" style="font-size:14px;flex-shrink:0;opacity:.55;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.55'">🎤</span></button>
-    <button id="searchClearBtnTop" onclick="clearSearch(true)" title="مسح البحث" style="display:none;padding:7px 10px;border:1px solid #fca5a5;border-radius:8px;background:transparent;color:#ef4444;font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='transparent'">✕</button>
+    <button id="searchClearBtnTop" onclick="clearSearch(true)" title="مسح البحث" style="display:none;padding:7px 10px;border:1px solid #fca5a5;border-radius:8px;background:transparent;color:#ef4444;font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;" onmouseover="this.style.background='var(--clr-red-bg)'" onmouseout="this.style.background='transparent'">✕</button>
   </div>
     <input type="text" id="searchBox" value="" oninput="triggerSearch()" onkeydown="searchKeyNav(event)" style="display:none;position:absolute;opacity:0;pointer-events:none">
     <button id="searchClearBtn" style="display:none">✕</button>
@@ -1056,13 +1119,13 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <button class="btn" id="fsaSaveBtn2" onclick="fsaPickFile()" title="ربط الملف للحفظ التلقائي على الجوال — Chrome/Edge" style="display:none">📁 ربط الملف</button>
     <button class="btn" id="exportFamilyBtn" onclick="exportFamilyCopy()" title="حفظ نسخة للمشاركة مع العائلة" style="display:none">📤 نسخة للعائلة</button>
     <button class="btn" id="familyUploadSetupBtn" onclick="openFamilyUploadSetup()" title="إعداد الرفع الصامت لنسخة العائلة" style="display:none">⚙️ إعداد رفع العائلة</button>
-    <button class="btn" id="familyUpdatesBtn" onclick="openFamilyUpdatesModal()" title="اطلع على آخر تحديث رفعته العائلة" style="display:none;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">📡 تحديثات العائلة</button>
-    <button class="btn" id="mergeLogBtn" onclick="openMergeLogModal()" title="سجل الدمج" style="display:none;background:#f8fafc;border-color:#8b5cf6;color:#5b21b6">📜 سجل الدمج</button>
-    <button class="btn" id="undoLastMergeBtn" onclick="undoLastMerge()" title="استرجاع آخر دمج" style="display:none;background:#fff7ed;border-color:#fb923c;color:#c2410c">↩ استرجاع قبل الدمج</button>
+    <button class="btn" id="familyUpdatesBtn" onclick="openFamilyUpdatesModal()" title="اطلع على آخر تحديث رفعته العائلة" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">📡 تحديثات العائلة</button>
+    <button class="btn" id="mergeLogBtn" onclick="openMergeLogModal()" title="سجل الدمج" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">📜 سجل الدمج</button>
+    <button class="btn" id="undoLastMergeBtn" onclick="undoLastMerge()" title="استرجاع آخر دمج" style="display:none;background:var(--clr-divorce-bg);border-color:#fb923c;color:var(--clr-divorce-text)">↩ استرجاع قبل الدمج</button>
     <button class="btn" onclick="showExportJSONModal()" title="تصدير البيانات كملف JSON للنسخ الاحتياطي">📤 تصدير JSON</button>
     <button class="btn" id="cloudSyncBtn" onclick="manualCloudSync()" title="لوحة المزامنة" style="display:none">☁️ مزامنة</button>
-    <button class="btn" id="cloudUploadBtn" onclick="_doUpload()" style="display:none;background:#eff6ff;border-color:#3b82f6;color:#1d4ed8">⬆️ رفع</button>
-    <button class="btn" id="cloudDownloadBtn" onclick="_doDownload(false)" style="display:none;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6">⬇️ تنزيل</button>
+    <button class="btn" id="cloudUploadBtn" onclick="_doUpload()" style="display:none;background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)">⬆️ رفع</button>
+    <button class="btn" id="cloudDownloadBtn" onclick="_doDownload(false)" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">⬇️ تنزيل</button>
     <button class="btn" id="cloudRestoreBtn" onclick="cloudRestorePrompt()" style="display:none">🔄 استعادة</button>
     <label class="btn" style="cursor:pointer;" title="استيراد من ملف HTML محفوظ أو JSON">📥 استيراد<input type="file" id="importFileInput" accept=".json,.html,.htm" onchange="handleImportFile(event)" style="display:none"></label>
   </div>
@@ -2342,10 +2405,10 @@ function _mssRenderItems(items,q){
     let lineage=par?(par.name+(gf?' بن '+gf.name:'')):'';
     let kin=myPersonId&&myPersonId!==p.id?getMyKinship(p.id):null;
     let kinHtml=kin
-      ?`<span style="font-size:11px;padding:2px 7px;border-radius:8px;background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;flex-shrink:0;white-space:nowrap">${kin.label}</span>`
-      :(myPersonId===p.id?`<span style="font-size:11px;padding:2px 7px;border-radius:8px;background:#fef9c3;color:#92400e;border:1px solid #fbbf24;flex-shrink:0">أنا</span>`:'');
+      ?`<span style="font-size:11px;padding:2px 7px;border-radius:8px;background:var(--clr-purple-bg);color:var(--clr-purple-text);border:1px solid #c4b5fd;flex-shrink:0;white-space:nowrap">${kin.label}</span>`
+      :(myPersonId===p.id?`<span style="font-size:11px;padding:2px 7px;border-radius:8px;background:var(--clr-amber-bg);color:var(--clr-amber-text);border:1px solid #fbbf24;flex-shrink:0">أنا</span>`:'');
     let dispName=highlightQueryHTML(p.name,q);
-    let gDot=`<div style="width:11px;height:11px;border-radius:50%;background:${p.gender==='male'?'#3b82f6':'#ec4899'};flex-shrink:0"></div>`;
+    let gDot=`<div style="width:11px;height:11px;border-radius:50%;background:${p.gender==='male'?'#3b82f6':'var(--clr-pink-border)'};flex-shrink:0"></div>`;
     let decIcon=p.deceased?`<span style="display:inline-flex;vertical-align:middle">${crescent('#2e7d32')}</span>`:'';
     let fn=p.familyName?` <span style="font-size:11px;color:var(--text2)">${p.familyName}</span>`:'';
     let titleHtml=p.title?`<span style="font-size:inherit;font-weight:500;color:var(--text)">${p.title} </span>`:'';
@@ -2749,18 +2812,18 @@ function buildDirectSpouseTree(p1, p2){
   let entry=getDirectSpouseEntry(p1.id,p2.id)||getDirectSpouseEntry(p2.id,p1.id);
   let isDivorced=entry&&entry.divorced;
   let ringLine=isDivorced
-    ? `<div style="display:flex;align-items:center;gap:6px;padding:8px 16px;border:2px dashed #f97316;border-radius:10px;background:#fff7ed;font-size:13px;font-weight:600;color:#c2410c">💔 طُلِّقا</div>`
-    : `<div style="display:flex;align-items:center;gap:6px;padding:8px 16px;border:2px solid #7c3aed;border-radius:10px;background:linear-gradient(135deg,#faf5ff,#ede9fe);font-size:13px;font-weight:600;color:#5b21b6">💍 متزوجان</div>`;
+    ? `<div style="display:flex;align-items:center;gap:6px;padding:8px 16px;border:2px dashed #f97316;border-radius:10px;background:var(--clr-divorce-bg);font-size:13px;font-weight:600;color:var(--clr-divorce-text)">💔 طُلِّقا</div>`
+    : `<div style="display:flex;align-items:center;gap:6px;padding:8px 16px;border:2px solid #7c3aed;border-radius:10px;background:linear-gradient(135deg,var(--card-bg),var(--clr-purple-bg));font-size:13px;font-weight:600;color:var(--clr-purple-text)">💍 متزوجان</div>`;
   let name1=p1.name.length>16?p1.name.slice(0,15)+'…':p1.name;
   let name2=p2.name.length>16?p2.name.slice(0,15)+'…':p2.name;
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 16px;border:2px solid ${p1.gender==='female'?'#ec4899':'#3b82f6'};border-radius:10px;background:var(--card-bg);min-width:90px;text-align:center">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 16px;border:2px solid ${p1.gender==='female'?'var(--clr-pink-border)':'#3b82f6'};border-radius:10px;background:var(--card-bg);min-width:90px;text-align:center">
         <span style="font-size:22px">${icon1}</span>
         <span style="font-size:13px;font-weight:600;color:var(--text)">${name1}</span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:4px">${ringLine}</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 16px;border:2px solid ${p2.gender==='female'?'#ec4899':'#3b82f6'};border-radius:10px;background:var(--card-bg);min-width:90px;text-align:center">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 16px;border:2px solid ${p2.gender==='female'?'var(--clr-pink-border)':'#3b82f6'};border-radius:10px;background:var(--card-bg);min-width:90px;text-align:center">
         <span style="font-size:22px">${icon2}</span>
         <span style="font-size:13px;font-weight:600;color:var(--text)">${name2}</span>
       </div>
@@ -2839,10 +2902,10 @@ function buildMarriageKinTree(p1,p2,mr){
   return bloodTreeHtml+`
     <div style="display:flex;flex-direction:column;align-items:center;margin-top:6px">
       <div style="font-size:18px;color:#7c3aed">↓</div>
-      <div style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:2px solid #7c3aed;border-radius:10px;background:linear-gradient(135deg,#faf5ff,#ede9fe);font-size:13px;font-weight:600;color:#5b21b6">
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:2px solid #7c3aed;border-radius:10px;background:linear-gradient(135deg,var(--card-bg),var(--clr-purple-bg));font-size:13px;font-weight:600;color:var(--clr-purple-text)">
         <span>💍</span>
         <span>${p2Name}</span>
-        <span style="font-size:10px;font-weight:400;color:#7c3aed;background:#fff;border:1px solid #c4b5fd;border-radius:4px;padding:1px 6px">${spouseWord} عن طريق المصاهرة</span>
+        <span style="font-size:10px;font-weight:400;color:var(--clr-purple-text);background:var(--card-bg);border:1px solid #c4b5fd;border-radius:4px;padding:1px 6px">${spouseWord} عن طريق المصاهرة</span>
       </div>
     </div>`;
 }
@@ -2888,14 +2951,14 @@ function discoverKin(){
     let entry=getDirectSpouseEntry(p1.id,p2.id)||getDirectSpouseEntry(p2.id,p1.id);
     let isDivorced=entry&&entry.divorced;
     relLabelHtml+=`<div class="kin-rel-label">${spouseLabel}
-      <span style="font-size:11px;font-weight:400;color:${isDivorced?'#c2410c':'#5b21b6'};background:${isDivorced?'#fff7ed':'#ede9fe'};border:1px solid ${isDivorced?'#f97316':'#c4b5fd'};border-radius:5px;padding:1px 6px;margin-right:4px">${isDivorced?'💔 طلاق':'💍 زواج مباشر'}</span>
+      <span style="font-size:11px;font-weight:400;color:${isDivorced?'var(--clr-divorce-text)':'var(--clr-purple-text)'};background:${isDivorced?'var(--clr-divorce-bg)':'var(--clr-purple-bg)'};border:1px solid ${isDivorced?'#f97316':'#c4b5fd'};border-radius:5px;padding:1px 6px;margin-right:4px">${isDivorced?'💔 طلاق':'💍 زواج مباشر'}</span>
     </div>`;
   }
   if(blood){
-    relLabelHtml+=`<div class="kin-rel-label" style="margin-top:${directSpouse?'8px':'0'}">${blood.label} <span style="font-size:11px;font-weight:400;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;border-radius:5px;padding:1px 6px;margin-right:4px">نسب</span></div>`;
+    relLabelHtml+=`<div class="kin-rel-label" style="margin-top:${directSpouse?'8px':'0'}">${blood.label} <span style="font-size:11px;font-weight:400;color:var(--clr-accent-text);background:var(--clr-accent-bg);border:1px solid #93c5fd;border-radius:5px;padding:1px 6px;margin-right:4px">نسب</span></div>`;
   }
   if(marriage){
-    relLabelHtml+=`<div class="kin-rel-label" style="margin-top:${(directSpouse||blood)?'8px':'0'}">${marriage.label} <span style="font-size:11px;font-weight:400;color:#5b21b6;background:#ede9fe;border:1px solid #c4b5fd;border-radius:5px;padding:1px 6px;margin-right:4px">مصاهرة</span></div>`;
+    relLabelHtml+=`<div class="kin-rel-label" style="margin-top:${(directSpouse||blood)?'8px':'0'}">${marriage.label} <span style="font-size:11px;font-weight:400;color:var(--clr-purple-text);background:var(--clr-purple-bg);border:1px solid #c4b5fd;border-radius:5px;padding:1px 6px;margin-right:4px">مصاهرة</span></div>`;
   }
 
   // ── بناء الشجرة المرئية ──
@@ -2906,7 +2969,7 @@ function discoverKin(){
       // عرض شجرة الدم الكاملة أسفل شجرة الزواج
       let bloodTreeHtml=buildKinTree(blood.path1,blood.path2,blood.lca.id,p1,p2);
       treeHtml+=`<div style="margin-top:14px;border-top:2px dashed #93c5fd;padding-top:12px">
-        <div style="text-align:center;font-size:11px;font-weight:600;color:#1d4ed8;margin-bottom:8px;background:#dbeafe;border-radius:6px;padding:4px 10px;display:inline-block">🩸 شجرة القرابة بالدم</div>
+        <div style="text-align:center;font-size:11px;font-weight:600;color:var(--clr-accent-text);margin-bottom:8px;background:var(--clr-accent-bg);border-radius:6px;padding:4px 10px;display:inline-block">🩸 شجرة القرابة بالدم</div>
         ${bloodTreeHtml}
       </div>`;
     }
@@ -2914,7 +2977,7 @@ function discoverKin(){
     treeHtml=buildKinTree(blood.path1,blood.path2,blood.lca.id,p1,p2);
     if(marriage){
       let spPerson=getPerson(marriage.spouseOfId);
-      treeHtml+=`<div style="margin-top:10px;padding:8px 12px;background:linear-gradient(135deg,#faf5ff,#ede9fe);border:1px solid #c4b5fd;border-radius:8px;font-size:12px;color:#5b21b6;text-align:center">
+      treeHtml+=`<div style="margin-top:10px;padding:8px 12px;background:linear-gradient(135deg,var(--card-bg),var(--clr-purple-bg));border:1px solid #c4b5fd;border-radius:8px;font-size:12px;color:var(--clr-purple-text);text-align:center">
         💍 يرتبط/ترتبط أيضاً بـ ${p1.name} عبر الزواج من <strong>${spPerson?spPerson.name:'؟'}</strong> (${marriage.spouseOfBloodLabel})
       </div>`;
     }
@@ -2960,7 +3023,7 @@ function buildKinTree(path1,path2,lcaId,p1,p2){
   rev1.shift();rev2.shift(); 
   function viaLabel(via){
     if(via==='father')return'<span style="font-size:9px;color:#3b82f6;display:block">▲ أب</span>';
-    if(via==='mother')return'<span style="font-size:9px;color:#ec4899;display:block">▲ أم</span>';
+    if(via==='mother')return'<span style="font-size:9px;color:var(--clr-pink-border);display:block">▲ أم</span>';
     return'';
   }
   function makeBox(entry,cls,genNum){
@@ -3003,17 +3066,17 @@ function buildKinTree(path1,path2,lcaId,p1,p2){
     </div>
     <div class="kin-branches">
       <div class="kin-branch">
-        <div class="kin-person-box" style="border-color:#3b82f6;background:#eff6ff;color:#1e40af;font-size:11px;">فرع: ${p1.name.length>12?p1.name.slice(0,11)+'…':p1.name}</div>
+        <div class="kin-person-box" style="border-color:#3b82f6;background:var(--clr-accent-bg);color:var(--clr-accent-text);font-size:11px;">فرع: ${p1.name.length>12?p1.name.slice(0,11)+'…':p1.name}</div>
         ${leftBoxes}
       </div>
       <div class="kin-branch">
-        <div class="kin-person-box" style="border-color:#ec4899;background:#fdf2f8;color:#9d174d;font-size:11px;">فرع: ${p2.name.length>12?p2.name.slice(0,11)+'…':p2.name}</div>
+        <div class="kin-person-box" style="border-color:var(--clr-pink-border);background:var(--clr-pink-bg);color:var(--clr-pink-text);font-size:11px;">فرع: ${p2.name.length>12?p2.name.slice(0,11)+'…':p2.name}</div>
         ${rightBoxes}
       </div>
     </div>`:'<div style="font-size:12px;color:var(--text2);margin-top:8px;">نفس الجيل — لا فارق أجيال</div>'}
     <div style="margin-top:10px;font-size:11px;color:var(--text2);display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
       <span><span style="color:#3b82f6">▲ أب</span> = انتساب عبر الأب</span>
-      <span><span style="color:#ec4899">▲ أم</span> = انتساب عبر الأم</span>
+      <span><span style="color:var(--clr-pink-border)">▲ أم</span> = انتساب عبر الأم</span>
     </div>
   </div>`;
 }
@@ -3135,7 +3198,7 @@ function focusPersonCard(id){
       let hdr=el.querySelector('.node-header');
       if(hdr){
         hdr.style.transition='background .12s ease, box-shadow .12s ease';
-        hdr.style.background='#fef9c3';
+        hdr.style.background='var(--clr-amber-bg)';
         hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.18)';
         setTimeout(()=>{
           hdr.style.transition='';
@@ -3262,12 +3325,12 @@ function _renderSearchPanel(){
   let itemsHtml=shown.map(p=>{
     let fline=getFullFatherLine(p);
     let kin=myPersonId&&myPersonId!==p.id?getMyKinship(p.id):null;
-    let kinHtml=kin?`<span class="srp-kin">${kin.label}</span>`:(myPersonId===p.id?`<span class="srp-kin" style="background:#fef9c3;color:#92400e;border:1px solid #fbbf24">أنا</span>`:'');
+    let kinHtml=kin?`<span class="srp-kin">${kin.label}</span>`:(myPersonId===p.id?`<span class="srp-kin" style="background:var(--clr-amber-bg);color:var(--clr-amber-text);border:1px solid #fbbf24">أنا</span>`:'');
     let gIcon=p.gender==='male'?`<div class="gender-dot male-dot" style="width:8px;height:8px;flex-shrink:0"></div>`:`<div class="gender-dot female-dot" style="width:8px;height:8px;flex-shrink:0"></div>`;
     let active=_searchActiveId===p.id?' srp-active':'';
     // تمييز الجزء المطابق في الاسم (بعد تجريد الألقاب)
     let dispName=highlightQueryHTML(p.name,nq);
-    let activeLabel=_searchActiveId===p.id?` <span style="font-size:10px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:999px;padding:1px 6px;white-space:nowrap">الحالية</span>`:'';
+    let activeLabel=_searchActiveId===p.id?` <span style="font-size:10px;font-weight:700;color:var(--clr-amber-text);background:var(--clr-amber-bg);border:1px solid #fbbf24;border-radius:999px;padding:1px 6px;white-space:nowrap">الحالية</span>`:'';
     return `<div class="srp-item${active}" onclick="searchNavigateTo(${p.id})" data-srp-id="${p.id}">
       ${gIcon}
       <div style="flex:1;min-width:0">
@@ -3450,7 +3513,7 @@ function searchNavigateTo(id){
     if(el){
       el.scrollIntoView({behavior:'smooth',block:'center'});
       let hdr=el.querySelector('.node-header');
-      if(hdr){hdr.style.background='#fef9c3';hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';setTimeout(()=>{hdr.style.background='';hdr.style.boxShadow='';},900);}
+      if(hdr){hdr.style.background='var(--clr-amber-bg)';hdr.style.boxShadow='0 0 0 3px rgba(245,158,11,.25)';setTimeout(()=>{hdr.style.background='';hdr.style.boxShadow='';},900);}
     }
   },360);
 }
@@ -3534,7 +3597,7 @@ function renderInfo(){
           <span>ذكر</span>
         </div>
         <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
-          <div style="width:22px;height:16px;border-radius:4px;background:#ec4899;flex-shrink:0;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="width:22px;height:16px;border-radius:4px;background:var(--clr-pink-border);flex-shrink:0;border:1px solid rgba(0,0,0,.08);"></div>
           <span>أنثى</span>
         </div>
         <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
@@ -3542,7 +3605,7 @@ function renderInfo(){
           <span>متوفى</span>
         </div>
         <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
-          <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fed7aa;color:#9a3412;border:1px solid #f97316;font-weight:600;flex-shrink:0;">م</span>
+          <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--clr-divorce-bg);color:var(--clr-divorce-text);border:1px solid #f97316;font-weight:600;flex-shrink:0;">م</span>
           <span>مطلق/ة</span>
         </div>
         <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);">
@@ -3564,7 +3627,7 @@ function renderStats(){
     {label:'إجمالي الأفراد',val:total,color:'#3b82f6'},
     {label:'عدد الأجيال',val:gens,color:'#8b5cf6'},
     {label:'ذكور',val:males,color:'#0ea5e9'},
-    {label:'إناث',val:females,color:'#ec4899'},
+    {label:'إناث',val:females,color:'var(--clr-pink-border)'},
     {label:'الأحياء',val:alive,color:'#22c55e'},
     {label:'المتوفين',val:deceased,color:'#6b7280'},
   ];
@@ -3712,14 +3775,14 @@ function _buildFamilyExportOption(){
   let photoCount=people.filter(p=>p.photo).length;
   let configured=!!(fuPat&&fuGid);
   let badge=configured
-    ?`<span style="font-size:11px;font-weight:400;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;padding:2px 6px;border-radius:6px;margin-right:6px;">\u0645\u064f\u0639\u062f\u064e\u0651\u062f Gist \u2713</span>`
-    :`<span style="font-size:11px;font-weight:400;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;padding:2px 6px;border-radius:6px;margin-right:6px;">\u0628\u062f\u0648\u0646 Gist</span>`;
+    ?`<span style="font-size:11px;font-weight:400;color:var(--clr-accent-text);background:var(--clr-accent-bg);border:1px solid #93c5fd;padding:2px 6px;border-radius:6px;margin-right:6px;">\u0645\u064f\u0639\u062f\u064e\u0651\u062f Gist \u2713</span>`
+    :`<span style="font-size:11px;font-weight:400;color:#b45309;background:var(--clr-amber-bg);border:1px solid #fcd34d;padding:2px 6px;border-radius:6px;margin-right:6px;">\u0628\u062f\u0648\u0646 Gist</span>`;
   let gidHint=configured
     ?`Gist: <code style="font-size:10px">${fuGid.slice(0,8)}\u2026</code>`
     :`<a href="#" onclick="closeModal();openFamilyUploadSetup();return false;" style="color:#3b82f6">\u2699\ufe0f \u0625\u0639\u062f\u0627\u062f Gist \u0623\u0648\u0644\u0627\u064b \u0644\u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0627\u0645\u062a</a>`;
   return `<div style="border:2px solid #3b82f6;border-radius:10px;overflow:hidden">
-    <div style="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe">
-      <div style="font-size:13px;font-weight:600;color:#1d4ed8;">\ud83d\udce8 \u0644\u0644\u0639\u0627\u0626\u0644\u0629 ${badge}</div>
+    <div style="padding:10px 14px;background:var(--clr-accent-bg);border-bottom:1px solid #bfdbfe">
+      <div style="font-size:13px;font-weight:600;color:var(--clr-accent-text);">\ud83d\udce8 \u0644\u0644\u0639\u0627\u0626\u0644\u0629 ${badge}</div>
       <div style="font-size:11px;color:#3b82f6;margin-top:2px">${gidHint} \u00b7 Device ID \u0641\u0631\u064a\u062f \u0644\u0643\u0644 \u0641\u0631\u062f</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
@@ -4013,7 +4076,7 @@ function renderNode(p,q,matchIds,contextIds){
   let isMatch=q&&matchesFullName(p,q);
   let isActive=_searchActiveId===p.id;
   let hCls='node-header'+(p.deceased?' deceased':'')+(isMatch?' search-match':'')+(isActive?' search-active-node':'');
-  let _pnEsc=p.name.replace(/'/g,"\'");let av=p.photo?`<img src="${p.photo}" class="avatar" alt="${p.name}" style="cursor:pointer" onclick="event.stopPropagation();zoomPhoto('${p.photo}','${_pnEsc}')">`:`<div class="avatar-placeholder" style="background:${p.gender==='male'?'#dbeafe':'#fce7f3'};color:${p.gender==='male'?'#1d4ed8':'#be185d'}">${p.name[0]||'؟'}</div>`;
+  let _pnEsc=p.name.replace(/'/g,"\'");let av=p.photo?`<img src="${p.photo}" class="avatar" alt="${p.name}" style="cursor:pointer" onclick="event.stopPropagation();zoomPhoto('${p.photo}','${_pnEsc}')">`:`<div class="avatar-placeholder" style="background:${p.gender==='male'?'var(--clr-accent-bg)':'var(--clr-pink-bg)'};color:${p.gender==='male'?'var(--clr-accent-text)':'var(--clr-pink-text)'}">${p.name[0]||'؟'}</div>`;
   let decIcon=p.deceased?`<span class="deceased-icon" title="${p.gender==='female'?'رحمها الله':'رحمه الله'}">${crescent('#2e7d32')}</span>`:'';
   let gDot=`<div class="gender-dot ${p.gender==='male'?'male-dot':'female-dot'}"></div>`;
   let relNums=getRelNums(p.id); // محتفظ به للبيانات — لا يُعرض كرقم منفصل بعد الآن
@@ -4021,7 +4084,7 @@ function renderNode(p,q,matchIds,contextIds){
   let nameOnClick=p.deceased?`event.stopPropagation();showPersonDetail(${p.id});showFatihaOverlay();`:`event.stopPropagation();showPersonDetail(${p.id});`;
   // Father badge: use fatherId system first, then legacy externalFatherName
   let fatherBadgeLabel=p.fatherId?(getPerson(p.fatherId)||{}).name||p.fatherName||'':p.fatherName||p.externalFatherName||'';
-  let extFatherBadge=fatherBadgeLabel?`<span title="الأب: ${fatherBadgeLabel}" style="font-size:10px;padding:1px 5px;border-radius:4px;background:#ede9fe;color:#5b21b6;border:1px solid #8b5cf6;flex-shrink:0">♂ ${fatherBadgeLabel}</span>`:'';
+  let extFatherBadge=fatherBadgeLabel?`<span title="الأب: ${fatherBadgeLabel}" style="font-size:10px;padding:1px 5px;border-radius:4px;background:var(--clr-purple-bg);color:var(--clr-purple-text);border:1px solid #8b5cf6;flex-shrink:0">♂ ${fatherBadgeLabel}</span>`:'';
   let kinBadge='';
   if(myPersonId&&myPersonId===p.id){kinBadge=`<span class="my-marker">أنا</span>`;}
   else if(myPersonId&&myPersonId!==p.id){let kin=getMyKinship(p.id);if(kin){let cls=kinBadgeClass(kin);let badgeTip=(kin.blood&&kin.marriage)?`نسب: ${kin.blood.label} | مصاهرة: ${kin.marriage.label}`:'صلة القرابة بك';let badgeLbl=kin.label+(kin.marriage&&kin.blood?' 💍':'');kinBadge=`<span class="kin-badge ${cls}" onclick="event.stopPropagation();showPersonDetail(${p.id})" title="${badgeTip}">${badgeLbl}</span>`;}}
@@ -4032,7 +4095,7 @@ function renderNode(p,q,matchIds,contextIds){
     if(wives.length){
       let wifeChips=wives.map(w=>{
       let wFN=w.familyName?(' '+w.familyName):'';
-      return `<span class="sp-tree-nav" style="border-color:#ec4899;background:#fdf2f8;color:#be185d;" title="زوجة في الشجرة الرئيسية — اضغط للانتقال" onclick="event.stopPropagation();navigateToMainForPerson(${w.id})">🏠 ${w.name}${wFN}</span>`;
+      return `<span class="sp-tree-nav" style="border-color:var(--clr-pink-border);background:var(--clr-pink-bg);color:var(--clr-pink-text);" title="زوجة في الشجرة الرئيسية — اضغط للانتقال" onclick="event.stopPropagation();navigateToMainForPerson(${w.id})">🏠 ${w.name}${wFN}</span>`;
     }).join('');
       spInfo=wifeChips;
     }
@@ -4077,12 +4140,12 @@ function renderNode(p,q,matchIds,contextIds){
   }
   // إشارة صغيرة للأبناء المنقولين لشجرة الأب
   if(_migratedCount>0){
-    let migBadge=`<span style="font-size:10px;color:#7c3aed;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="لديها ${_migratedCount} ابن/ابنة في شجرة أزواجها" onclick="event.stopPropagation();showPersonDetail(${p.id})">🌿 ${_migratedCount}</span>`;
+    let migBadge=`<span style="font-size:10px;color:#7c3aed;background:var(--clr-purple-bg);border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="لديها ${_migratedCount} ابن/ابنة في شجرة أزواجها" onclick="event.stopPropagation();showPersonDetail(${p.id})">🌿 ${_migratedCount}</span>`;
     spInfo=(spInfo?spInfo+' ':'')+migBadge;
   }
   // شارة تحذير: أبناء موضوعون خطأ تحت الأنثى الخارجية عبر parentId
   if(_wrongExtFemCount>0){
-    let wrongBadge=`<span style="font-size:10px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="يوجد ${_wrongExtFemCount} ابن/ابنة مسجلون بشكل خاطئ تحتها — يجب نقلهم لشجرة الأب" onclick="event.stopPropagation();showPersonDetail(${p.id})">⚠️ ${_wrongExtFemCount} غير منقول</span>`;
+    let wrongBadge=`<span style="font-size:10px;color:var(--clr-amber-text);background:var(--clr-amber-bg);border:1px solid #fbbf24;border-radius:4px;padding:1px 5px;flex-shrink:0;cursor:pointer" title="يوجد ${_wrongExtFemCount} ابن/ابنة مسجلون بشكل خاطئ تحتها — يجب نقلهم لشجرة الأب" onclick="event.stopPropagation();showPersonDetail(${p.id})">⚠️ ${_wrongExtFemCount} غير منقول</span>`;
     spInfo=(spInfo?spInfo+' ':'')+wrongBadge;
   }
   let meta='';
@@ -4112,7 +4175,7 @@ function renderNode(p,q,matchIds,contextIds){
   let html=`<div class="node" data-person-id="${p.id}"><div class="${hCls}" onclick="${hdrOnClick}">
     ${tog}${av}${gDot}
     <div style="flex:1;min-width:0;overflow:hidden;">
-      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span class="node-name" onclick="${nameOnClick}" style="cursor:pointer;">${p.title?`<span>${escapeHtml(p.title)} </span>`:''}<span>${highlightQueryHTML(p.name,q)}</span></span>${p.familyName?`<span style="font-size:11px;color:var(--text2);background:var(--color-background-secondary,#f9fafb);border:1px solid var(--card-border);border-radius:4px;padding:1px 6px;flex-shrink:0">${highlightQueryHTML(p.familyName,q)}</span>`:''}${isActive?`<span style="font-size:10px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:999px;padding:1px 6px;flex-shrink:0">الحالي</span>`:''}${extFatherBadge}${decIcon}${relB}${spInfo}${kinBadge}</div>
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span class="node-name" onclick="${nameOnClick}" style="cursor:pointer;">${p.title?`<span>${escapeHtml(p.title)} </span>`:''}<span>${highlightQueryHTML(p.name,q)}</span></span>${p.familyName?`<span style="font-size:11px;color:var(--text2);background:var(--color-background-secondary,#f9fafb);border:1px solid var(--card-border);border-radius:4px;padding:1px 6px;flex-shrink:0">${highlightQueryHTML(p.familyName,q)}</span>`:''}${isActive?`<span style="font-size:10px;font-weight:700;color:var(--clr-amber-text);background:var(--clr-amber-bg);border:1px solid #fbbf24;border-radius:999px;padding:1px 6px;flex-shrink:0">الحالي</span>`:''}${extFatherBadge}${decIcon}${relB}${spInfo}${kinBadge}</div>
       <div>${meta}</div>
     </div>
     ${actionsHtml}
@@ -4201,7 +4264,7 @@ function navigateToPerson(id){
         let hdr=el.querySelector('.node-header');
         if(hdr){
           hdr.style.transition='background .1s';
-          hdr.style.background='#fef9c3';
+          hdr.style.background='var(--clr-amber-bg)';
           setTimeout(()=>{hdr.style.transition='background .4s';hdr.style.background='';},600);
         }
       }
@@ -4227,7 +4290,7 @@ function navigateToMainForPerson(personId){
         let hdr=el.querySelector('.node-header');
         if(hdr){
           hdr.style.transition='background .1s';
-          hdr.style.background='#fce7f3';
+          hdr.style.background='var(--clr-pink-bg)';
           setTimeout(()=>{hdr.style.transition='background .4s';hdr.style.background='';},700);
         }
       }
@@ -4435,8 +4498,8 @@ function renderList(){
       let myKin=myPersonId&&myPersonId!==p.id?getMyKinship(p.id):null;
       let myKinLine=myKin?(()=>{
         let parts=[];
-        if(myKin.blood)parts.push(`<span style="color:#1d4ed8;font-weight:500">${myKin.blood.label}</span><span style="font-size:9px;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:0 3px;margin-right:2px">نسب</span>`);
-        if(myKin.marriage)parts.push(`<span style="color:#5b21b6;font-weight:500">💍${myKin.marriage.label}</span><span style="font-size:9px;color:#5b21b6;background:#ede9fe;border-radius:3px;padding:0 3px;margin-right:2px">مصاهرة</span>`);
+        if(myKin.blood)parts.push(`<span style="color:var(--clr-accent-text);font-weight:500">${myKin.blood.label}</span><span style="font-size:9px;color:var(--clr-accent-text);background:var(--clr-accent-bg);border-radius:3px;padding:0 3px;margin-right:2px">نسب</span>`);
+        if(myKin.marriage)parts.push(`<span style="color:var(--clr-purple-text);font-weight:500">💍${myKin.marriage.label}</span><span style="font-size:9px;color:var(--clr-purple-text);background:var(--clr-purple-bg);border-radius:3px;padding:0 3px;margin-right:2px">مصاهرة</span>`);
         if(!parts.length)parts.push(`<span style="color:#7c3aed;font-weight:500">${myKin.label}</span>`);
         return `<div style="font-size:11px;margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span style="color:#7c3aed">🔗</span>${parts.join('<span style="color:var(--text2);margin:0 2px">·</span>')}</div>`;
       })():(myPersonId===p.id?`<div style="font-size:11px;margin-top:3px"><span class="my-marker">أنا</span></div>`:'');
@@ -4498,8 +4561,8 @@ function _listLoadMore(offset){
     let myKin=myPersonId&&myPersonId!==p.id?getMyKinship(p.id):null;
     let myKinLine=myKin?(()=>{
       let parts=[];
-      if(myKin.blood)parts.push(`<span style="color:#1d4ed8;font-weight:500">${myKin.blood.label}</span><span style="font-size:9px;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:0 3px;margin-right:2px">نسب</span>`);
-      if(myKin.marriage)parts.push(`<span style="color:#5b21b6;font-weight:500">💍${myKin.marriage.label}</span><span style="font-size:9px;color:#5b21b6;background:#ede9fe;border-radius:3px;padding:0 3px;margin-right:2px">مصاهرة</span>`);
+      if(myKin.blood)parts.push(`<span style="color:var(--clr-accent-text);font-weight:500">${myKin.blood.label}</span><span style="font-size:9px;color:var(--clr-accent-text);background:var(--clr-accent-bg);border-radius:3px;padding:0 3px;margin-right:2px">نسب</span>`);
+      if(myKin.marriage)parts.push(`<span style="color:var(--clr-purple-text);font-weight:500">💍${myKin.marriage.label}</span><span style="font-size:9px;color:var(--clr-purple-text);background:var(--clr-purple-bg);border-radius:3px;padding:0 3px;margin-right:2px">مصاهرة</span>`);
       if(!parts.length)parts.push(`<span style="color:#7c3aed;font-weight:500">${myKin.label}</span>`);
       return `<div style="font-size:11px;margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span style="color:#7c3aed">🔗</span>${parts.join('<span style="color:var(--text2);margin:0 2px">·</span>')}</div>`;
     })():(myPersonId===p.id?`<div style="font-size:11px;margin-top:3px"><span class="my-marker">أنا</span></div>`:'');
@@ -4627,7 +4690,7 @@ function showPersonDetail(id){
   let rBadges=''; // أُزيلت أرقام القرابة — لم تعد تُعرض
   // ── قيم محسوبة مسبقاً لتجنب تعارض الـ template ──
   let _detailNameEsc=p.name.replace(/'/g,"&#39;");
-  let _detailBorderColor=p.gender==='male'?'#3b82f6':'#ec4899';
+  let _detailBorderColor=p.gender==='male'?'#3b82f6':'var(--clr-pink-border)';
   let _detailPhotoHtml=p.photo
     ?`<div style="text-align:center;margin-bottom:14px"><img src="${p.photo}"
         onclick="zoomPhoto('${p.photo}','${_detailNameEsc}')"
@@ -4639,7 +4702,7 @@ function showPersonDetail(id){
   <div class="modal detail-modal">
     ${_detailPhotoHtml}
     <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;${_detailH3Align}">${p.title?`<span style="font-weight:500;color:var(--text2);font-size:inherit">${p.title}</span> `:''}<span>${p.name}</span>${p.deceased?`<span style="display:inline-flex">${crescent('#2e7d32')}</span>`:''}${rBadges}</h3>
-    ${p.title?row('اللقب الشرفي',`<span style="font-weight:600;color:#5b21b6;background:#ede9fe;padding:2px 10px;border-radius:8px;border:1px solid #c4b5fd">${p.title}</span>`):''}
+    ${p.title?row('اللقب الشرفي',`<span style="font-weight:600;color:var(--clr-purple-text);background:var(--clr-purple-bg);padding:2px 10px;border-radius:8px;border:1px solid #c4b5fd">${p.title}</span>`):''}
     ${row('الجنس',p.gender==='male'?'ذكر':'أنثى')}
     ${p.familyName?row('اللقب / العائلة',`<span style="font-weight:600;color:var(--text)">${p.familyName}</span>`):''}
     ${getPersonDateDisplay(p,'dob')?row('تاريخ الولادة',getPersonDateDisplay(p,'dob')):''}
@@ -4713,17 +4776,17 @@ function showPersonDetail(id){
       let kin=getMyKinship(p.id);
       if(!kin)return '';
       let badgeCls=kinBadgeClass(kin);
-      let badgeStyle=badgeCls==='direct'?'background:#d1fae5;border-color:#6ee7b7;color:#065f46':badgeCls==='close'?'background:#ede9fe;border-color:#c4b5fd;color:#5b21b6':'background:#fef3c7;border-color:#f59e0b;color:#92400e';
+      let badgeStyle=badgeCls==='direct'?'background:var(--clr-green-bg);border-color:#6ee7b7;color:var(--clr-green-text)':badgeCls==='close'?'background:var(--clr-purple-bg);border-color:#c4b5fd;color:var(--clr-purple-text)':'background:var(--clr-amber-bg);border-color:#f59e0b;color:var(--clr-amber-text)';
       let typeTag=kin.blood&&kin.marriage?'نسب + مصاهرة':kin.blood?'نسب':'مصاهرة';
-      return `<div style="margin-top:8px;padding:10px 12px;background:linear-gradient(135deg,#ede9fe,#faf5ff);border:1px solid #8b5cf6;border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;" onclick="openKinPopup(${p.id})" title="اضغط لعرض شجرة القرابة الكاملة">
+      return `<div style="margin-top:8px;padding:10px 12px;background:linear-gradient(135deg,var(--clr-purple-bg),var(--card-bg));border:1px solid #8b5cf6;border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;" onclick="openKinPopup(${p.id})" title="اضغط لعرض شجرة القرابة الكاملة">
         <span style="font-size:20px;flex-shrink:0">🔗</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:700;color:#5b21b6">صلة القرابة بي</div>
+          <div style="font-size:12px;font-weight:700;color:var(--clr-purple-text)">صلة القرابة بي</div>
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px">${kin.label}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
           <span style="font-size:10px;padding:2px 7px;border-radius:8px;border:1px solid;${badgeStyle}">${typeTag}</span>
-          <span style="font-size:10px;color:#7c3aed;background:#fff;border:1px solid #c4b5fd;border-radius:6px;padding:1px 7px">↗ عرض الشجرة</span>
+          <span style="font-size:10px;color:var(--clr-purple-text);background:var(--card-bg);border:1px solid #c4b5fd;border-radius:6px;padding:1px 7px">↗ عرض الشجرة</span>
         </div>
       </div>`;
     })()}
@@ -4732,9 +4795,9 @@ function showPersonDetail(id){
       <button class="btn" onclick="closeModal()">إغلاق</button>
       <button class="btn" onclick="closeModal();navigateToPerson(${p.id})">🌳 الشجرة</button>
       <button class="btn primary" onclick="closeModal();openEditModal(${p.id})">✏️ تعديل</button>
-      ${!(p.isExternal&&p.gender==='female')?`<button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن</button>`:''}
-      ${p.parentId?`<button class="btn" style="background:#ecfdf5;border-color:#6ee7b7;color:#065f46" onclick="closeModal();openAddModal(${p.parentId})">➕ إضافة أخ/أخت</button>`:''}
-      ${(p.isExternal===true&&!p.parentId)?`<button class="btn" style="background:#fff7ed;border-color:#fdba74;color:#9a3412" onclick="closeModal();openAddParentModal(${p.id})">➕ إضافة والد/والدة</button>`:''}
+      ${!(p.isExternal&&p.gender==='female')?`<button class="btn" style="background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)" onclick="closeModal();openAddModal(${p.id})">➕ إضافة ابن</button>`:''}
+      ${p.parentId?`<button class="btn" style="background:var(--clr-green-bg);border-color:#6ee7b7;color:var(--clr-green-text)" onclick="closeModal();openAddModal(${p.parentId})">➕ إضافة أخ/أخت</button>`:''}
+      ${(p.isExternal===true&&!p.parentId)?`<button class="btn" style="background:var(--clr-divorce-bg);border-color:#fdba74;color:var(--clr-divorce-text)" onclick="closeModal();openAddParentModal(${p.id})">➕ إضافة والد/والدة</button>`:''}
       ${getChildrenForNode(p.id).length?`<button class="btn" onclick="closeModal();openReorderModal(${p.id})">⇅ ترتيب</button>`:''}
       <button class="btn" style="color:#ef4444;border-color:#fca5a5" onclick="closeModal();confirmDeleteFromList(${p.id})">🗑 حذف</button>
     </div>
@@ -4831,17 +4894,17 @@ function openKinPopup(targetId){
     let entry=getDirectSpouseEntry(myPersonId,targetId)||getDirectSpouseEntry(targetId,myPersonId);
     let isDivorced=entry&&entry.divorced;
     relLabelHtml+=`<div class="kin-rel-label">${spouseLabel}
-      <span style="font-size:11px;font-weight:400;color:${isDivorced?'#c2410c':'#5b21b6'};background:${isDivorced?'#fff7ed':'#ede9fe'};border:1px solid ${isDivorced?'#f97316':'#c4b5fd'};border-radius:5px;padding:1px 6px;margin-right:4px">${isDivorced?'💔 طلاق':'💍 زواج مباشر'}</span>
+      <span style="font-size:11px;font-weight:400;color:${isDivorced?'var(--clr-divorce-text)':'var(--clr-purple-text)'};background:${isDivorced?'var(--clr-divorce-bg)':'var(--clr-purple-bg)'};border:1px solid ${isDivorced?'#f97316':'#c4b5fd'};border-radius:5px;padding:1px 6px;margin-right:4px">${isDivorced?'💔 طلاق':'💍 زواج مباشر'}</span>
     </div>`;
   }
   if(blood){
     relLabelHtml+=`<div class="kin-rel-label" style="margin-top:${directSpouse?'8px':'0'}">${blood.label}
-      <span style="font-size:11px;font-weight:400;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;border-radius:5px;padding:1px 6px;margin-right:4px">نسب</span>
+      <span style="font-size:11px;font-weight:400;color:var(--clr-accent-text);background:var(--clr-accent-bg);border:1px solid #93c5fd;border-radius:5px;padding:1px 6px;margin-right:4px">نسب</span>
     </div>`;
   }
   if(marriage){
     relLabelHtml+=`<div class="kin-rel-label" style="margin-top:${(directSpouse||blood)?'8px':'0'}">${marriage.label}
-      <span style="font-size:11px;font-weight:400;color:#5b21b6;background:#ede9fe;border:1px solid #c4b5fd;border-radius:5px;padding:1px 6px;margin-right:4px">مصاهرة</span>
+      <span style="font-size:11px;font-weight:400;color:var(--clr-purple-text);background:var(--clr-purple-bg);border:1px solid #c4b5fd;border-radius:5px;padding:1px 6px;margin-right:4px">مصاهرة</span>
     </div>`;
   }
   if(!directSpouse&&!blood&&!marriage){
@@ -4859,7 +4922,7 @@ function openKinPopup(targetId){
     if(blood){
       let bloodTreeHtml=buildKinTree(blood.path1,blood.path2,blood.lca.id,me,them);
       treeHtml+=`<div style="margin-top:14px;border-top:2px dashed #93c5fd;padding-top:12px">
-        <div style="text-align:center;font-size:11px;font-weight:600;color:#1d4ed8;margin-bottom:8px;background:#dbeafe;border-radius:6px;padding:4px 10px;display:inline-block">🩸 شجرة القرابة بالدم</div>
+        <div style="text-align:center;font-size:11px;font-weight:600;color:var(--clr-accent-text);margin-bottom:8px;background:var(--clr-accent-bg);border-radius:6px;padding:4px 10px;display:inline-block">🩸 شجرة القرابة بالدم</div>
         ${bloodTreeHtml}
       </div>`;
     }
@@ -4867,7 +4930,7 @@ function openKinPopup(targetId){
     treeHtml=buildKinTree(blood.path1,blood.path2,blood.lca.id,me,them);
     if(marriage){
       let spPerson=getPerson(marriage.spouseOfId);
-      treeHtml+=`<div style="margin-top:10px;padding:8px 12px;background:linear-gradient(135deg,#faf5ff,#ede9fe);border:1px solid #c4b5fd;border-radius:8px;font-size:12px;color:#5b21b6;text-align:center">
+      treeHtml+=`<div style="margin-top:10px;padding:8px 12px;background:linear-gradient(135deg,var(--card-bg),var(--clr-purple-bg));border:1px solid #c4b5fd;border-radius:8px;font-size:12px;color:var(--clr-purple-text);text-align:center">
         💍 يرتبط/ترتبط أيضاً بـ ${me.name} عبر الزواج من <strong>${spPerson?spPerson.name:'؟'}</strong> (${marriage.spouseOfBloodLabel})
       </div>`;
     }
@@ -4919,7 +4982,7 @@ function openKinPopup(targetId){
     <div class="modal-footer" style="margin-top:14px">
       <button class="btn" onclick="closeModal()">إغلاق</button>
       <button class="btn" onclick="closeModal();showPersonDetail(${targetId})">↩ رجوع للبيانات</button>
-      <button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"
+      <button class="btn" style="background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)"
         onclick="closeModal();switchTab('kin',document.querySelectorAll('.tab')[2]);setTimeout(()=>{kinPerson1=getPerson(${myPersonId});kinPerson2=getPerson(${targetId});renderKinPanel();},80)"
         title="فتح في كاشف القرابة الكامل">🔍 كاشف القرابة</button>
     </div>
@@ -5092,7 +5155,7 @@ function showEditModal(editId,parentId){
       <button type="button" id="f_mother_intree_btn"
         onclick="toggleMotherMode()"
         style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
-        ${currentMotherId?'background:#ede9fe!important;color:#5b21b6;border-color:#8b5cf6;box-shadow:0 0 0 3px #8b5cf61a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        ${currentMotherId?'background:var(--clr-purple-bg)!important;color:var(--clr-purple-text);border-color:#8b5cf6;box-shadow:0 0 0 3px #8b5cf61a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
         title="اضغط للتبديل">🔗 ربط بشخص في الشجرة</button>
       <input type="hidden" id="f_mother_intree" value="${currentMotherId?'1':'0'}">
     </div>
@@ -5155,7 +5218,7 @@ function showEditModal(editId,parentId){
       <button type="button" id="f_deceased_btn"
         onclick="toggleDeceasedBtn()"
         style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
-        ${(p&&p.deceased)?'background:#d1fae5!important;color:#065f46;border-color:#10b981;box-shadow:0 0 0 3px #10b9811a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        ${(p&&p.deceased)?'background:var(--clr-green-bg)!important;color:var(--clr-green-text);border-color:#10b981;box-shadow:0 0 0 3px #10b9811a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
         title="اضغط للتبديل"><span style="display:inline-flex">${crescent('#2e7d32')}</span> متوفى</button>
       <input type="hidden" id="f_deceased" value="${(p&&p.deceased)?'1':'0'}">
     </div></div>
@@ -5163,8 +5226,8 @@ function showEditModal(editId,parentId){
     <div class="form-row"><label>صورة</label><div class="file-input-btn btn" style="width:100%;justify-content:center;">📷 رفع صورة<input type="file" accept="image/*" onchange="handlePhoto(event)"></div><div id="photoPreview" style="margin-top:6px;"></div></div>
     <div class="form-row"><label>ملاحظات</label><textarea id="f_notes" rows="2" style="resize:vertical">${p?p.notes:''}</textarea></div>
     <div class="section-title">الأزواج / الزوجات
-      <span style="font-size:11px;font-weight:400;color:#5b21b6;background:#ede9fe;padding:2px 7px;border-radius:6px;margin-right:8px;">💡 أضف الأزواج ثم أضف أبناءهم في شجرة كل زوج</span>
-      <span style="font-size:11px;font-weight:400;color:#0369a1;background:#e0f2fe;padding:2px 7px;border-radius:6px;margin-right:4px;">🔒 جنس الزوج/ة يُحدَّد تلقائياً</span>
+      <span style="font-size:11px;font-weight:400;color:var(--clr-purple-text);background:var(--clr-purple-bg);padding:2px 7px;border-radius:6px;margin-right:8px;">💡 أضف الأزواج ثم أضف أبناءهم في شجرة كل زوج</span>
+      <span style="font-size:11px;font-weight:400;color:var(--clr-cyan-text);background:var(--clr-cyan-bg);padding:2px 7px;border-radius:6px;margin-right:4px;">🔒 جنس الزوج/ة يُحدَّد تلقائياً</span>
     </div>
     <div id="spousesList"></div>
     <button class="add-sub-btn" onclick="addSpouseRow()">+ إضافة زوج/ة</button>
@@ -5289,7 +5352,7 @@ function toggleMotherMode(){
   hidden.value=newActive?'1':'0';
   if(newActive){
     treeWrap.style.display='block';textWrap.style.display='none';
-    if(btn){btn.style.background='#ede9fe';btn.style.color='#5b21b6';btn.style.borderColor='#8b5cf6';btn.style.boxShadow='0 0 0 3px #8b5cf61a';}
+    if(btn){btn.style.background='var(--clr-purple-bg)';btn.style.color='var(--clr-purple-text)';btn.style.borderColor='#8b5cf6';btn.style.boxShadow='0 0 0 3px #8b5cf61a';}
   } else {
     treeWrap.style.display='none';textWrap.style.display='block';
     document.getElementById('f_mother_id').value='';
@@ -5390,7 +5453,7 @@ function toggleDeceasedBtn(){
   if(dodRow)dodRow.style.display=newActive?'block':'none';
   if(btn){
     if(newActive){
-      btn.style.background='#d1fae5';btn.style.color='#065f46';btn.style.borderColor='#10b981';btn.style.boxShadow='0 0 0 3px #10b9811a';
+      btn.style.background='var(--clr-green-bg)';btn.style.color='var(--clr-green-text)';btn.style.borderColor='#10b981';btn.style.boxShadow='0 0 0 3px #10b9811a';
     } else {
       btn.style.background='none';btn.style.color='var(--text2,#6b7280)';btn.style.borderColor='var(--card-border,#e5e7eb)';btn.style.boxShadow='';
     }
@@ -5417,8 +5480,8 @@ function renderSpouseRows(){
     let isExt=s.isExternal!==false; // default true (most spouses are external)
     // ── Spouse gender label ──
     let spouseGenderLabel = s.gender === 'male' ? 'ذكر ♂' : 'أنثى ♀';
-    let spouseGenderColor = s.gender === 'male' ? '#1d4ed8' : '#be185d';
-    let spouseGenderBg = s.gender === 'male' ? '#dbeafe' : '#fce7f3';
+    let spouseGenderColor = s.gender === 'male' ? 'var(--clr-accent-text)' : 'var(--clr-pink-text)';
+    let spouseGenderBg = s.gender === 'male' ? 'var(--clr-accent-bg)' : 'var(--clr-pink-bg)';
 
     // ── Row 1: name inputs ──
     let inputRow=`<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
@@ -5433,12 +5496,12 @@ function renderSpouseRows(){
       <button type="button"
         onclick="editingSpouses[${i}].divorced=!editingSpouses[${i}].divorced;renderSpouseRows()"
         style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
-        ${s.divorced?'background:#fef3c7!important;color:#92400e;border-color:#f59e0b;box-shadow:0 0 0 3px #f59e0b1a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        ${s.divorced?'background:var(--clr-amber-bg)!important;color:var(--clr-amber-text);border-color:#f59e0b;box-shadow:0 0 0 3px #f59e0b1a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
         title="اضغط للتبديل">💔 مطلق/ة</button>
       <button type="button"
         onclick="editingSpouses[${i}].deceased=!editingSpouses[${i}].deceased;renderSpouseRows()"
         style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .2s;white-space:nowrap;background:none;
-        ${s.deceased?'background:#d1fae5!important;color:#065f46;border-color:#10b981;box-shadow:0 0 0 3px #10b9811a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        ${s.deceased?'background:var(--clr-green-bg)!important;color:var(--clr-green-text);border-color:#10b981;box-shadow:0 0 0 3px #10b9811a;':'color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
         title="اضغط للتبديل">${crescent('#2e7d32')} متوفى/ة</button>
     </div>`;
 
@@ -5449,18 +5512,18 @@ function renderSpouseRows(){
       <button type="button"
         onclick="toggleSpouseExternal(${i},${!isExt})"
         style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .2s;
-        ${isExt?'background:#ede9fe;color:#5b21b6;border-color:#8b5cf6;':'background:#dbeafe;color:#1d4ed8;border-color:#3b82f6;'}"
+        ${isExt?'background:var(--clr-purple-bg);color:var(--clr-purple-text);border-color:#8b5cf6;':'background:var(--clr-accent-bg);color:var(--clr-accent-text);border-color:#3b82f6;'}"
         title="اضغط للتبديل بين الخارجي والداخلي">
         ${isExt?'🏠 من خارج العائلة':'🔗 من داخل الشجرة'}
         <span style="font-size:10px;padding:1px 5px;border-radius:6px;font-weight:400;
-          ${isExt?'background:#c4b5fd;color:#3b0764;':'background:#d1fae5;color:#065f46;'}">
+          ${isExt?'background:#c4b5fd;color:#3b0764;':'background:var(--clr-green-bg);color:var(--clr-green-text);'}">
           ${isExt?'خارجي':'داخلي'}
         </span>
       </button>
       ${isExt?`<button type="button"
         onclick="editingSpouses[${i}].forceTreeBtn=!editingSpouses[${i}].forceTreeBtn;renderSpouseRows()"
         style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;border:1.5px solid;transition:all .2s;
-        ${s.forceTreeBtn?'background:#ede9fe;color:#5b21b6;border-color:#8b5cf6;box-shadow:0 0 0 3px #8b5cf61a;':'background:transparent;color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
+        ${s.forceTreeBtn?'background:var(--clr-purple-bg);color:var(--clr-purple-text);border-color:#8b5cf6;box-shadow:0 0 0 3px #8b5cf61a;':'background:transparent;color:var(--text2,#6b7280);border-color:var(--card-border,#e5e7eb);'}"
         title="إظهار زر الشجرة دائماً بجانب اسم الزوج">
         🌳 زر الشجرة${s.forceTreeBtn?' ✓':''}
       </button>`:''}
@@ -5479,7 +5542,7 @@ function renderSpouseRows(){
           <span>✅</span>
           <span style="font-weight:600">${linkedPerson.name}</span>
           ${getParent(linkedPerson)?`<span style="opacity:.7;font-size:11px">بن/ت ${getParent(linkedPerson).name}</span>`:''}
-          <span style="margin-right:auto;font-size:10px;background:#6ee7b7;padding:1px 6px;border-radius:6px">مرتبط بالشجرة</span>
+          <span style="margin-right:auto;font-size:10px;background:#6ee7b7;color:#065f46;padding:1px 6px;border-radius:6px">مرتبط بالشجرة</span>
           <button class="ext-action-btn view" onclick="event.stopPropagation();closeModal();navigateToSpouseFamily(${linkedPerson.id})" title="فتح شجرة عائلته">🌳 فتح الشجرة</button>
           <span class="undo" onclick="editingSpouses[${i}].personId=null;renderSpouseRows();" title="إلغاء الربط">✕</span>
         </div>`:
@@ -5493,7 +5556,7 @@ function renderSpouseRows(){
       </div>`}
       `:`<!-- inner family: link to existing person -->
       ${linkedPerson?`
-        <div class="ext-linked-chip" style="background:var(--card-bg);border-color:#3b82f6;color:#1d4ed8;">
+        <div class="ext-linked-chip" style="background:var(--card-bg);border-color:#3b82f6;color:var(--clr-accent-text);">
           <span>🔗</span>
           <span style="font-weight:600">${linkedPerson.name}</span>
           ${getParent(linkedPerson)?`<span style="opacity:.7;font-size:11px">بن/ت ${getParent(linkedPerson).name}</span>`:''}
@@ -5748,10 +5811,10 @@ function _initChildrenSection(gender, editId, parentId){
       var existingUnder=editId?people.filter(function(x){return x.parentId===editId;}):[];
       var legacyHtml='';
       if(existingUnder.length){
-        legacyHtml='<div style="margin-bottom:8px;padding:8px 12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e">'
+        legacyHtml='<div style="margin-bottom:8px;padding:8px 12px;background:var(--clr-amber-bg);border:1px solid #f59e0b;border-radius:8px;font-size:12px;color:var(--clr-amber-text)">'
           +'⚠️ يوجد '+existingUnder.length+' شخص مسجّل تحت هذه البنت من نسخة قديمة: '
           +existingUnder.map(function(x){return x.name;}).join('، ')
-          +'<br><button class="btn" style="font-size:11px;margin-top:5px;background:#fef3c7;border-color:#f59e0b;color:#92400e" onclick="migrateChildrenToFather('+editId+')">🔄 نقل تلقائي لشجرة الأب</button></div>';
+          +'<br><button class="btn" style="font-size:11px;margin-top:5px;background:var(--clr-amber-bg);border-color:#f59e0b;color:var(--clr-amber-text)" onclick="migrateChildrenToFather('+editId+')">🔄 نقل تلقائي لشجرة الأب</button></div>';
       }
       // أزواج لهم personId — نعرض أزرار الانتقال
       var p=editId?getPerson(editId):null;
@@ -5759,12 +5822,12 @@ function _initChildrenSection(gender, editId, parentId){
       if(p&&p.spouses&&p.spouses.length){
         spouseLinks=p.spouses.filter(function(s){return s.personId&&getPerson(s.personId);}).map(function(s){
           var lp=getPerson(s.personId);
-          return '<button class="btn" style="font-size:12px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6;margin-left:6px;margin-bottom:4px" '
+          return '<button class="btn" style="font-size:12px;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text);margin-left:6px;margin-bottom:4px" '
             +'onclick="closeModal();navigateToSpouseFamily('+s.personId+')" title="انتقل لشجرة '+s.name+' لإضافة الأبناء هناك">'
             +'🌳 انتقل لشجرة '+s.name+'</button>';
         }).join('');
       }
-      var infoBox='<div style="padding:10px 12px;background:#ede9fe;border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:#5b21b6;line-height:1.8">'
+      var infoBox='<div style="padding:10px 12px;background:var(--clr-purple-bg);border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:var(--clr-purple-text);line-height:1.8">'
         +'<strong>أبناء البنت ينتمون لعائلة الأب</strong><br>'
         +'أضفهم في شجرة الزوج ← حقل "الأم" اختر البنت ← يظهرون تلقائياً.'
         +(spouseLinks?'<div style="margin-top:8px">'+spouseLinks+'</div>':'')
@@ -5836,7 +5899,7 @@ function _autoFillMotherFromSpouse(editId, parentId){
     if(cb.value!=='1'){
       cb.value='1';
       let btn=document.getElementById('f_mother_intree_btn');
-      if(btn){btn.style.background='#ede9fe';btn.style.color='#5b21b6';btn.style.borderColor='#8b5cf6';btn.style.boxShadow='0 0 0 3px #8b5cf61a';}
+      if(btn){btn.style.background='var(--clr-purple-bg)';btn.style.color='var(--clr-purple-text)';btn.style.borderColor='#8b5cf6';btn.style.boxShadow='0 0 0 3px #8b5cf61a';}
       if(treeWrap)treeWrap.style.display='block';
       if(textWrap)textWrap.style.display='none';
     }
@@ -5879,13 +5942,13 @@ function renderChildRows(){
           new RegExp(`value="${selectedPid}"`),
           `value="${selectedPid}" selected`
         );
-        let fatherSelect=`<select onchange="selectChildFather(${i},this)" style="min-width:80px;font-size:12px;background:linear-gradient(135deg,#faf5ff,#ede9fe);border-color:#8b5cf6;color:#5b21b6;" title="اختر الأب من قائمة الأزواج">${optsWithSelected}</select>`;
+        let fatherSelect=`<select onchange="selectChildFather(${i},this)" style="min-width:80px;font-size:12px;background:linear-gradient(135deg,var(--card-bg),var(--clr-purple-bg));border-color:#8b5cf6;color:var(--clr-purple-text);" title="اختر الأب من قائمة الأزواج">${optsWithSelected}</select>`;
         extraField=fatherSelect+fnField;
       }
     } else if(mothers.length){
       // اختيار الأم: للجديد والموجود
       let curMother=ch.motherName||(ch.motherId&&getPerson(ch.motherId)?getPerson(ch.motherId).name:'');
-      let motherSelect=`<select style="max-width:100px;font-size:12px;border-color:#10b981;color:#065f46;background:#d1fae5" onchange="editingChildren[${i}].motherName=this.options[this.selectedIndex].dataset.name||'';editingChildren[${i}].motherId=this.value?parseInt(this.value)||null:null" title="الأم"><option value="">الأم؟</option>${mothers.map(s=>{let sel=(ch.motherId&&ch.motherId===s.personId)||(!ch.motherId&&curMother===s.name);return `<option value="${s.personId||''}" data-name="${s.name}"${sel?' selected':''}>${s.name}</option>`;}).join('')}</select>`;
+      let motherSelect=`<select style="max-width:100px;font-size:12px;border-color:#10b981;color:var(--clr-green-text);background:var(--clr-green-bg)" onchange="editingChildren[${i}].motherName=this.options[this.selectedIndex].dataset.name||'';editingChildren[${i}].motherId=this.value?parseInt(this.value)||null:null" title="الأم"><option value="">الأم؟</option>${mothers.map(s=>{let sel=(ch.motherId&&ch.motherId===s.personId)||(!ch.motherId&&curMother===s.name);return `<option value="${s.personId||''}" data-name="${s.name}"${sel?' selected':''}>${s.name}</option>`;}).join('')}</select>`;
       extraField=(ch.isExisting?'':fnField)+motherSelect;
     } else if(!ch.isExisting){
       extraField=fnField;
@@ -6120,7 +6183,7 @@ function navigateToSpouseFamily(personId){
       let hdr=el.querySelector('.node-header');
       if(hdr){
         hdr.style.transition='background .1s';
-        hdr.style.background='#ede9fe';
+        hdr.style.background='var(--clr-purple-bg)';
         setTimeout(()=>{hdr.style.transition='background .4s';hdr.style.background='';},700);
       }
     }
@@ -6476,7 +6539,7 @@ function buildMyKinMiniTree(kin){
     let them2=kin.path2&&kin.path2[0]?getPerson(kin.path2[0].id):null;
     let rightPath=nodeHtml(them2?them2.id:0,'them',them2?them2.name:'؟');
     kin.path2.slice(1).forEach(s=>{rightPath+=arrow(s.via)+nodeHtml(s.id,'anc','');});
-    html+=`<div class="kmt-title">🔗 صلة القرابة بي — <strong style="color:var(--text)">${kin.blood.label} <span style="font-size:10px;color:#1d4ed8;background:#dbeafe;border-radius:4px;padding:0 4px">نسب</span></strong></div>
+    html+=`<div class="kmt-title">🔗 صلة القرابة بي — <strong style="color:var(--text)">${kin.blood.label} <span style="font-size:10px;color:var(--clr-accent-text);background:var(--clr-accent-bg);border-radius:4px;padding:0 4px">نسب</span></strong></div>
     <div class="kmt-path">${leftPath}</div>
     <div class="kmt-path">${rightPath}</div>
     ${kin.otherLCAs&&kin.otherLCAs.length?`<div style="font-size:11px;color:var(--text2);margin-top:6px">جد مشترك أبعد: ${kin.otherLCAs.map(x=>{let pp=getPerson(x.id);return pp?pp.name+'('+x.total+' جيل)':'';}).join('، ')}</div>`:''}`;
@@ -6496,7 +6559,7 @@ function buildMyKinMiniTree(kin){
     // الشخص المستهدف: استخدم targetId المخزّن في kin أولاً، وإلا path2
     let targetPerson=(kin.targetId?getPerson(kin.targetId):null)||(kin.path2&&kin.path2[0]?getPerson(kin.path2[0].id):null);
     let divider=kin.blood?'<div style="border-top:1px dashed var(--card-border);margin:8px 0"></div>':'';
-    html+=`${divider}<div class="kmt-title" style="color:#5b21b6">💍 ${kin.marriage.label} <span style="font-size:10px;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:0 4px">مصاهرة</span></div>
+    html+=`${divider}<div class="kmt-title" style="color:var(--clr-purple-text)">💍 ${kin.marriage.label} <span style="font-size:10px;background:var(--clr-purple-bg);border:1px solid #c4b5fd;border-radius:4px;padding:0 4px">مصاهرة</span></div>
     <div class="kmt-path" style="font-size:11px">
       <span class="kmt-node me">أنا</span>
       <span class="kmt-arrow">←</span>
@@ -7031,11 +7094,11 @@ function openFamilyUploadSetup(){
       </div>
       <div style="font-size:11px;color:var(--text2);margin-top:3px">💡 اضغط "إنشاء الآن" لإنشاء Gist مخصص ومشاركة معرّفه مع جميع النسخ — هذا يضمن أن تحديثات العائلة تصل إليك بشكل صحيح</div>
     </div>
-    <div style="padding:10px 12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:12px;color:#065f46;margin-bottom:8px">
+    <div style="padding:10px 12px;background:var(--clr-green-bg);border:1px solid #10b981;border-radius:8px;font-size:12px;color:var(--clr-green-text);margin-bottom:8px">
       <strong>🔐 التشفير تلقائي وإلزامي:</strong> يُستخدم نفس مفتاح AES-256 الخاص بك — لا يحتاج أي إعداد إضافي.<br>
       حتى لو حصل أحد على رابط الـ Gist لن يتمكن من قراءة البيانات بدون مفتاحك.
     </div>
-    <div style="padding:10px 12px;background:#ede9fe;border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:#5b21b6;margin-bottom:14px">
+    <div style="padding:10px 12px;background:var(--clr-purple-bg);border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:var(--clr-purple-text);margin-bottom:14px">
       <strong>💾 بعد الإعداد:</strong> اضغط <strong>"📤 نسخة للعائلة"</strong> لتصدير نسخة تحتوي هذه الإعدادات مُضمَّنة تلقائياً.<br>
       أفراد العائلة لن يروا أي إشعار رفع — كل شيء يحدث في الخلفية.
     </div>
@@ -7080,7 +7143,7 @@ async function createFamilyGistNow(){
     document.getElementById('fu_gid').value=j.id;
     localStorage.setItem(FAMILY_UPLOAD_GIST_KEY,j.id);
     btn.textContent='✅ تم الإنشاء';
-    btn.style.background='#d1fae5';btn.style.borderColor='#10b981';btn.style.color='#065f46';
+    btn.style.background='var(--clr-green-bg)';btn.style.borderColor='#10b981';btn.style.color='var(--clr-green-text)';
   }catch(e){
     btn.disabled=false;btn.textContent='🧪 إنشاء الآن';
     alert('خطأ: '+e.message);
@@ -7287,20 +7350,34 @@ function _familySummarizeUpdate(data){
   let incomingMap=_familyIncomingMap(data||{});
   let stats=_familyPeopleStats(incoming);
   let localMap=new Map((people||[]).map(p=>[p.id,p]));
-  let newPeople=[],updatedPeople=[],unchangedPeople=[];
+  let newPeople=[],updatedPeople=[],unchangedPeople=[],ambiguousPeople=[];
   incoming.forEach(p=>{
     let found=_familyMatchLocalPerson(p,incomingMap);
     if(!found){
       newPeople.push(p);
       return;
     }
+    // حالة غامضة — تحتاج مراجعة بشرية، لا تُدمج تلقائياً أبداً
+    if(found.ambiguous){
+      ambiguousPeople.push({
+        remote:p,
+        candidates:found.candidates||[],
+        score:found.score||0,
+      });
+      return;
+    }
     let local=found.match;
     let localSig=JSON.stringify(_familyComparablePerson(local,{personMap:localMap}));
     let remoteSig=JSON.stringify(_familyComparablePerson(p,{personMap:incomingMap}));
     if(localSig===remoteSig)unchangedPeople.push(p);
-    else updatedPeople.push({local,remote:p,desc:_familyChangeDescription(local,p,incomingMap)});
+    else updatedPeople.push({
+      local,remote:p,
+      desc:_familyChangeDescription(local,p,incomingMap),
+      matchHow:found.reason||'scored',
+      confidence:found.confidence||0,
+    });
   });
-  return {stats,newPeople,updatedPeople,unchangedPeople,incomingMap};
+  return {stats,newPeople,updatedPeople,unchangedPeople,ambiguousPeople,incomingMap};
 }
 
 async function _findFamilyUploadsGist(){
@@ -7387,68 +7464,231 @@ function _familyIncomingMap(data){
   return new Map(arr.filter(p=>p&&p.id!=null).map(p=>[p.id,p]));
 }
 
-function _familyMatchLocalPerson(remote,incomingMap){
-  if(!remote||typeof remote!=='object')return null;
-  let arr=Array.isArray(people)?people:[];
-  if(!arr.length)return null;
-  let localById=new Map(arr.filter(p=>p&&p.id!=null).map(p=>[p.id,p]));
+// ════════════════════════════════════════════════════════════════════════════
+// محرك المطابقة الآمنة — Safe Matching Engine
+// القاعدة الذهبية: "إذا كان هناك شك، فلا تدمج"
+// ════════════════════════════════════════════════════════════════════════════
 
-  // 1) مطابقة بالمعرّف نفسه
-  if(remote.id!=null && localById.has(remote.id)){
-    return {match:localById.get(remote.id), reason:'id'};
+/**
+ * أوزان مؤشرات المطابقة
+ * المجموع الأقصى الممكن: ~153 نقطة
+ *
+ * لماذا هذه الأوزان؟
+ *  - الاسم وحده (30) ليس كافياً — الأسماء تتكرر كثيراً في العائلات العربية
+ *  - الاسم + الأب (52) لا يزال غير كافٍ — "محمد بن علي" شائع جداً
+ *  - الاسم + الأب + الجد (68) قريب لكن قد يتكرر بين الأبناء العمومة
+ *  - الاسم + الأب + الجد + الجنس (74) لا يزال دون الحد (80)
+ *  - الاسم + الأب + الجد + الجنس + اللقب (86) → دمج تلقائي آمن ✓
+ *  - الاسم + الأب + تاريخ الميلاد + الجنس (80) → دمج تلقائي آمن ✓
+ */
+const _MATCH_WEIGHTS={
+  name:30,            // الاسم (مطلوب — 0 إذا لم يتطابق)
+  familyName:12,      // لقب العائلة
+  gender:6,           // الجنس (استبعاد كامل عند التعارض)
+  fatherName:22,      // اسم الأب (بالاسم لا بالمعرّف)
+  grandfatherName:16, // اسم الجد
+  motherName:14,      // اسم الأم
+  dob:22,             // تاريخ الميلاد
+  dod:14,             // تاريخ الوفاة
+  spouseMatch:14,     // تطابق زوج/زوجة واحدة على الأقل
+  deceased:3,         // حالة الوفاة
+};
+
+/** حد الدمج التلقائي — مرتفع عمداً لتجنب الأخطاء */
+const _AUTO_MERGE_THRESHOLD=80;
+
+/** الحد الأدنى لاعتبار الشخص مرشحاً للإبلاغ */
+const _CANDIDATE_THRESHOLD=30;
+
+/** الفرق الأدنى بين الأول والثاني لقبول المطابقة دون غموض */
+const _AMBIGUITY_MIN_GAP=25;
+
+/** يحل اسم شخص بمعرّفه من خريطتين (الأولى تُقدَّم على الثانية) */
+function _safeLookupName(id,firstMap,secondMap){
+  if(id==null)return '';
+  const p=(firstMap&&firstMap.get(id))||(secondMap&&secondMap.get(id));
+  return p&&p.name?normalizeAr(p.name).toLowerCase().trim():'';
+}
+
+/** يحل اسم الجد عبر سلسلة الأب */
+function _resolveGrandfatherName(person,primaryMap,secondaryMap){
+  if(!person)return '';
+  const fId=person.fatherId!=null?person.fatherId:(person.parentId!=null?person.parentId:null);
+  if(fId==null)return '';
+  const father=(primaryMap&&primaryMap.get(fId))||(secondaryMap&&secondaryMap.get(fId));
+  if(!father)return '';
+  const gfId=father.fatherId!=null?father.fatherId:(father.parentId!=null?father.parentId:null);
+  if(gfId==null)return '';
+  const gf=(primaryMap&&primaryMap.get(gfId))||(secondaryMap&&secondaryMap.get(gfId));
+  return gf&&gf.name?normalizeAr(gf.name).toLowerCase().trim():'';
+}
+
+/**
+ * يحسب درجة التطابق بين شخصين باستخدام أكبر عدد ممكن من المؤشرات
+ * @returns {{score:number, breakdown:object, disqualified:boolean}}
+ */
+function _computePersonMatchScore(remote,local,localMap,incomingMap){
+  const norm=v=>normalizeAr(String(v==null?'':v)).toLowerCase().trim();
+  let score=0;
+  const breakdown={};
+
+  // ─── الاسم: مطلوب — لا مطابقة بدونه ────────────────────────────────
+  const rName=norm(remote.name), lName=norm(local.name);
+  if(!rName||!lName||rName!==lName)
+    return {score:0,breakdown:{name:'mismatch'},disqualified:true};
+  score+=_MATCH_WEIGHTS.name;
+  breakdown.name='match';
+
+  // ─── الجنس: استبعاد كامل عند التعارض ───────────────────────────────
+  const rG=norm(remote.gender), lG=norm(local.gender);
+  if(rG&&lG){
+    if(rG===lG){score+=_MATCH_WEIGHTS.gender;breakdown.gender='match';}
+    else return {score:0,breakdown:{gender:'mismatch'},disqualified:true};
   }
 
-  // 2) مطابقة بالهوية المنطقية بعد التطبيع
-  let remoteSig=JSON.stringify(_familyComparablePerson(remote,{personMap:incomingMap||new Map()}));
-  for(let p of arr){
+  // ─── لقب العائلة ─────────────────────────────────────────────────────
+  const rF=norm(remote.familyName), lF=norm(local.familyName);
+  if(rF&&lF&&rF===lF){score+=_MATCH_WEIGHTS.familyName;breakdown.familyName='match';}
+
+  // ─── اسم الأب (يُحلَّل من الاسم لا المعرّف — موثوق عبر الأجهزة) ──────
+  const rFatherName=norm(remote.fatherName)||
+    _safeLookupName(remote.fatherId!=null?remote.fatherId:remote.parentId,incomingMap,localMap);
+  const lFatherName=norm(local.fatherName)||
+    _safeLookupName(local.fatherId!=null?local.fatherId:local.parentId,localMap,incomingMap);
+  if(rFatherName&&lFatherName&&rFatherName===lFatherName){
+    score+=_MATCH_WEIGHTS.fatherName;breakdown.fatherName='match';
+  }
+
+  // ─── اسم الجد ────────────────────────────────────────────────────────
+  const rGfName=_resolveGrandfatherName(remote,incomingMap,localMap);
+  const lGfName=_resolveGrandfatherName(local,localMap,incomingMap);
+  if(rGfName&&lGfName&&rGfName===lGfName){
+    score+=_MATCH_WEIGHTS.grandfatherName;breakdown.grandfatherName='match';
+  }
+
+  // ─── اسم الأم ────────────────────────────────────────────────────────
+  const rMotherName=norm(remote.motherName)||
+    _safeLookupName(remote.motherId,incomingMap,localMap);
+  const lMotherName=norm(local.motherName)||
+    _safeLookupName(local.motherId,localMap,incomingMap);
+  if(rMotherName&&lMotherName&&rMotherName===lMotherName){
+    score+=_MATCH_WEIGHTS.motherName;breakdown.motherName='match';
+  }
+
+  // ─── تاريخ الميلاد ───────────────────────────────────────────────────
+  const rDob=norm(remote.dob), lDob=norm(local.dob);
+  if(rDob&&lDob&&rDob===lDob){score+=_MATCH_WEIGHTS.dob;breakdown.dob='match';}
+
+  // ─── تاريخ الوفاة ────────────────────────────────────────────────────
+  const rDod=norm(remote.dod), lDod=norm(local.dod);
+  if(rDod&&lDod&&rDod===lDod){score+=_MATCH_WEIGHTS.dod;breakdown.dod='match';}
+
+  // ─── تطابق الزوج/الزوجة ──────────────────────────────────────────────
+  const rSp=(Array.isArray(remote.spouses)?remote.spouses:[])
+    .map(s=>s&&s.name?norm(s.name):'').filter(Boolean);
+  const lSp=(Array.isArray(local.spouses)?local.spouses:[])
+    .map(s=>s&&s.name?norm(s.name):'').filter(Boolean);
+  if(rSp.length&&lSp.length&&rSp.some(rn=>lSp.includes(rn))){
+    score+=_MATCH_WEIGHTS.spouseMatch;breakdown.spouseMatch='match';
+  }
+
+  // ─── حالة الوفاة ─────────────────────────────────────────────────────
+  const rDec=!!(remote.deceased||remote.isDeceased||remote.dead);
+  const lDec=!!(local.deceased||local.isDeceased||local.dead);
+  if(rDec===lDec){score+=_MATCH_WEIGHTS.deceased;breakdown.deceased='match';}
+
+  return {score,breakdown,disqualified:false};
+}
+
+/**
+ * البحث الآمن عن مطابقة للشخص في الشجرة المحلية
+ *
+ * @returns {null}
+ *   لا مطابقة → أضف كشخص جديد
+ * @returns {{match, score, confidence, how, candidates}}
+ *   مطابقة آمنة بثقة عالية
+ * @returns {{match:null, how:'ambiguous', score, candidates}}
+ *   حالة غامضة → مراجعة بشرية مطلوبة، لا دمج تلقائي
+ * @returns {{match:null, how:'below_threshold', score, candidates}}
+ *   درجة منخفضة → شخص جديد
+ */
+function _findSafeLocalMatch(remote,incomingMap){
+  if(!remote||typeof remote!=='object')return null;
+  const arr=Array.isArray(people)?people:[];
+  if(!arr.length)return null;
+  const localMap=new Map(arr.filter(p=>p&&p.id!=null).map(p=>[p.id,p]));
+  const map0=incomingMap||new Map();
+
+  // ── 1) مطابقة بالمعرّف — الأعلى ثقة دائماً ─────────────────────────
+  if(remote.id!=null&&localMap.has(remote.id)){
+    return {match:localMap.get(remote.id),score:100,confidence:100,how:'id'};
+  }
+
+  // ── 2) مطابقة بالتوقيع الكامل ───────────────────────────────────────
+  const remoteSig=JSON.stringify(_familyComparablePerson(remote,{personMap:map0}));
+  const sigMatches=[];
+  for(const p of arr){
     try{
-      let localSig=JSON.stringify(_familyComparablePerson(p,{personMap:localById}));
-      if(localSig===remoteSig){
-        return {match:p, reason:'signature'};
-      }
+      if(JSON.stringify(_familyComparablePerson(p,{personMap:localMap}))===remoteSig)
+        sigMatches.push(p);
     }catch(e){}
   }
+  // توقيع واحد → تطابق مؤكد
+  if(sigMatches.length===1)
+    return {match:sigMatches[0],score:98,confidence:98,how:'signature'};
+  // توقيعات متعددة → سجلات مكررة محتملة → غامض
+  if(sigMatches.length>1)
+    return {match:null,how:'ambiguous',score:98,
+      candidates:sigMatches.map(p=>({person:p,score:98,breakdown:{signature:'match'}}))};
 
-  // 3) مطابقة مرنة: الاسم + اللقب + الجنس + الأب/الأم + الميلاد/الوفاة
-  const norm=v=>normalizeAr(String(v==null?'':v)).toLowerCase().trim();
-  const rn=norm(remote.name), rf=norm(remote.familyName), rg=norm(remote.gender);
-  const rdob=norm(remote.dob), rdod=norm(remote.dod);
-  const rfather=remote.fatherId??null, rmother=remote.motherId??null;
-
-  let best=null;
-  let bestScore=0;
-
-  for(let p of arr){
-    let score=0;
-    if(rn && norm(p.name)===rn) score+=4;
-    if(rf && norm(p.familyName)===rf) score+=2;
-    if(rg && norm(p.gender)===rg) score+=1;
-    if(rdob && norm(p.dob)===rdob) score+=1;
-    if(rdod && norm(p.dod)===rdod) score+=1;
-    if(rfather!=null && (p.fatherId??null)===rfather) score+=2;
-    if(rmother!=null && (p.motherId??null)===rmother) score+=2;
-
-    // للأسماء المتقاربة جدًا
-    if(score>bestScore){
-      bestScore=score;
-      best=p;
+  // ── 3) مطابقة بدرجة الثقة مع كشف الغموض ────────────────────────────
+  const candidates=[];
+  for(const p of arr){
+    const res=_computePersonMatchScore(remote,p,localMap,map0);
+    if(!res.disqualified&&res.score>=_CANDIDATE_THRESHOLD){
+      candidates.push({person:p,score:res.score,breakdown:res.breakdown});
     }
   }
 
-  // الحد الأدنى للمطابقة الضبابية المرفوع لتجنب التطابق الخاطئ:
-  // يجب أن يكون الاسم متطابقاً (4 نقاط) + اللقب (2) أو أحد الوالدين (2) على الأقل.
-  // أي: score >= 7 يعني (اسم + لقب + جنس) أو ما هو أقوى.
-  // الاسم + الجنس فقط (5 نقاط) = لا يكفي → يُصنَّف كشخص جديد.
-  let hasName = rn && best && (norm(best.name)===rn);
-  let hasFamilyName = rf && best && (norm(best.familyName)===rf);
-  let hasParent = best && (
-    (rfather!=null && (best.fatherId??null)===rfather) ||
-    (rmother!=null && (best.motherId??null)===rmother)
-  );
-  if(best && bestScore>=7 && hasName && (hasFamilyName||hasParent)){
-    return {match:best, reason:'fuzzy', score:bestScore};
+  if(!candidates.length)return null;
+  candidates.sort((a,b)=>b.score-a.score);
+  const best=candidates[0];
+
+  // أقل من حد الدمج → شخص جديد (آمن)
+  if(best.score<_AUTO_MERGE_THRESHOLD){
+    return {match:null,how:'below_threshold',score:best.score,candidates};
   }
-  return null;
+
+  // فحص الغموض: مرشح ثانٍ قريب جداً → لا دمج تلقائي
+  if(candidates.length>=2&&
+     candidates[1].score>=_AUTO_MERGE_THRESHOLD-_AMBIGUITY_MIN_GAP){
+    return {match:null,how:'ambiguous',score:best.score,candidates};
+  }
+
+  const confidence=Math.min(99,Math.round((best.score/140)*100));
+  return {match:best.person,score:best.score,confidence,how:'scored',candidates};
+}
+
+/**
+ * مطابقة الشخص الوارد مع الشجرة المحلية (للمعاينة والتقرير)
+ *
+ * @returns {null}
+ *   شخص جديد تماماً أو تحت حد الثقة
+ * @returns {{ambiguous:true, candidates, score}}
+ *   حالة غامضة — لن تُدمج تلقائياً
+ * @returns {{match, reason, score, confidence}}
+ *   مطابقة مؤكدة بثقة عالية
+ */
+function _familyMatchLocalPerson(remote,incomingMap){
+  if(!remote||typeof remote!=='object')return null;
+  const result=_findSafeLocalMatch(remote,incomingMap);
+  if(!result)return null;
+  if(!result.match){
+    if(result.how==='ambiguous')
+      return {ambiguous:true,candidates:result.candidates||[],score:result.score||0};
+    return null; // below_threshold → شخص جديد
+  }
+  return {match:result.match,reason:result.how,score:result.score,confidence:result.confidence};
 }
 
 async function _familyParseUpdateRaw(raw,keyHex){
@@ -7607,8 +7847,8 @@ async function openFamilyUpdatesModal(){
       ].map(t=>`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px">${t}</span>`).join('');
       // شرائح التغييرات بألوان مميزة
       let changeChips=[
-        u.newCnt>0?`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;background:#d1fae5;color:#065f46;border-color:#10b981">➕ ${u.newCnt} جديد</span>`:`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;color:var(--text3)">➕ 0</span>`,
-        u.updatedCnt>0?`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;background:#dbeafe;color:#1d4ed8;border-color:#3b82f6">🔄 ${u.updatedCnt} محدَّث</span>`:`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;color:var(--text3)">🔄 0</span>`,
+        u.newCnt>0?`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;background:var(--clr-green-bg);color:var(--clr-green-text);border-color:#10b981">➕ ${u.newCnt} جديد</span>`:`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;color:var(--text3)">➕ 0</span>`,
+        u.updatedCnt>0?`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;background:var(--clr-accent-bg);color:var(--clr-accent-text);border-color:#3b82f6">🔄 ${u.updatedCnt} محدَّث</span>`:`<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px;color:var(--text3)">🔄 0</span>`,
         `<span class="kin-stat" style="display:inline-flex;align-items:center;gap:4px">⏭ ${u.unchangedCnt}</span>`
       ].join('');
       return `<div style="padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:10px">
@@ -7622,17 +7862,17 @@ async function openFamilyUpdatesModal(){
             <div style="font-size:12px;color:var(--text2);margin-top:5px">${u.pCount} فرد · ${ts}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-            <button class="btn" style="font-size:11px;padding:4px 10px;background:#dbeafe;border-color:#3b82f6;color:#1d4ed8" onclick="openFamilyUpdateDetails(${idx})">🔍 عرض التفاصيل</button>
-            <button class="btn" style="font-size:11px;padding:4px 10px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
+            <button class="btn" style="font-size:11px;padding:4px 10px;background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)" onclick="openFamilyUpdateDetails(${idx})">🔍 عرض التفاصيل</button>
+            <button class="btn" style="font-size:11px;padding:4px 10px;background:var(--clr-green-bg);border-color:#10b981;color:var(--clr-green-text)" onclick="confirmFamilyMerge(${idx})">➕ دمج</button>
             <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_familyDownloadOne(${idx})">⬇️ JSON</button>
-            <button class="btn" style="font-size:11px;padding:4px 10px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c" onclick="deleteFamilyUpdate(${idx})">🗑 حذف</button>
+            <button class="btn" style="font-size:11px;padding:4px 10px;background:var(--clr-red-bg);border-color:#fca5a5;color:#b91c1c" onclick="deleteFamilyUpdate(${idx})">🗑 حذف</button>
           </div>
         </div>
         <div class="kin-stats" style="margin:0;padding:8px 0 0;border-top:1px dashed var(--card-border);background:transparent">${chips}${changeChips}</div>
       </div>`;
     }).join('');
 
-    let mergeAllBtn=okUpdates.length>1?`<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${okUpdates.length} نسخة)</button>`:'';
+    let mergeAllBtn=okUpdates.length>1?`<button class="btn primary" style="background:var(--clr-green-deep);border-color:var(--clr-green-deep)" onclick="confirmFamilyMergeAll()">➕ دمج الكل (${okUpdates.length} نسخة)</button>`:'';
     document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:760px;width:min(760px,96vw)">
       <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📡 تحديثات العائلة <span style="font-size:12px;font-weight:400;color:var(--text2)">${okUpdates.length} نسخة</span></h3>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">🔗 <a href="https://gist.github.com/${gistId}" target="_blank" style="color:#3b82f6">فتح Gist في GitHub</a></div>
@@ -7645,7 +7885,7 @@ async function openFamilyUpdatesModal(){
 
     window._familyUpdates=okUpdates;
   }catch(e){
-    document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:520px"><h3>📡 تحديثات العائلة</h3><div style="padding:14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;line-height:1.8">❌ ${String(e.message||e)}</div><div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn primary" onclick="closeModal();openFamilyUploadSetup()">⚙️ إعداد</button></div></div></div>`;
+    document.getElementById('modalContainer').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:520px"><h3>📡 تحديثات العائلة</h3><div style="padding:14px;background:var(--clr-red-bg);border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;line-height:1.8">❌ ${String(e.message||e)}</div><div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn primary" onclick="closeModal();openFamilyUploadSetup()">⚙️ إعداد</button></div></div></div>`;
   }
 }
 
@@ -7678,7 +7918,7 @@ function _showFamilyUpdates401Modal(reason, gistId, usedPat){
   <div class="modal" style="max-width:500px">
     <h3>📡 تحديثات العائلة</h3>
 
-    <div style="padding:12px 14px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;margin-bottom:16px">
+    <div style="padding:12px 14px;background:var(--clr-red-bg);border:1px solid #fca5a5;border-radius:10px;margin-bottom:16px">
       <div style="font-size:14px;font-weight:600;color:#991b1b;margin-bottom:6px">${title}</div>
       <div style="font-size:13px;color:#7f1d1d;line-height:1.8">${body}</div>
       <div style="font-size:12px;color:#991b1b;margin-top:8px;line-height:1.8">${hint}</div>
@@ -7872,20 +8112,22 @@ function _fvBuildDiffTable(diffs) {
 }
 
 function _fvSwitchTab(tab, idx) {
-  const newPanel = document.getElementById('fvpanel_new');
-  const updPanel = document.getElementById('fvpanel_upd');
-  const tabNew = document.getElementById('fvtab_new');
-  const tabUpd = document.getElementById('fvtab_upd');
-  if (newPanel) newPanel.style.display = tab === 'new' ? 'block' : 'none';
-  if (updPanel) updPanel.style.display = tab === 'upd' ? 'block' : 'none';
-  if (tabNew) {
-    tabNew.style.color = tab === 'new' ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
-    tabNew.style.borderBottom = tab === 'new' ? '2px solid var(--color-border-info)' : 'none';
-  }
-  if (tabUpd) {
-    tabUpd.style.color = tab === 'upd' ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
-    tabUpd.style.borderBottom = tab === 'upd' ? '2px solid var(--color-border-info)' : 'none';
-  }
+  // الألواح والتبويبات: new / upd / amb
+  const defs = {
+    new: {panel:'fvpanel_new', btn:'fvtab_new'},
+    upd: {panel:'fvpanel_upd', btn:'fvtab_upd'},
+    amb: {panel:'fvpanel_amb', btn:'fvtab_amb'},
+  };
+  Object.keys(defs).forEach(key => {
+    const panel = document.getElementById(defs[key].panel);
+    const btn   = document.getElementById(defs[key].btn);
+    const active = key === tab;
+    if (panel) panel.style.display = active ? 'block' : 'none';
+    if (btn) {
+      btn.style.color        = active ? 'var(--color-text-info)' : 'var(--color-text-secondary)';
+      btn.style.borderBottom = active ? '2px solid var(--color-border-info)' : 'none';
+    }
+  });
 }
 
 function _fvSelectAll(idx, val) {
@@ -8068,15 +8310,18 @@ function openFamilyUpdateDetails(idx) {
   if (!u || !u.data) return;
 
   const summary = u.summary || _familySummarizeUpdate(u.data);
+  u.summary = summary; // cache للاستخدام لاحقاً
   const incomingMap = summary.incomingMap || _familyIncomingMap(u.data);
 
   window._fvSelections = window._fvSelections || {};
   window._fvSelections[idx] = window._fvSelections[idx] || {};
 
-  const newPeople = summary.newPeople || [];
-  const updatedPeople = summary.updatedPeople || [];
+  const newPeople      = summary.newPeople      || [];
+  const updatedPeople  = summary.updatedPeople  || [];
+  const ambiguousPeople= summary.ambiguousPeople|| [];
   const unchangedCount = (summary.unchangedPeople || []).length;
 
+  // تحديد مسبق: الجدد والتحديثات مُقبولة بشكل افتراضي
   newPeople.forEach(p => {
     const key = `new_${p.id}`;
     if (window._fvSelections[idx][key] === undefined) window._fvSelections[idx][key] = true;
@@ -8086,13 +8331,13 @@ function openFamilyUpdateDetails(idx) {
     if (window._fvSelections[idx][key] === undefined) window._fvSelections[idx][key] = true;
   });
 
+  // ── لوحة الأفراد الجدد ──────────────────────────────────────────────
   const newHtml = newPeople.length ? newPeople.map((p, i) => {
     const father = p.fatherId != null ? incomingMap.get(p.fatherId) : null;
     const mother = p.motherId != null ? incomingMap.get(p.motherId) : null;
     const fatherName = father ? _familyDisplayName(father) : '—';
     const motherName = mother ? _familyDisplayName(mother) : '—';
     const selKey = `new_${p.id}`;
-
     return `
       <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:6px;background:var(--color-background-success)">
         <input type="checkbox" id="fvsel_${idx}_new_${i}" ${window._fvSelections[idx][selKey] ? 'checked' : ''}
@@ -8106,14 +8351,17 @@ function openFamilyUpdateDetails(idx) {
       </div>`;
   }).join('') : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا يوجد أفراد جدد</div>';
 
+  // ── لوحة التحديثات ──────────────────────────────────────────────────
   const updHtml = updatedPeople.length ? updatedPeople.map((x, i) => {
     const diffs = _fvDiffPerson(x.local, x.remote);
     const selKey = `upd_${x.remote.id}`;
     const riskLevel = diffs.some(d => ['name', 'parentId', 'fatherId', 'motherId', 'gender'].includes(d.field)) ? 'high' : 'low';
+    const confBadge = x.confidence
+      ? `<span style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--clr-cyan-bg);color:var(--clr-cyan-text);border:0.5px solid #bae6fd;white-space:nowrap">ثقة ${x.confidence}%</span>`
+      : '';
     const riskBadge = riskLevel === 'high'
       ? '<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-warning);white-space:nowrap">راجع بعناية</span>'
       : '<span style="font-size:10px;padding:2px 7px;border-radius:999px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);white-space:nowrap">تحديث عادي</span>';
-
     return `
       <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:8px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--color-background-secondary)">
@@ -8124,16 +8372,67 @@ function openFamilyUpdateDetails(idx) {
             <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${_familyDisplayName(x.remote)}</div>
             <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">${diffs.length} حقل متغير</div>
           </div>
-          ${riskBadge}
+          <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">${confBadge}${riskBadge}</div>
         </div>
-        <div style="padding:8px 12px">
-          ${_fvBuildDiffTable(diffs)}
-        </div>
+        <div style="padding:8px 12px">${_fvBuildDiffTable(diffs)}</div>
       </div>`;
   }).join('') : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا يوجد تحديثات على أفراد موجودين</div>';
 
+  // ── لوحة الحالات الغامضة ────────────────────────────────────────────
+  // هؤلاء لن يُدمجوا تلقائياً — فقط للمراجعة البشرية
+  const ambHtml = ambiguousPeople.length ? `
+    <div style="padding:10px 12px;background:var(--clr-amber-bg);border:0.5px solid #f59e0b;border-radius:var(--border-radius-md);margin-bottom:12px;font-size:12px;color:var(--clr-amber-text);line-height:1.7">
+      ⚠️ الحالات الغامضة <strong>لن تُدمج تلقائياً</strong>. يُرجى مراجعتها يدوياً وتحديد الإجراء المناسب لكل حالة.
+    </div>
+    ${ambiguousPeople.map(item => {
+      const p = item.remote;
+      const father = p.fatherId != null ? incomingMap.get(p.fatherId) : null;
+      const mother = p.motherId != null ? incomingMap.get(p.motherId) : null;
+      const fatherName = father ? _familyDisplayName(father) : '—';
+      const motherName = mother ? _familyDisplayName(mother) : '—';
+      const candidatesHtml = (item.candidates || []).slice(0, 4).map(c => {
+        const cp = c.person;
+        const signals = Object.keys(c.breakdown || {})
+          .filter(k => c.breakdown[k] === 'match')
+          .map(k => ({
+            name:'اسم', familyName:'لقب', gender:'جنس', fatherName:'أب',
+            grandfatherName:'جد', motherName:'أم', dob:'ميلاد',
+            dod:'وفاة', spouseMatch:'زوج/ة', deceased:'حالة'
+          }[k] || k))
+          .join('، ');
+        return `
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--color-background-secondary);border-radius:var(--border-radius-sm);margin-top:4px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:500;color:var(--color-text-primary)">${_familyDisplayName(cp)}</div>
+              <div style="font-size:10px;color:var(--color-text-secondary);margin-top:1px">تطابق في: ${signals||'—'}</div>
+            </div>
+            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--clr-amber-bg);color:var(--clr-amber-text);border:0.5px solid #f59e0b;white-space:nowrap">${c.score} نقطة</span>
+          </div>`;
+      }).join('');
+      return `
+        <div style="border:0.5px solid #f59e0b;border-radius:var(--border-radius-md);margin-bottom:10px;overflow:hidden">
+          <div style="padding:10px 12px;background:#fffde7;border-bottom:0.5px solid #fde68a">
+            <div style="font-size:13px;font-weight:600;color:var(--color-text-primary)">${_familyDisplayName(p)}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;line-height:1.7">
+              الأب: ${fatherName} · الأم: ${motherName} · ${p.gender === 'male' ? 'ذكر' : 'أنثى'}${p.deceased ? ' · متوفى' : ''}
+            </div>
+          </div>
+          <div style="padding:8px 12px">
+            <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px">مرشحون محتملون في الشجرة الحالية:</div>
+            ${candidatesHtml}
+          </div>
+        </div>`;
+    }).join('')}` : '<div style="padding:12px;text-align:center;color:var(--color-text-secondary);font-size:13px">لا توجد حالات غامضة</div>';
+
   const totalNew = newPeople.length;
   const totalUpd = updatedPeople.length;
+  const totalAmb = ambiguousPeople.length;
+
+  // شارة التحذير إذا كانت هناك حالات غامضة
+  const ambWarning = totalAmb
+    ? `<div style="padding:8px 12px;background:var(--clr-amber-bg);border:0.5px solid #f59e0b;border-radius:var(--border-radius-md);font-size:12px;color:var(--clr-amber-text);margin-bottom:10px">
+        🔍 <strong>${totalAmb}</strong> حالة غامضة مُعلَّقة — هؤلاء سيُضافون كأشخاص جدد بعلامة "يحتاج مراجعة" ما لم تُقرر يدوياً.
+       </div>` : '';
 
   document.getElementById('modalContainer').innerHTML = `
   <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
@@ -8147,28 +8446,36 @@ function openFamilyUpdateDetails(idx) {
       <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success)">➕ ${totalNew} جديد</span>
       <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info)">🔄 ${totalUpd} تحديث</span>
       <span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)">⏭ ${unchangedCount} بدون تغيير</span>
+      ${totalAmb ? `<span style="font-size:12px;padding:2px 8px;border-radius:999px;background:var(--clr-amber-bg);color:var(--clr-amber-text);border:0.5px solid #f59e0b">⚠️ ${totalAmb} غامض</span>` : ''}
     </div>
+
+    ${ambWarning}
 
     <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
       <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_fvSelectAll(${idx},true)">✅ قبول الكل</button>
       <button class="btn" style="font-size:11px;padding:4px 10px" onclick="_fvSelectAll(${idx},false)">❌ رفض الكل</button>
-      <button class="btn" style="font-size:11px;padding:4px 10px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="_fvSelectNewOnly(${idx})">➕ الجدد فقط (آمن)</button>
-      <button class="btn" style="font-size:11px;padding:4px 10px;background:#dbeafe;border-color:#3b82f6;color:#1e40af" onclick="_fvSelectUpdOnly(${idx})">🔄 التحديثات فقط</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px;background:var(--clr-green-bg);border-color:#10b981;color:var(--clr-green-text)" onclick="_fvSelectNewOnly(${idx})">➕ الجدد فقط (آمن)</button>
+      <button class="btn" style="font-size:11px;padding:4px 10px;background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)" onclick="_fvSelectUpdOnly(${idx})">🔄 التحديثات فقط</button>
     </div>
 
     <div style="display:flex;gap:0;margin-bottom:10px;border-bottom:0.5px solid var(--color-border-tertiary)">
       <button id="fvtab_new" onclick="_fvSwitchTab('new',${idx})"
-        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--color-text-info);border-bottom:2px solid currentColor;cursor:pointer">
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer">
         ➕ جدد (${totalNew})
       </button>
       <button id="fvtab_upd" onclick="_fvSwitchTab('upd',${idx})"
-        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--color-text-secondary);cursor:pointer">
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer">
         🔄 تحديثات (${totalUpd})
       </button>
+      ${totalAmb ? `<button id="fvtab_amb" onclick="_fvSwitchTab('amb',${idx})"
+        style="padding:7px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:#f59e0b">
+        ⚠️ غامض (${totalAmb})
+      </button>` : ''}
     </div>
 
     <div id="fvpanel_new" style="max-height:44vh;overflow-y:auto">${newHtml}</div>
     <div id="fvpanel_upd" style="display:none;max-height:44vh;overflow-y:auto">${updHtml}</div>
+    <div id="fvpanel_amb" style="display:none;max-height:44vh;overflow-y:auto">${ambHtml}</div>
 
     <div id="fv_merge_summary_${idx}" style="margin-top:10px;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);font-size:13px;color:var(--color-text-primary)">
       سيُدمج: <strong>${totalNew}</strong> جديد + <strong>${totalUpd}</strong> تحديث
@@ -8176,7 +8483,7 @@ function openFamilyUpdateDetails(idx) {
 
     <div class="modal-footer" style="flex-wrap:wrap;gap:6px;margin-top:10px">
       <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">◀ رجوع</button>
-      <button class="btn primary" style="background:#059669;border-color:#059669" onclick="_fvExecuteSelectiveMerge(${idx})">✔ دمج المحدَّد</button>
+      <button class="btn primary" style="background:var(--clr-green-deep);border-color:var(--clr-green-deep)" onclick="_fvExecuteSelectiveMerge(${idx})">✔ دمج المحدَّد</button>
     </div>
   </div>
   </div>`;
@@ -8189,11 +8496,18 @@ function confirmFamilyMerge(idx) {
   const u = window._familyUpdates && window._familyUpdates[idx];
   if (!u || !u.data) return;
   const st = u.summary || _familySummarizeUpdate(u.data);
+  u.summary = st;
   const hasUpdates = (st.updatedPeople || []).length > 0;
+  const ambCount   = (st.ambiguousPeople || []).length;
 
   const warningHtml = hasUpdates ? `
-    <div style="padding:10px 12px;background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-warning);margin-bottom:12px;line-height:1.7">
+    <div style="padding:10px 12px;background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-warning);margin-bottom:10px;line-height:1.7">
       ⚠️ يوجد <strong>${st.updatedPeople.length}</strong> شخص محدَّث — يُنصح بمراجعة التفاصيل قبل الدمج لضمان دقة البيانات.
+    </div>` : '';
+
+  const ambHtml = ambCount ? `
+    <div style="padding:10px 12px;background:var(--clr-amber-bg);border:0.5px solid #f59e0b;border-radius:var(--border-radius-md);font-size:12px;color:var(--clr-amber-text);margin-bottom:10px;line-height:1.7">
+      🔍 يوجد <strong>${ambCount}</strong> حالة غامضة — <strong>لن تُدمج تلقائياً</strong>. ستظهر كأشخاص جدد تحتاج مراجعة يدوية.
     </div>` : '';
 
   document.getElementById('modalContainer').innerHTML = `
@@ -8201,15 +8515,18 @@ function confirmFamilyMerge(idx) {
   <div class="modal" style="max-width:480px">
     <h3 style="margin-bottom:4px">تأكيد الدمج</h3>
     <div style="color:var(--color-text-secondary);font-size:12px;margin-bottom:12px">الجهاز: ${u.devName || u.devId}</div>
-    ${warningHtml}
-    <div style="line-height:2;font-size:14px;color:var(--color-text-primary);margin-bottom:12px">
+    ${warningHtml}${ambHtml}
+    <div style="line-height:2.1;font-size:14px;color:var(--color-text-primary);margin-bottom:12px">
       ➕ <strong style="color:var(--color-text-success)">${st.newPeople.length}</strong> أشخاص جدد سيُضافون<br>
       🔄 <strong style="color:var(--color-text-info)">${st.updatedPeople.length}</strong> أشخاص ستُحدَّث بياناتهم<br>
       ⏭ <strong>${st.unchangedPeople.length}</strong> أشخاص موجودون بدون تغيير
+      ${ambCount ? `<br>⚠️ <strong style="color:#f59e0b">${ambCount}</strong> حالة غامضة (محفوظة للمراجعة)` : ''}
     </div>
     <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn" onclick="closeModal();openFamilyUpdatesModal()">إلغاء</button>
-      ${hasUpdates ? `<button class="btn" style="background:#dbeafe;border-color:#3b82f6;color:#1e40af" onclick="closeModal();openFamilyUpdateDetails(${idx})">🔍 مراجعة التفاصيل أولاً</button>` : ''}
+      ${hasUpdates || ambCount
+        ? `<button class="btn" style="background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)" onclick="closeModal();openFamilyUpdateDetails(${idx})">🔍 مراجعة التفاصيل أولاً</button>`
+        : ''}
       <button class="btn primary" onclick="_fvMergeAll(${idx})">✔ دمج كل شيء</button>
     </div>
   </div>
@@ -8334,7 +8651,7 @@ function _showNewDeviceBanner(){
     +'box-shadow:0 6px 24px rgba(0,0,0,.35);max-width:calc(100vw - 32px);'
     +'text-align:right;direction:rtl;';
   b.innerHTML='<span>☁️ <strong>جهاز جديد</strong> — يوجد بيانات في السحابة</span>'
-    +'<button onclick="_autoRestoreFromCloud()" style="background:#fff;color:#1e40af;'
+    +'<button onclick="_autoRestoreFromCloud()" style="background:#fff;color:#1d4ed8;'
     +'border:none;border-radius:8px;padding:6px 12px;font-size:12px;'
     +'cursor:pointer;font-weight:700;white-space:nowrap">⬇️ تحميل الآن</button>'
     +'<button onclick="document.getElementById(\'newDeviceBanner\').remove()" '
@@ -8653,18 +8970,17 @@ function _cloudSmartMerge(cloudData, mergeOptions){
     return out;
   }
 
+  // ── مطابقة آمنة: القاعدة "إذا كان هناك شك، فلا تدمج" ──────────────
+  // الحالات الغامضة أو منخفضة الثقة تُعامَل كأشخاص جدد (أسلم من الدمج الخاطئ).
   function _findLocal(cp){
-    let byId=people.find(lp=>lp.id===cp.id);
+    // 1) مطابقة بالمعرّف — الأعلى ثقة دائماً
+    const byId=people.find(lp=>lp.id===cp.id);
     if(byId)return {match:byId,how:'id'};
-    let inParent=incoming.find(x=>x.id===cp.parentId);
-    let byName=people.find(lp=>{
-      if(normalizeAr(lp.name)!==normalizeAr(cp.name))return false;
-      if(cp.gender&&lp.gender&&cp.gender!==lp.gender)return false;
-      if(inParent){let lp2=getPerson(lp.parentId);return lp2?normalizeAr(lp2.name)===normalizeAr(inParent.name):false;}
-      return !cp.parentId&&!lp.parentId;
-    });
-    if(byName)return {match:byName,how:'name'};
-    return null;
+    // 2) مطابقة بدرجة الثقة الشاملة عبر محرك المطابقة الآمنة
+    const result=_findSafeLocalMatch(cp,incomingMap);
+    // غامض أو تحت الحد → شخص جديد (لا ندمج)
+    if(!result||!result.match)return null;
+    return {match:result.match,how:result.how,score:result.score,confidence:result.confidence};
   }
 
   let idMap=new Map();
@@ -8816,7 +9132,7 @@ function openMergeLogModal(){
     let src = h.devId ? ` · ${h.devId}` : '';
     let counts = `➕ ${h.added || 0} · 🔄 ${h.updated || 0}`;
     let keep = h.backup ? 'قابل للاسترجاع' : 'سجل فقط';
-    let color = h.backup ? '#059669' : '#b45309';
+    let color = h.backup ? 'var(--color-text-success)' : '#b45309';
     return `
       <div class="sub-item" style="align-items:flex-start;justify-content:space-between;gap:10px">
         <div style="flex:1;min-width:0">
@@ -8900,23 +9216,23 @@ async function cloudRestorePrompt(){
   var gistId=localStorage.getItem(CLOUD_GIST_KEY)||CLOUD_CONFIG.GIST_ID||'';
   var html='<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:480px">'+
     '<h3>⬇️ استعادة من السحابة</h3>'+
-    '<div style="padding:9px 12px;background:#fef9c3;border:1px solid #eab308;border-radius:8px;margin-bottom:12px;font-size:12px;color:#713f12;line-height:1.7">'+
+    '<div style="padding:9px 12px;background:var(--clr-amber-bg);border:1px solid #eab308;border-radius:8px;margin-bottom:12px;font-size:12px;color:#713f12;line-height:1.7">'+
     '⚠️ <strong>إذا لم تظهر الصور:</strong> الجهازان متصلان بـ Gist مختلفَين.<br>استخدم "استعادة من Gist جهاز آخر" أدناه وأدخل ID الجهاز الذي يحتوي الصور.</div>'+
     '<div style="padding:7px 10px;background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:7px;margin-bottom:12px;font-size:11px">'+
     'Gist هذا الجهاز: <code style="font-size:10px">'+(gistId||'غير مُعيَّن')+'</code></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
-    '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#d1fae5;border-color:#10b981;color:#065f46">'+
+    '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--clr-green-bg);border-color:#10b981;color:var(--clr-green-text)">'+
     '<span style="font-size:18px">🔀</span><span style="font-weight:600">دمج</span><span style="font-size:10px;opacity:.8">يضيف الجديد ويفحص التعارضات</span></button>'+
-    '<button class="btn" onclick="closeModal();_doDownload(true)" style="padding:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">'+
+    '<button class="btn" onclick="closeModal();_doDownload(true)" style="padding:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--clr-red-bg);border-color:#fca5a5;color:#b91c1c">'+
     '<span style="font-size:18px">🔄</span><span style="font-weight:600">استبدال كامل</span><span style="font-size:10px;opacity:.8">يمسح المحلي تماماً</span></button>'+
     '</div>'+
     '<div style="padding:10px 12px;background:var(--bg-secondary);border:2px solid #3b82f6;border-radius:8px;margin-bottom:10px">'+
-    '<div style="font-size:12px;font-weight:600;color:#1d4ed8;margin-bottom:6px">🔗 استعادة من Gist جهاز آخر (لإصلاح مشكلة الصور)</div>'+
+    '<div style="font-size:12px;font-weight:600;color:var(--clr-accent-text);margin-bottom:6px">🔗 استعادة من Gist جهاز آخر (لإصلاح مشكلة الصور)</div>'+
     '<div style="font-size:11px;color:var(--text2);margin-bottom:5px">الصق Gist ID الجهاز الذي رفع الصور:</div>'+
     '<input id="otherGistInput" type="text" placeholder="مثال: 39281f2f65e8ff9a9e28..." style="width:100%;font-family:monospace;font-size:11px;padding:6px 8px;border:1px solid var(--card-border);border-radius:6px;background:var(--card-bg);color:var(--text);margin-bottom:6px;box-sizing:border-box">'+
     '<div style="display:flex;gap:6px">'+
-    '<button class="btn" onclick="_restoreFromOtherGist(false)" style="flex:1;font-size:12px;background:#d1fae5;border-color:#10b981;color:#065f46">🔀 دمج منه</button>'+
-    '<button class="btn" onclick="_restoreFromOtherGist(true)" style="flex:1;font-size:12px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">🔄 استبدال منه</button>'+
+    '<button class="btn" onclick="_restoreFromOtherGist(false)" style="flex:1;font-size:12px;background:var(--clr-green-bg);border-color:#10b981;color:var(--clr-green-text)">🔀 دمج منه</button>'+
+    '<button class="btn" onclick="_restoreFromOtherGist(true)" style="flex:1;font-size:12px;background:var(--clr-red-bg);border-color:#fca5a5;color:#b91c1c">🔄 استبدال منه</button>'+
     '</div></div>'+
     '<div class="modal-footer"><button class="btn" onclick="closeModal()">إلغاء</button></div>'+
     '</div></div>';
@@ -8996,11 +9312,11 @@ function openCloudSetup(){
     </div>
     ${gistId?`<div class="form-row"><label>🔗 معرّف Gist الحالي (للقراءة فقط)</label><input type="text" value="${gistId}" readonly style="font-size:11px;font-family:monospace;background:var(--bg-secondary)"><button class="btn" style="font-size:11px;margin-top:4px;color:#ef4444" onclick="if(confirm('هل تريد حذف الربط بـ Gist الحالي؟ لن يُحذف الـ Gist من GitHub.'))localStorage.removeItem('${CLOUD_GIST_KEY.replace("'","\'")}');closeModal();openCloudSetup()">✕ إلغاء الربط</button></div>`
     :`<div class="form-row"><label>🔗 معرّف Gist (اختياري — اتركه فارغاً للبحث التلقائي)</label><input id="cs_gist" type="text" style="font-family:monospace;font-size:11px" placeholder="يُملأ تلقائياً — أو الصق الـ ID يدوياً"></div>`}
-    <div style="padding:10px 12px;background:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:12px;color:#065f46;margin-bottom:8px">
+    <div style="padding:10px 12px;background:var(--clr-green-bg);border:1px solid #10b981;border-radius:8px;font-size:12px;color:var(--clr-green-text);margin-bottom:8px">
       <strong>✅ الإعدادات تُحفظ تلقائياً</strong> في هذا المتصفح على هذا الجهاز.<br>
       لنقلها لجهاز آخر: بعد الإعداد اضغط <strong>💾 حفظ نسخة</strong> — ستُضمَّن الإعدادات في ملف HTML.
     </div>
-    <div style="padding:10px 12px;background:#ede9fe;border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:#5b21b6;margin-bottom:14px">
+    <div style="padding:10px 12px;background:var(--clr-purple-bg);border:1px solid #8b5cf6;border-radius:8px;font-size:12px;color:var(--clr-purple-text);margin-bottom:14px">
       <strong>📐 هيكلية الأمان:</strong><br>
       🔑 <strong>أنت (المالك):</strong> نسختك تحتوي الإعدادات → حفظ وتحميل سحابي تلقائي<br>
       👥 <strong>أفراد العائلة:</strong> نسختهم بلا إعدادات → يعملون محلياً → يُصدّرون JSON ويُرسلونه لك<br>
@@ -9649,7 +9965,7 @@ function _updateFsaBtn(state){
     if(bar)bar.style.display='none';
   }else if(state==='ok'){
     btn.innerHTML='📁 مرتبط ✓';
-    btn.style.background='#d1fae5';btn.style.borderColor='#10b981';btn.style.color='#065f46';
+    btn.style.background='var(--clr-green-bg)';btn.style.borderColor='#10b981';btn.style.color='var(--clr-green-text)';
     if(bar)bar.style.display='none';
   }else if(state==='prompt'){
     if(bar){
@@ -10595,12 +10911,12 @@ function _setVoiceActive(on){
   .mss-groups{display:flex;gap:6px;padding:10px 14px 0;overflow-x:auto;flex-shrink:0;scrollbar-width:none;}
   .mss-groups::-webkit-scrollbar{display:none;}
   .mss-group-tab{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;border:1.5px solid var(--card-border);background:var(--bg-secondary);color:var(--text2);flex-shrink:0;transition:all .15s;}
-  .mss-group-tab.active{background:#1e40af;color:#fff;border-color:#1e40af;}
+  .mss-group-tab.active{background:#1e40af;color:#fff;border-color:var(--clr-accent-text);}
   .mss-body{overflow-y:auto;flex:1;}
   .mss-item{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:.5px solid var(--card-border);cursor:pointer;}
   body.mobile-mode .mss-item{min-height:60px;padding:14px 18px;}
   .mss-item:hover,.mss-item:active{background:var(--bg-secondary);}
-  .mss-item.active{background:linear-gradient(135deg,var(--clr-accent-bg),#eff6ff);box-shadow:inset 0 0 0 1px rgba(59,130,246,.12);}
+  .mss-item.active{background:var(--clr-accent-bg);box-shadow:inset 0 0 0 1px rgba(59,130,246,.12);}
   .mss-item-name{font-size:14px;font-weight:500;color:var(--text);}
   body.mobile-mode .mss-item-name{font-size:15px;}
   .mss-item-sub{font-size:11px;color:var(--text2);margin-top:2px;}
@@ -10610,7 +10926,7 @@ function _setVoiceActive(on){
   .mss-footer button.mss-btn-secondary{padding:12px 16px;background:var(--bg-secondary);color:var(--text2);border:1px solid var(--card-border);border-radius:12px;font-size:13px;cursor:pointer;}
   .mss-sort-btn{padding:5px 12px;border:1.5px solid var(--card-border);border-radius:20px;background:var(--card-bg);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;}
   .mss-sort-btn:hover{background:var(--bg-secondary);color:var(--text);}
-  .mss-sort-btn.active{background:#1e40af;color:#fff;border-color:#1e40af;}
+  .mss-sort-btn.active{background:#1e40af;color:#fff;border-color:var(--clr-accent-text);}
   #mss-sort-bar::-webkit-scrollbar{display:none;}
   #mss-input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12);}
   /* صوت نشط */
@@ -10841,16 +11157,16 @@ function openCloudSyncPanel(){
   var lastSync=_getLastSync();
   var lastLabel=lastSync?new Date(lastSync).toLocaleString('ar-SA',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'لم تتم مزامنة بعد';
   var gistShare=gistId?
-    '<div style="padding:10px 12px;background:#d1fae5;border:1px solid #6ee7b7;border-radius:10px;margin-bottom:12px">'+
-    '<div style="font-size:12px;font-weight:600;color:#065f46;margin-bottom:6px">🔗 معرّف السحابة — شاركه مع أجهزتك الأخرى</div>'+
+    '<div style="padding:10px 12px;background:var(--clr-green-bg);border:1px solid #6ee7b7;border-radius:10px;margin-bottom:12px">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--clr-green-text);margin-bottom:6px">🔗 معرّف السحابة — شاركه مع أجهزتك الأخرى</div>'+
     '<div style="display:flex;gap:6px;align-items:center">'+
-    '<code style="flex:1;font-size:10px;background:#fff;padding:5px 8px;border-radius:6px;border:1px solid #a7f3d0;word-break:break-all;color:#065f46">'+gistId+'</code>'+
+    '<code style="flex:1;font-size:10px;background:var(--card-bg);padding:5px 8px;border-radius:6px;border:1px solid #a7f3d0;word-break:break-all;color:var(--clr-green-text)">'+gistId+'</code>'+
     '<button class="btn" id="copyGistBtn" onclick="_copyGistId()" style="font-size:11px;flex-shrink:0">📋</button>'+
-    '</div><div style="font-size:10px;color:#065f46;margin-top:4px">على الجهاز الآخر: الإعدادات ← أدخل هذا الـ ID في حقل Gist ID</div></div>'
-    :'<div style="padding:8px 12px;background:#fef9c3;border:1px solid #eab308;border-radius:8px;margin-bottom:12px;font-size:12px;color:#713f12">⚠️ ارفع البيانات أولاً للحصول على معرّف السحابة</div>';
+    '</div><div style="font-size:10px;color:var(--clr-green-text);margin-top:4px">على الجهاز الآخر: الإعدادات ← أدخل هذا الـ ID في حقل Gist ID</div></div>'
+    :'<div style="padding:8px 12px;background:var(--clr-amber-bg);border:1px solid #eab308;border-radius:8px;margin-bottom:12px;font-size:12px;color:#713f12">⚠️ ارفع البيانات أولاً للحصول على معرّف السحابة</div>';
   var warnHtml='';
-  if(invalidCount>0)warnHtml+='<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:11px;color:#9a3412;margin-bottom:8px">⚠️ '+invalidCount+' صورة بمسار محلي (blob) — لن تُرفع</div>';
-  if(sizeKB>8000)warnHtml+='<div style="padding:7px 10px;background:#fef9c3;border:1px solid #eab308;border-radius:7px;font-size:11px;color:#713f12;margin-bottom:8px">⚠️ حجم كبير ('+sizeLabel+') — قد يستغرق الرفع وقتاً</div>';
+  if(invalidCount>0)warnHtml+='<div style="padding:7px 10px;background:var(--clr-divorce-bg);border:1px solid #fb923c;border-radius:7px;font-size:11px;color:var(--clr-divorce-text);margin-bottom:8px">⚠️ '+invalidCount+' صورة بمسار محلي (blob) — لن تُرفع</div>';
+  if(sizeKB>8000)warnHtml+='<div style="padding:7px 10px;background:var(--clr-amber-bg);border:1px solid #eab308;border-radius:7px;font-size:11px;color:#713f12;margin-bottom:8px">⚠️ حجم كبير ('+sizeLabel+') — قد يستغرق الرفع وقتاً</div>';
   var html='<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:500px">'+
     '<h3 style="display:flex;align-items:center;gap:8px;margin-bottom:12px">☁️ المزامنة السحابية <span id="cloudLastSyncTimePnl" style="font-size:11px;font-weight:400;color:var(--text2);margin-right:auto"></span></h3>'+
     gistShare+
@@ -10860,12 +11176,12 @@ function openCloudSyncPanel(){
     warnHtml+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'+
     '<button class="btn primary" onclick="closeModal();_doUpload()" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:20px">⬆️</span><span style="font-weight:600">رفع</span><span style="font-size:10px;opacity:.7">'+people.length+' فرد · '+validPhotos.length+' صورة</span></button>'+
-    '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">مزامنة ذكية</span><span style="font-size:10px;opacity:.7">يفحص التعارضات</span></button>'+
+    '<button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)"><span style="font-size:20px">⬇️</span><span style="font-weight:600">مزامنة ذكية</span><span style="font-size:10px;opacity:.7">يفحص التعارضات</span></button>'+
     '</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
-    '<button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:#fff7ed;border-color:#fb923c;color:#c2410c">🔄 استبدال كامل</button>'+
+    '<button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:var(--clr-divorce-bg);border-color:#fb923c;color:var(--clr-divorce-text)">🔄 استبدال كامل</button>'+
     '<button class="btn" onclick="openSyncDebugPanel()" style="flex:1;font-size:12px">🔍 سجل</button>'+
-    '<button class="btn" onclick="openCloudResetPanel()" style="flex:1;font-size:12px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">🗑 ضبط</button>'+
+    '<button class="btn" onclick="openCloudResetPanel()" style="flex:1;font-size:12px;background:var(--clr-red-bg);border-color:#fca5a5;color:#b91c1c">🗑 ضبط</button>'+
     '</div>'+
     '<div class="modal-footer" style="margin-top:8px"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn" onclick="closeModal();openCloudSetup()" style="font-size:11px">⚙️ الإعدادات</button></div>'+
     '</div></div>';
@@ -10895,7 +11211,7 @@ async function _restoreFromOtherGist(forceReplace){
 function openCloudResetPanel(){
   var html='<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:420px">'+
     '<h3 style="color:#dc2626">🗑 إعادة ضبط السحابة</h3>'+
-    '<div style="padding:9px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;margin-bottom:14px;font-size:12px;color:#991b1b;line-height:1.7">'+
+    '<div style="padding:9px 12px;background:var(--clr-red-bg);border:1px solid #fca5a5;border-radius:8px;margin-bottom:14px;font-size:12px;color:#991b1b;line-height:1.7">'+
     '⚠️ سيُستبدَل محتوى الـ Gist بعلامة reset. بياناتك المحلية لن تُمَس.</div>'+
     '<div style="margin-bottom:12px">'+
     '<label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer"><input type="checkbox" id="rst_data" checked><span style="font-size:13px">📄 ملف البيانات</span></label>'+
@@ -10956,7 +11272,7 @@ function openSyncDebugPanel(){
     '<h3>🔍 تشخيص المزامنة والصور</h3>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'+
     [['👥',people.length,'الأفراد',''],['📷',people.filter(p=>_isValidPhoto(p.photo)).length,'صور صالحة',''],
-     ['📤',unsynced,'غير مزامنة',unsynced>0?'#dc2626':'#15803d'],['⚠️',invalid,'صور blob',invalid>0?'#92400e':'#15803d'],
+     ['📤',unsynced,'غير مزامنة',unsynced>0?'#dc2626':'#15803d'],['⚠️',invalid,'صور blob',invalid>0?'var(--clr-amber-text)':'#15803d'],
      ['🕐',_getLastSync()?new Date(_getLastSync()).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—','آخر مزامنة','']
     ].map(([ic,v,lbl,col])=>'<div style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:7px;padding:7px;text-align:center"><div style="font-size:10px;color:var(--text2)">'+lbl+'</div><div style="font-size:15px;font-weight:700;color:'+(col||'var(--text)')+'">'+v+'</div></div>').join('')+
     '</div>'+
@@ -11315,7 +11631,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
               <div style="font-size:13px;font-weight:700;color:var(--text)">${title}</div>
               <div style="font-size:11px;color:var(--text2);margin-top:2px">#${pid}</div>
             </div>
-            <div style="font-size:11px;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;border-radius:999px;padding:2px 8px">تعارض صورة</div>
+            <div style="font-size:11px;color:var(--clr-accent-text);background:var(--clr-accent-bg);border:1px solid #93c5fd;border-radius:999px;padding:2px 8px">تعارض صورة</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <label style="display:block;border:1px solid var(--card-border);border-radius:10px;padding:8px;background:var(--bg-secondary);cursor:pointer">
@@ -11675,7 +11991,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
           <div style="font-size:11px;color:#ef4444;margin-top:4px">احتفظ بالمفتاح في مكان آمن، لأن فقدانه يعني فقدان القدرة على فك النسخ القديمة.</div>
         </div>
 
-        <div style="padding:10px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1d4ed8;margin-bottom:10px;line-height:1.6">
+        <div style="padding:10px 12px;background:var(--clr-accent-bg);border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:var(--clr-accent-text);margin-bottom:10px;line-height:1.6">
           <strong>خطوات Supabase المطلوبة خارج التطبيق:</strong><br>
           1) أنشئ Bucket بنفس الاسم أعلاه.<br>
           2) فعّل Anonymous Sign-Ins.<br>
@@ -11741,8 +12057,8 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     const shortSync = s.syncId ? (s.syncId.length > 24 ? s.syncId.slice(0, 10) + '…' + s.syncId.slice(-8) : s.syncId) : '—';
 
     const warnHtml =
-      (invalidCount > 0 ? `<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:11px;color:#9a3412;margin-bottom:8px">⚠️ ${invalidCount} صورة بمسار محلي (blob) — لن تُرفع</div>` : '') +
-      (sizeKB > 8000 ? `<div style="padding:7px 10px;background:#fef9c3;border:1px solid #eab308;border-radius:7px;font-size:11px;color:#713f12;margin-bottom:8px">⚠️ حجم كبير (${sizeLabel}) — قد يستغرق الرفع وقتاً</div>` : '');
+      (invalidCount > 0 ? `<div style="padding:7px 10px;background:var(--clr-divorce-bg);border:1px solid #fb923c;border-radius:7px;font-size:11px;color:var(--clr-divorce-text);margin-bottom:8px">⚠️ ${invalidCount} صورة بمسار محلي (blob) — لن تُرفع</div>` : '') +
+      (sizeKB > 8000 ? `<div style="padding:7px 10px;background:var(--clr-amber-bg);border:1px solid #eab308;border-radius:7px;font-size:11px;color:#713f12;margin-bottom:8px">⚠️ حجم كبير (${sizeLabel}) — قد يستغرق الرفع وقتاً</div>` : '');
 
     const html = `
       <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
@@ -11751,7 +12067,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
           <div style="padding:10px 12px;background:#ecfeff;border:1px solid #67e8f9;border-radius:10px;margin-bottom:12px">
             <div style="font-size:12px;font-weight:600;color:#155e75;margin-bottom:6px">🔗 معرّف المزامنة</div>
             <div style="display:flex;gap:6px;align-items:center">
-              <code style="flex:1;font-size:10px;background:#fff;padding:5px 8px;border-radius:6px;border:1px solid #a5f3fc;word-break:break-all;color:#155e75">${shortSync}</code>
+              <code style="flex:1;font-size:10px;background:var(--card-bg);padding:5px 8px;border-radius:6px;border:1px solid #a5f3fc;word-break:break-all;color:var(--clr-cyan-text)">${shortSync}</code>
               <button class="btn" id="copyGistBtn" onclick="_copyGistId()" style="font-size:11px;flex-shrink:0">📋</button>
             </div>
             <div style="font-size:10px;color:#155e75;margin-top:4px">استخدم نفس القيم على جهاز المالك الآخر</div>
@@ -11766,13 +12082,13 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
             <button class="btn primary" onclick="closeModal();_doUpload()" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:20px">⬆️</span><span style="font-weight:600">رفع</span><span style="font-size:10px;opacity:.7">${people.length} فرد · ${validPhotos.length} صورة</span></button>
-            <button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#ede9fe;border-color:#8b5cf6;color:#5b21b6"><span style="font-size:20px">⬇️</span><span style="font-weight:600">مزامنة ذكية</span><span style="font-size:10px;opacity:.7">يفحص التعارضات</span></button>
+            <button class="btn" onclick="closeModal();_doDownload(false)" style="padding:12px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)"><span style="font-size:20px">⬇️</span><span style="font-weight:600">مزامنة ذكية</span><span style="font-size:10px;opacity:.7">يفحص التعارضات</span></button>
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-            <button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:#fff7ed;border-color:#fb923c;color:#c2410c">🔄 استبدال كامل</button>
+            <button class="btn" onclick="closeModal();cloudRestorePrompt()" style="flex:1;font-size:12px;background:var(--clr-divorce-bg);border-color:#fb923c;color:var(--clr-divorce-text)">🔄 استبدال كامل</button>
             <button class="btn" onclick="openSyncDebugPanel()" style="flex:1;font-size:12px">🔍 سجل</button>
-            <button class="btn" onclick="openCloudResetPanel()" style="flex:1;font-size:12px;background:#fee2e2;border-color:#fca5a5;color:#b91c1c">🗑 ضبط</button>
+            <button class="btn" onclick="openCloudResetPanel()" style="flex:1;font-size:12px;background:var(--clr-red-bg);border-color:#fca5a5;color:#b91c1c">🗑 ضبط</button>
           </div>
 
           <div class="modal-footer" style="margin-top:8px"><button class="btn" onclick="closeModal()">إغلاق</button><button class="btn" onclick="closeModal();openCloudSetup()" style="font-size:11px">⚙️ الإعدادات</button></div>
@@ -11841,7 +12157,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
               ['👥', (people || []).length, 'الأفراد', ''],
               ['📷', (people || []).filter((p) => _isValidPhoto(p.photo)).length, 'صور صالحة', ''],
               ['📤', unsynced, 'غير مزامنة', unsynced > 0 ? '#dc2626' : '#15803d'],
-              ['⚠️', invalid, 'صور blob', invalid > 0 ? '#92400e' : '#15803d'],
+              ['⚠️', invalid, 'صور blob', invalid > 0 ? 'var(--clr-amber-text)' : '#15803d'],
               ['🕐', _getLastSync() ? new Date(_getLastSync()).toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' }) : '—', 'آخر مزامنة', '']
             ].map(([ic, v, lbl, col]) => '<div style="background:var(--bg-secondary);border:1px solid var(--card-border);border-radius:7px;padding:7px;text-align:center"><div style="font-size:10px;color:var(--text2)">'+lbl+'</div><div style="font-size:15px;font-weight:700;color:'+(col||'var(--text)')+'">'+v+'</div></div>').join('')}
           </div>
@@ -12110,7 +12426,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       document.getElementById('modalContainer').innerHTML=
         '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'
         +'<div class="modal" style="max-width:440px"><h3>📡 تحديثات العائلة</h3>'
-        +'<div style="padding:12px;background:#fff7ed;border:1px solid #fb923c;border-radius:8px;font-size:13px;color:#9a3412">⚙️ يجب إعداد المزامنة السحابية أولاً</div>'
+        +'<div style="padding:12px;background:var(--clr-divorce-bg);border:1px solid #fb923c;border-radius:8px;font-size:13px;color:var(--clr-divorce-text)">⚙️ يجب إعداد المزامنة السحابية أولاً</div>'
         +'<div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button>'
         +'<button class="btn primary" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button></div></div></div>';
       return;
@@ -12143,11 +12459,11 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     }).catch(function(e){
       var msg=String(e.message||e);
       var hint=/relation|does not exist/i.test(msg)
-        ?'<div style="margin-top:10px;padding:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e">💡 جدول <code>family_updates</code> غير موجود — اضغط "🛠 SQL" لإنشائه</div>':'';
+        ?'<div style="margin-top:10px;padding:10px;background:var(--clr-amber-bg);border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:var(--clr-amber-text)">💡 جدول <code>family_updates</code> غير موجود — اضغط "🛠 SQL" لإنشائه</div>':'';
       document.getElementById('modalContainer').innerHTML=
         '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'
         +'<div class="modal" style="max-width:480px"><h3>📡 تحديثات العائلة</h3>'
-        +'<div style="padding:12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b">❌ '+escapeHtml(msg)+'</div>'
+        +'<div style="padding:12px;background:var(--clr-red-bg);border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b">❌ '+escapeHtml(msg)+'</div>'
         +hint
         +'<div class="modal-footer"><button class="btn" onclick="closeModal()">إغلاق</button>'
         +'<button class="btn" onclick="window._fuShowSQL()">🛠 SQL</button></div></div></div>';
@@ -12187,9 +12503,9 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       var pc=u.data&&u.data.people&&u.data.people.length||0;
       var isMyDevice=(u.row.device_id===fuDevId());
       var tb=u.row.update_type==='migration'
-        ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d">مُهاجَر</span>'
+        ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--clr-amber-bg);color:var(--clr-amber-text);border:1px solid #fcd34d">مُهاجَر</span>'
         :isMyDevice
-          ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd">جهازك الحالي</span>'
+          ?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--clr-accent-bg);color:var(--clr-accent-text);border:1px solid #93c5fd">جهازك الحالي</span>'
           :'';
       return '<div style="padding:12px 14px;border:1px solid var(--card-border);border-radius:10px;background:var(--card-bg);margin-bottom:9px">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
@@ -12197,18 +12513,18 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         +'<div style="font-size:10px;font-family:monospace;color:var(--text3);margin-top:1px">'+escapeHtml(u.row.device_id||'')+'</div>'
         +'<div style="font-size:11px;color:var(--text2);margin-top:4px">'+pc+' فرد · '+ts+'</div></div>'
         +'<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">'
-        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:#dbeafe;border-color:#3b82f6;color:#1d4ed8" onclick="openFamilyUpdateDetails('+idx+')">🔍</button>'
-        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:#d1fae5;border-color:#10b981;color:#065f46" onclick="confirmFamilyMerge('+idx+')">➕ دمج</button>'
+        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)" onclick="openFamilyUpdateDetails('+idx+')">🔍</button>'
+        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:var(--clr-green-bg);border-color:#10b981;color:var(--clr-green-text)" onclick="confirmFamilyMerge('+idx+')">➕ دمج</button>'
         +'<button class="btn" style="font-size:11px;padding:3px 9px" onclick="_familyDownloadOne('+idx+')">⬇️</button>'
-        +(!isMyDevice?'<button class="btn" style="font-size:11px;padding:3px 9px;background:#fee2e2;border-color:#fca5a5;color:#991b1b" onclick="fuDeleteRecord(\''+u.row.id+'\')">🗑️</button>':'')
+        +(!isMyDevice?'<button class="btn" style="font-size:11px;padding:3px 9px;background:var(--clr-red-bg);border-color:#fca5a5;color:#991b1b" onclick="fuDeleteRecord(\''+u.row.id+'\')">🗑️</button>':'')
         +'</div></div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:7px;border-top:1px dashed var(--card-border)">'
         +'<span class="kin-stat">👨 '+(st.males||0)+'</span>'
         +'<span class="kin-stat">👩 '+(st.females||0)+'</span>'
         +'<span class="kin-stat">⚰️ '+(st.deceased||0)+'</span>'
         +'<span class="kin-stat">🖼 '+(st.photos||0)+'</span>'
-        +(np?'<span class="kin-stat" style="background:#d1fae5;color:#065f46;border-color:#10b981">➕ '+np+' جديد</span>':'<span class="kin-stat" style="opacity:.4">➕ 0</span>')
-        +(up2?'<span class="kin-stat" style="background:#dbeafe;color:#1d4ed8;border-color:#3b82f6">🔄 '+up2+' محدَّث</span>':'<span class="kin-stat" style="opacity:.4">🔄 0</span>')
+        +(np?'<span class="kin-stat" style="background:var(--clr-green-bg);color:var(--clr-green-text);border-color:#10b981">➕ '+np+' جديد</span>':'<span class="kin-stat" style="opacity:.4">➕ 0</span>')
+        +(up2?'<span class="kin-stat" style="background:var(--clr-accent-bg);color:var(--clr-accent-text);border-color:#3b82f6">🔄 '+up2+' محدَّث</span>':'<span class="kin-stat" style="opacity:.4">🔄 0</span>')
         +'<span class="kin-stat" style="opacity:.5">⏭ '+uc+'</span>'
         +'</div></div>';
     }
@@ -12218,12 +12534,12 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
         .map(function(u,i){return card(u,p*FU_PAGE_SIZE+i);}).join('');
     }
 
-    var errNote=invalid?'<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:11px;color:#9a3412;margin-bottom:10px">⚠️ '+invalid+' سجل لم يُفك تشفيره — تحقق من مفتاح التشفير</div>':'';
+    var errNote=invalid?'<div style="padding:7px 10px;background:var(--clr-divorce-bg);border:1px solid #fb923c;border-radius:7px;font-size:11px;color:var(--clr-divorce-text);margin-bottom:10px">⚠️ '+invalid+' سجل لم يُفك تشفيره — تحقق من مفتاح التشفير</div>':'';
     var paging=total>1?'<div style="display:flex;gap:6px;align-items:center;justify-content:center;padding:8px 0;border-top:1px solid var(--card-border)">'
       +'<button class="btn" style="font-size:11px;padding:3px 10px" onclick="window._fuPg(-1)">‹</button>'
       +'<span id="fuPgLbl" style="font-size:11px;color:var(--text2)">1 / '+total+'</span>'
       +'<button class="btn" style="font-size:11px;padding:3px 10px" onclick="window._fuPg(1)">›</button></div>':'';
-    var mergeAll=valid>1?'<button class="btn primary" style="background:#059669;border-color:#059669" onclick="confirmFamilyMergeAll()">➕ دمج الكل ('+valid+')</button>':'';
+    var mergeAll=valid>1?'<button class="btn primary" style="background:var(--clr-green-deep);border-color:var(--clr-green-deep)" onclick="confirmFamilyMergeAll()">➕ دمج الكل ('+valid+')</button>':'';
 
     document.getElementById('modalContainer').innerHTML=
       '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'
@@ -12485,8 +12801,8 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
   window._buildFamilyExportOption=function(){
     var ok=fuReady(), fid=fuFamilyId();
     var badge=ok
-      ?'<span style="font-size:11px;font-weight:400;color:#065f46;background:#d1fae5;border:1px solid #10b981;padding:2px 6px;border-radius:6px;margin-right:6px">Supabase ✓</span>'
-      :'<span style="font-size:11px;font-weight:400;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;padding:2px 6px;border-radius:6px;margin-right:6px">Supabase غير مُعدَّة</span>';
+      ?'<span style="font-size:11px;font-weight:400;color:var(--clr-green-text);background:var(--clr-green-bg);border:1px solid #10b981;padding:2px 6px;border-radius:6px;margin-right:6px">Supabase ✓</span>'
+      :'<span style="font-size:11px;font-weight:400;color:#b45309;background:var(--clr-amber-bg);border:1px solid #fcd34d;padding:2px 6px;border-radius:6px;margin-right:6px">Supabase غير مُعدَّة</span>';
     var hint=ok
       ?'Family ID: <code style="font-size:10px">'+escapeHtml(fid.slice(0,12))+'…</code>'
       :'<a href="#" onclick="closeModal();openCloudSetup();return false;" style="color:#3b82f6">⚙️ إعداد Supabase أولاً</a>';
@@ -12494,8 +12810,8 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     /* مسح الاسم السابق */
     window._fuLastRecipName='';
     return '<div style="border:2px solid #3b82f6;border-radius:10px;overflow:hidden">'
-      +'<div style="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe">'
-      +'<div style="font-size:13px;font-weight:600;color:#1d4ed8">📨 تصدير نسخة لفرد العائلة '+badge+'</div>'
+      +'<div style="padding:10px 14px;background:var(--clr-accent-bg);border-bottom:1px solid #bfdbfe">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--clr-accent-text)">📨 تصدير نسخة لفرد العائلة '+badge+'</div>'
       +'<div style="font-size:11px;color:#3b82f6;margin-top:2px">'+hint+'</div></div>'
       /* ── حقل اسم المستلم ── */
       +'<div style="padding:10px 14px;background:var(--card-bg);border-bottom:1px solid #bfdbfe">'
@@ -12522,7 +12838,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
     document.getElementById('modalContainer').innerHTML=
       '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'
       +'<div class="modal" style="max-width:480px"><h3>📡 إعداد تحديثات العائلة</h3>'
-      +'<div style="padding:10px 14px;background:'+(ok?'#d1fae5':'#fff7ed')+';border:1px solid '+(ok?'#10b981':'#fb923c')+';border-radius:8px;font-size:12px;color:'+(ok?'#065f46':'#9a3412')+';margin-bottom:14px;line-height:1.8">'
+      +'<div style="padding:10px 14px;background:'+(ok?'var(--clr-green-bg)':'var(--clr-divorce-bg)')+';border:1px solid '+(ok?'#10b981':'#fb923c')+';border-radius:8px;font-size:12px;color:'+(ok?'var(--clr-green-text)':'var(--clr-divorce-text)')+';margin-bottom:14px;line-height:1.8">'
       +(ok?'✅ Supabase مُعدَّة — الرفع يعمل تلقائياً (5 ثوانٍ بعد الحفظ).<br>Family ID: <code style="background:#c6f6d5;padding:1px 5px;border-radius:4px">'+escapeHtml(fid)+'</code>'
          :'⚙️ Supabase غير مُعدَّة — اضغط "إعداد Supabase" أدناه.')
       +'</div>'
@@ -12541,7 +12857,7 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(_refreshMerge
       +'">🔄 معرّف جديد</button></div>'
       +'<div class="modal-footer">'
       +'<button class="btn" onclick="closeModal()">إغلاق</button>'
-      +(!ok?'<button class="btn" style="background:#ede9fe;border-color:#8b5cf6;color:#5b21b6" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>':'')
+      +(!ok?'<button class="btn" style="background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)" onclick="closeModal();openCloudSetup()">⚙️ إعداد Supabase</button>':'')
       +'<button class="btn primary" onclick="var v=(document.getElementById(\'_fuNm\')||{}).value||\'\';if(v.trim())try{localStorage.setItem(\'ft_family_device_name\',v.trim())}catch(e){}closeModal();if(typeof _showCloudToast===\'function\')_showCloudToast(\'✅ تم حفظ اسم الجهاز\',\'success\',2000);">✓ حفظ</button>'
       +'</div></div></div>';
   }
