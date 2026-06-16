@@ -813,6 +813,8 @@ body.mobile-mode #mergeLogBtn,
 body.mobile-mode #undoLastMergeBtn,
 body.mobile-mode #fsaSaveBtn2 { display:none !important; }
 
+body.mobile-mode .hide-mobile { display:none !important; }
+
 /* لوحة إجراءات سريعة في الأسفل (Action Sheet) */
 #mob-action-sheet {
   position:fixed;bottom:0;left:0;right:0;
@@ -1092,7 +1094,7 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
   </div>
   <div id="saveToast" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none;">✔ تم الحفظ</div>
   <div class="legend">
-    <button id="mobileModeBtn" class="mobile-mode-btn" onclick="toggleMobileMode()" title="وضع الجوال: شجرة أخف وأسرع">📱 وضع الجوال</button>
+    <button id="mobileModeBtn" class="mobile-mode-btn" onclick="toggleMobileMode()" title="وضع الجوال: شجرة أخف وأسرع">📱</button>
     <button id="themeToggleBtn" onclick="toggleTheme()" title="تبديل المظهر" style="padding:4px 8px;border:1px solid var(--card-border);border-radius:8px;background:var(--card-bg);cursor:pointer;flex-shrink:0;transition:background .15s;display:flex;align-items:center;justify-content:center;line-height:1;"><span id="themeToggleIcon" style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;"></span></button>
     <button class="btn" id="myPersonBtn" onclick="openMyPersonPicker()" style="font-size:12px;padding:4px 10px;white-space:nowrap;flex-shrink:0;">👤 أنا في الشجرة</button>
     <div class="legend-spacer"></div>
@@ -1112,22 +1114,22 @@ body.mobile-mode #fsaSaveBtn2 { display:none !important; }
     <input type="text" id="searchBox" value="" oninput="triggerSearch()" onkeydown="searchKeyNav(event)" style="display:none;position:absolute;opacity:0;pointer-events:none">
     <button id="searchClearBtn" style="display:none">✕</button>
     <div id="searchResultsPanel" style="display:none"></div>
-    <button class="btn primary" onclick="openAddModal(null)">+ إضافة فرد</button>
-    <button class="btn" onclick="toggleAll(true)">فتح الكل</button>
-    <button class="btn" onclick="toggleAll(false)">غلق الكل</button>
-    <button class="btn" onclick="exportData()" title="حفظ كملف HTML مع الإعدادات السحابية — للمالك فقط">💾 حفظ نسخة</button>
+    <button class="btn primary hide-mobile" onclick="openAddModal(null)">+ إضافة فرد</button>
+    <button class="btn hide-mobile" onclick="toggleAll(true)">فتح الكل</button>
+    <button class="btn" onclick="toggleAll(false)" title="غلق/طي جميع العناصر">⊖</button>
+    <button class="btn hide-mobile" onclick="exportData()" title="حفظ كملف HTML مع الإعدادات السحابية — للمالك فقط">💾 حفظ نسخة</button>
     <button class="btn" id="fsaSaveBtn2" onclick="fsaPickFile()" title="ربط الملف للحفظ التلقائي على الجوال — Chrome/Edge" style="display:none">📁 ربط الملف</button>
     <button class="btn" id="exportFamilyBtn" onclick="exportFamilyCopy()" title="حفظ نسخة للمشاركة مع العائلة" style="display:none">📤 نسخة للعائلة</button>
     <button class="btn" id="familyUploadSetupBtn" onclick="openFamilyUploadSetup()" title="إعداد الرفع الصامت لنسخة العائلة" style="display:none">⚙️ إعداد رفع العائلة</button>
     <button class="btn" id="familyUpdatesBtn" onclick="openFamilyUpdatesModal()" title="اطلع على آخر تحديث رفعته العائلة" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">📡 تحديثات العائلة</button>
     <button class="btn" id="mergeLogBtn" onclick="openMergeLogModal()" title="سجل الدمج" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">📜 سجل الدمج</button>
     <button class="btn" id="undoLastMergeBtn" onclick="undoLastMerge()" title="استرجاع آخر دمج" style="display:none;background:var(--clr-divorce-bg);border-color:#fb923c;color:var(--clr-divorce-text)">↩ استرجاع قبل الدمج</button>
-    <button class="btn" onclick="showExportJSONModal()" title="تصدير البيانات كملف JSON للنسخ الاحتياطي">📤 تصدير JSON</button>
+    <button class="btn" onclick="showExportJSONModal()" title="تصدير البيانات كملف JSON للنسخ الاحتياطي">📤</button>
     <button class="btn" id="cloudSyncBtn" onclick="manualCloudSync()" title="لوحة المزامنة" style="display:none">☁️ مزامنة</button>
-    <button class="btn" id="cloudUploadBtn" onclick="_doUpload()" style="display:none;background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)">⬆️ رفع</button>
-    <button class="btn" id="cloudDownloadBtn" onclick="_doDownload(false)" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">⬇️ تنزيل</button>
+    <button class="btn hide-mobile" id="cloudUploadBtn" onclick="_doUpload()" style="display:none;background:var(--clr-accent-bg);border-color:#3b82f6;color:var(--clr-accent-text)">⬆️ رفع</button>
+    <button class="btn hide-mobile" id="cloudDownloadBtn" onclick="_doDownload(false)" style="display:none;background:var(--clr-purple-bg);border-color:#8b5cf6;color:var(--clr-purple-text)">⬇️ تنزيل</button>
     <button class="btn" id="cloudRestoreBtn" onclick="cloudRestorePrompt()" style="display:none">🔄 استعادة</button>
-    <label class="btn" style="cursor:pointer;" title="استيراد من ملف HTML محفوظ أو JSON">📥 استيراد<input type="file" id="importFileInput" accept=".json,.html,.htm" onchange="handleImportFile(event)" style="display:none"></label>
+    <label class="btn hide-mobile" style="cursor:pointer;" title="استيراد من ملف HTML محفوظ أو JSON">📥 استيراد<input type="file" id="importFileInput" accept=".json,.html,.htm" onchange="handleImportFile(event)" style="display:none"></label>
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('tree',this)">🌳 شجرة العائلة</div>
@@ -1191,11 +1193,11 @@ function _applyMobileMode(){
   if(!btn)return;
   if(_mobileMode){
     btn.classList.add('active');
-    btn.innerHTML='📱 جوال ✓';
-    btn.title='إلغاء وضع الجوال';
+    btn.innerHTML='🖥️';
+    btn.title='العودة إلى وضع الديسكتوب';
   } else {
     btn.classList.remove('active');
-    btn.innerHTML='📱 وضع الجوال';
+    btn.innerHTML='📱';
     btn.title='وضع الجوال: شجرة أخف وأسرع';
   }
 }
