@@ -1,0 +1,188 @@
+/**
+ * css/mobile.css
+ * ═══════════════════════════════════════════════════════════════
+ * وضع الجوال — Mobile Mode + Action Sheet + FAB Buttons
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Depends on: base.css, components.css
+ *
+ * Applies when: <body class="mobile-mode">
+ */
+
+/* ── Mobile Mode Toggle Button ── */
+.mobile-mode-btn {
+  padding: 7px 13px; border: 1.5px solid var(--card-border);
+  border-radius: 8px; background: var(--card-bg); color: var(--text);
+  font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: all .2s; flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+}
+.mobile-mode-btn.active {
+  background: #7c3aed; color: #fff; border-color: #7c3aed;
+  box-shadow: 0 2px 8px rgba(124,58,237,.35);
+}
+
+/* ── Mobile Mode: App Layout ── */
+body.mobile-mode #app { padding: 8px; }
+body.mobile-mode .toolbar { gap: 5px; }
+body.mobile-mode .toolbar input { font-size: 13px; }
+
+/* ── Mobile Mode: Node Cards ── */
+body.mobile-mode .node-header {
+  padding: 10px 10px; border-radius: 10px;
+  min-height: 52px; position: relative;
+}
+body.mobile-mode .node-name { font-size: 15px; }
+body.mobile-mode .node-meta { font-size: 11px; }
+body.mobile-mode .avatar { width: 34px; height: 34px; }
+body.mobile-mode .avatar-placeholder { width: 34px; height: 34px; font-size: 13px; }
+body.mobile-mode .gender-dot { width: 11px; height: 11px; }
+
+/* ── Mobile Mode: Node Actions ── */
+body.mobile-mode .node-actions {
+  display: flex; flex-direction: row; gap: 3px;
+  flex-shrink: 0; margin-right: auto;
+  position: static; opacity: 1; pointer-events: auto;
+  background: none; border: none; box-shadow: none; padding: 0;
+}
+body.mobile-mode .act-btn { width: 30px; height: 30px; font-size: 14px; border-radius: 7px; }
+
+/* ── Mobile Mode: Children Indentation ── */
+body.mobile-mode .node-children {
+  padding-right: 14px; border-right-width: 2px; margin-right: 8px;
+}
+body.mobile-mode .node { margin: 3px 0; }
+
+/* ── Mobile Mode: Stats ── */
+body.mobile-mode #statsBar { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+
+/* ── Mobile Mode: Toggle Button Size ── */
+body.mobile-mode .toggle-btn { width: 26px; height: 26px; font-size: 14px; border-radius: 6px; border: 1.5px solid var(--card-border); }
+
+/* ── Mobile Mode: Spouse Chips ── */
+body.mobile-mode .spouse-chip,
+body.mobile-mode .spouse-chip-linked,
+body.mobile-mode .sp-tree-nav { font-size: 11px; }
+
+/* ── Mobile Mode: Hide Secondary Elements ── */
+body.mobile-mode .ext-family-badge { display: none; }
+body.mobile-mode #searchResultsPanel { max-width: calc(100vw - 16px); }
+
+/* ── Mobile Mode: Kin Badges ── */
+body.mobile-mode .kin-badge { font-size: 9px; padding: 1px 4px; }
+body.mobile-mode .my-marker { font-size: 9px; }
+body.mobile-mode .me-badge { font-size: 9px; }
+
+/* ── Mobile Mode: Disable Heavy Transitions ── */
+body.mobile-mode .node-header { transition: none; }
+body.mobile-mode .node-children { transition: none; }
+
+/* ── Mobile Mode: Hide Cloud/Advanced Buttons ── */
+body.mobile-mode #cloudSyncBtn,
+body.mobile-mode #cloudRestoreBtn,
+body.mobile-mode #exportFamilyBtn,
+body.mobile-mode #familyUploadSetupBtn,
+body.mobile-mode #familyUpdatesBtn,
+body.mobile-mode #mergeLogBtn,
+body.mobile-mode #undoLastMergeBtn,
+body.mobile-mode #fsaSaveBtn2 { display: none !important; }
+
+body.mobile-mode .hide-mobile { display: none !important; }
+
+/* ── Action Sheet ── */
+#mob-action-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--card-bg); border-top: 1px solid var(--card-border);
+  border-radius: 20px 20px 0 0; padding: 12px 16px 32px;
+  z-index: 500;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.32,.72,0,1);
+  box-shadow: 0 -8px 32px rgba(0,0,0,.15);
+}
+#mob-action-sheet.open { transform: translateY(0); }
+#mob-action-sheet .sheet-handle {
+  width: 40px; height: 4px; border-radius: 2px;
+  background: var(--card-border); margin: 0 auto 14px;
+}
+#mob-action-sheet .sheet-name {
+  font-size: 15px; font-weight: 600; color: var(--text);
+  text-align: center; margin-bottom: 14px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#mob-action-sheet .sheet-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+#mob-action-sheet .sheet-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 4px; border-radius: 10px;
+  border: 1px solid var(--card-border); background: var(--bg-secondary);
+  cursor: pointer; transition: background .15s;
+}
+#mob-action-sheet .sheet-btn:hover { background: var(--card-border); }
+#mob-action-sheet .sheet-btn .sh-icon { font-size: 22px; line-height: 1; }
+#mob-action-sheet .sheet-btn .sh-label { font-size: 10px; color: var(--text2); text-align: center; }
+#mob-action-sheet .sheet-btn.danger { border-color: #fca5a5; }
+#mob-action-sheet .sheet-btn.danger .sh-label { color: #ef4444; }
+
+#mob-action-sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 499;
+  opacity: 0; pointer-events: none; transition: opacity .3s;
+}
+#mob-action-sheet-overlay.open { opacity: 1; pointer-events: auto; }
+
+/* ── FAB Buttons (Floating Action Buttons) ── */
+#mob-fab-add {
+  position: fixed; bottom: 80px; left: 20px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: #3b82f6; color: #fff; border: none;
+  font-size: 24px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(59,130,246,.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 400; transition: transform .2s, opacity .2s;
+}
+#mob-fab-add:hover { transform: scale(1.1); }
+#mob-fab-add:active { transform: scale(.95); }
+#mob-fab-search {
+  position: fixed; bottom: 140px; left: 20px;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: #7c3aed; color: #fff; border: none;
+  font-size: 20px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(124,58,237,.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 400; transition: transform .2s, opacity .2s;
+}
+#mob-fab-search:hover { transform: scale(1.1); }
+
+/* Hide FABs when modal is open */
+.modal-open #mob-fab-add,
+.modal-open #mob-fab-search { opacity: 0; pointer-events: none; }
+
+/* ── Voice Search Button ── */
+.field-mic-btn {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  font-size: 14px; opacity: .5; padding: 3px 4px;
+  line-height: 1; border-radius: 50%;
+  flex-shrink: 0; transition: opacity .15s; z-index: 2;
+}
+.field-mic-btn:hover { opacity: .9 !important; }
+.field-mic-btn.voice-active { animation: fieldVoicePulse .7s ease-in-out infinite; }
+@keyframes fieldVoicePulse {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; transform: translateY(-50%) scale(1.25); }
+}
+
+/* ── Responsive: Small Screens ── */
+@media (max-width: 480px) {
+  .modal { width: 98vw; padding: 14px; }
+  .kin-row { flex-direction: column; gap: 8px; }
+  .tabs { flex-wrap: wrap; }
+  .tab { font-size: 12px; padding: 6px 10px; }
+  #app { padding: 10px; }
+  .toolbar { gap: 4px; }
+  .btn { font-size: 12px; padding: 7px 10px; }
+}
+
+@media (max-width: 360px) {
+  body.mobile-mode .node-name { font-size: 13px; }
+  body.mobile-mode .act-btn { width: 26px; height: 26px; font-size: 12px; }
+  .legend { gap: 4px; padding: 6px 8px; }
+}

@@ -1,0 +1,111 @@
+/**
+ * css/pwa.css
+ * ═══════════════════════════════════════════════════════════════
+ * PWA Styles — Install Banner, iOS Tip, Update Toast
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Depends on: base.css
+ */
+
+/* ── PWA Install Banner ── */
+#pwa-install-banner {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #fff; z-index: 9000; padding: 0;
+  transform: translateY(100%);
+  transition: transform .4s cubic-bezier(.32,.72,0,1);
+}
+#pwa-install-banner.pwa-banner-visible { transform: translateY(0); }
+#pwa-banner-inner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; max-width: 600px; margin: 0 auto;
+  flex-wrap: wrap;
+}
+#pwa-banner-icon { font-size: 28px; flex-shrink: 0; }
+#pwa-banner-text {
+  flex: 1; min-width: 0; line-height: 1.5;
+  display: flex; flex-direction: column;
+}
+#pwa-banner-text strong { font-size: 14px; font-weight: 700; }
+#pwa-banner-text span { font-size: 12px; opacity: .9; }
+#pwa-install-btn {
+  padding: 8px 18px; background: #fff; color: #1d4ed8;
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+  cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  transition: transform .15s, box-shadow .15s;
+}
+#pwa-install-btn:hover { transform: scale(1.04); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+#pwa-install-btn:active { transform: scale(.97); }
+#pwa-dismiss-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+  color: #fff; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background .15s;
+}
+#pwa-dismiss-btn:hover { background: rgba(255,255,255,.35); }
+
+/* ── iOS "Add to Home Screen" Tip ── */
+#pwa-ios-tip {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
+  opacity: 0; transition: opacity .5s; pointer-events: none;
+}
+#pwa-ios-tip.pwa-ios-tip-visible { opacity: 1; pointer-events: auto; }
+#pwa-ios-tip-inner {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: rgba(0,0,0,.88); color: #fff; backdrop-filter: blur(12px);
+  padding: 12px 16px; font-size: 13px; line-height: 1.5;
+  border-radius: 16px 16px 0 0;
+  max-width: 500px; margin: 0 auto;
+}
+
+/* ── Save Toast ── */
+#saveToast {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  background: #22c55e; color: #fff;
+  padding: 7px 18px; border-radius: 20px; font-size: 13px;
+  opacity: 0; transition: opacity .4s; z-index: 999; pointer-events: none;
+}
+
+/* ── Cloud Toast ── */
+#cloudToast {
+  position: fixed; top: 48px; left: 50%; transform: translateX(-50%);
+  padding: 6px 16px; border-radius: 20px; font-size: 12px;
+  opacity: 0; transition: opacity .4s; z-index: 998;
+  pointer-events: none; display: flex; align-items: center; gap: 6px;
+}
+
+/* ── PWA Update Toast ── */
+#pwa-update-toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: #1f2937; color: #f9fafb; border: 1px solid #374151;
+  padding: 12px 20px; border-radius: 12px; font-size: 13px;
+  z-index: 9001; opacity: 0; transition: opacity .4s;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  max-width: 90vw;
+}
+#pwa-update-toast.pwa-toast-visible { opacity: 1; }
+
+/* ── FSA Bar (File System Access) ── */
+#fsaBar {
+  display: none; background: linear-gradient(135deg, #065f46, #059669);
+  color: #fff; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px;
+  font-size: 13px; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+/* ── Cloud Setup Banner ── */
+#cloudSetupBanner {
+  display: none;
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #fff; padding: 10px 16px; border-radius: 10px;
+  margin-bottom: 12px; font-size: 13px;
+  align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+/* ── Install Banner (legacy in-page) ── */
+#installBanner {
+  display: none; background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #fff; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px;
+  font-size: 13px; align-items: center; gap: 10px; flex-wrap: wrap;
+}

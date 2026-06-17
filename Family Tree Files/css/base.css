@@ -1,0 +1,237 @@
+/**
+ * css/base.css
+ * ═══════════════════════════════════════════════════════════════
+ * نظام الثيم (CSS Variables) + Reset عام
+ * Theme System (Light / Dark / Auto) + Base Reset
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * يُطبَّق data-theme="light"|"dark" على <html>
+ * بدون attribute = تلقائي (يتبع نظام التشغيل)
+ */
+
+/* ══════════════════════════════════════════════════════════
+   CSS VARIABLES — ثوابت الألوان والمتغيرات
+══════════════════════════════════════════════════════════ */
+:root {
+  /* ── Brand Colors (ثوابت لا تتغير مع الثيم) ── */
+  --clr-male:           #3b82f6;
+  --clr-female:         #ec4899;
+  --clr-accent:         #3b82f6;
+  --clr-accent-hover:   #2563eb;
+  --clr-accent-bg:      #dbeafe;
+  --clr-accent-text:    #1d4ed8;
+  --clr-purple:         #7c3aed;
+  --clr-purple-mid:     #5b21b6;
+  --clr-purple-bg:      #ede9fe;
+  --clr-purple-border:  #8b5cf6;
+  --clr-purple-muted:   #c4b5fd;
+  --clr-green:          #22c55e;
+  --clr-green-bg:       #d1fae5;
+  --clr-green-deep:     #059669;
+  --clr-teal:           #10b981;
+  --clr-red:            #ef4444;
+  --clr-red-bg:         #fee2e2;
+  --clr-orange:         #f97316;
+  --clr-amber:          #f59e0b;
+  --clr-amber-bg:       #fef3c7;
+  --clr-amber-text:     #92400e;
+
+  /* ── Extended badge families ── */
+  --clr-purple-text:    #5b21b6;
+  --clr-green-text:     #065f46;
+  --clr-pink-bg:        #fce7f3;
+  --clr-pink-text:      #be185d;
+  --clr-pink-border:    #ec4899;
+  --clr-cyan-bg:        #e0f2fe;
+  --clr-cyan-text:      #0c4a6e;
+  --clr-cyan-border:    #38bdf8;
+  --clr-divorce-bg:     #fff7ed;
+  --clr-divorce-text:   #c2410c;
+
+  /* ── Light Theme (default) ── */
+  --bg:               #f3f4f6;
+  --bg-secondary:     #f9fafb;
+  --card-bg:          #ffffff;
+  --card-border:      #e5e7eb;
+  --text:             #111827;
+  --text2:            #6b7280;
+  --deceased-bg:      #e8f5e9;
+  --deceased-border:  #4caf50;
+
+  /* ── External Spouse component ── */
+  --ext-wrap-bg:        linear-gradient(135deg,#faf5ff 0%,#ede9fe 100%);
+  --ext-wrap-border:    #8b5cf6;
+  --ext-label-color:    #5b21b6;
+  --ext-info-bg:        #ede9fe;
+  --ext-info-border:    #c4b5fd;
+  --ext-info-color:     #7c3aed;
+  --ext-linked-bg:      #d1fae5;
+  --ext-linked-border:  #10b981;
+  --ext-linked-color:   #065f46;
+
+  /* ── Shadows ── */
+  --shadow-sm:  0 1px 4px rgba(0,0,0,.08);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.12);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,.16);
+
+  /* ── Review modal aliases ── */
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-success:    #059669;
+  --color-text-warning:    #92400e;
+  --color-text-info:       #1d4ed8;
+  --color-text-danger:     #dc2626;
+  --color-border-secondary: var(--card-border);
+  --color-border-tertiary:  var(--card-border);
+  --color-border-success:   #10b981;
+  --color-border-warning:   #f59e0b;
+  --color-border-info:      #3b82f6;
+  --color-background-success: #d1fae5;
+  --color-background-warning: #fef3c7;
+  --color-background-info:    #dbeafe;
+  --color-background-secondary: var(--bg-secondary);
+  --border-radius-md: 10px;
+
+  /* ── Backwards-compat aliases ── */
+  --male:   var(--clr-male);
+  --female: var(--clr-female);
+}
+
+/* ── Dark Theme ── */
+[data-theme="dark"] {
+  --bg:               #0f172a;
+  --bg-secondary:     #111827;
+  --card-bg:          #1f2937;
+  --card-border:      #374151;
+  --text:             #f9fafb;
+  --text2:            #9ca3af;
+  --deceased-bg:      #0d2b14;
+  --deceased-border:  #4caf50;
+
+  --clr-accent-bg:    #1e3a5f;
+  --clr-accent-text:  #93c5fd;
+  --clr-purple-bg:    #2e1065;
+  --clr-purple-muted: #c4b5fd;
+  --clr-amber-bg:     #451a03;
+  --clr-amber-text:   #fcd34d;
+  --clr-green-bg:     #064e3b;
+  --clr-red-bg:       #450a0a;
+
+  --clr-purple-text:    #c4b5fd;
+  --clr-green-text:     #6ee7b7;
+  --clr-pink-bg:        #4a1942;
+  --clr-pink-text:      #f9a8d4;
+  --clr-pink-border:    #f472b6;
+  --clr-cyan-bg:        #0c2d3d;
+  --clr-cyan-text:      #7dd3fc;
+  --clr-cyan-border:    #38bdf8;
+  --clr-divorce-bg:     #431407;
+  --clr-divorce-text:   #fdba74;
+
+  --ext-wrap-bg:        linear-gradient(135deg,#2e1065 0%,#3b0764 100%);
+  --ext-wrap-border:    #7c3aed;
+  --ext-label-color:    #c4b5fd;
+  --ext-info-bg:        #3b0764;
+  --ext-info-border:    #7c3aed;
+  --ext-info-color:     #c4b5fd;
+  --ext-linked-bg:      #064e3b;
+  --ext-linked-border:  #10b981;
+  --ext-linked-color:   #6ee7b7;
+
+  --shadow-sm:  0 1px 4px rgba(0,0,0,.25);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.4);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,.5);
+
+  --color-text-success:    #6ee7b7;
+  --color-text-warning:    #fcd34d;
+  --color-text-info:       #93c5fd;
+  --color-text-danger:     #fca5a5;
+  --color-border-success:  #10b981;
+  --color-border-warning:  #f59e0b;
+  --color-border-info:     #3b82f6;
+  --color-background-success: #064e3b;
+  --color-background-warning: #451a03;
+  --color-background-info:    #1e3a5f;
+}
+
+/* ── Auto mode: follows OS unless explicitly set ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg:               #0f172a;
+    --bg-secondary:     #111827;
+    --card-bg:          #1f2937;
+    --card-border:      #374151;
+    --text:             #f9fafb;
+    --text2:            #9ca3af;
+    --deceased-bg:      #0d2b14;
+    --deceased-border:  #4caf50;
+    --clr-accent-bg:    #1e3a5f;
+    --clr-accent-text:  #93c5fd;
+    --clr-purple-bg:    #2e1065;
+    --clr-amber-bg:     #451a03;
+    --clr-amber-text:   #fcd34d;
+    --clr-green-bg:     #064e3b;
+    --clr-red-bg:       #450a0a;
+    --clr-purple-text:  #c4b5fd;
+    --clr-green-text:   #6ee7b7;
+    --clr-pink-bg:      #4a1942;
+    --clr-pink-text:    #f9a8d4;
+    --clr-pink-border:  #f472b6;
+    --clr-cyan-bg:      #0c2d3d;
+    --clr-cyan-text:    #7dd3fc;
+    --clr-cyan-border:  #38bdf8;
+    --clr-divorce-bg:   #431407;
+    --clr-divorce-text: #fdba74;
+    --shadow-sm: 0 1px 4px rgba(0,0,0,.25);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.4);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,.5);
+    --color-background-secondary: var(--bg-secondary);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   RESET & BASE
+══════════════════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  direction: rtl;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background .25s ease, color .2s ease;
+}
+
+#app {
+  padding: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* ── تحسينات الوضع الداكن ── */
+[data-theme="dark"] .node-header.search-active-node {
+  background: linear-gradient(135deg, var(--clr-amber-bg), #5c2d0c);
+}
+
+[data-theme="dark"] .list-go-tree:hover,
+[data-theme="dark"] .nav-back-btn:hover,
+[data-theme="dark"] .spouse-chip-linked:hover,
+[data-theme="dark"] .ext-action-btn.link:hover,
+[data-theme="dark"] .sp-tree-nav:hover { background: #4c1d95; }
+
+[data-theme="dark"] .ext-action-btn.view:hover { background: #1e3a8a; }
+[data-theme="dark"] .kin-chip:hover { background: #155e75; }
+[data-theme="dark"] .ext-action-btn.create:hover { background: #065f46; }
